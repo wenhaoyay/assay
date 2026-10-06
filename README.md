@@ -34,6 +34,15 @@ pasting a curl command into the connect wizard and clicking the reply.
 - **AI-assisted test cases, human-approved.** Generate candidates from your documents, each with
   its evidence quote (flagged if the quote is not in the document). Nothing enters a dataset
   until a person approves it.
+- **Golden sets without the typing.** A dataset's *Build* tab: approve or correct a run's
+  answers as flashcards (GaugeLab suggests the codes, numbers and names a correct answer must
+  mention), a copy-paste prompt kit for your own ChatGPT or Claude whose output lands in the
+  review queue, real questions from chat history grouped by how often they were asked, an
+  expert interview mode, a spreadsheet template for colleagues, and variations of a case
+  (typo, other words, Chinese, Japanese). Coverage against a suggested mix of question kinds
+  and checks on the set itself (duplicates, phrases too generic to test, patterns that cannot
+  fail, expectations in no document, cases that always fail). Every case records where it came
+  from and who approved it.
 - **29 evaluators**: deterministic checks (must-mention, forbidden claims, regex, JSON schema,
   citation validity, refusal, numbers grounded in evidence), IR metrics (Recall@k, Precision@k,
   MRR, nDCG), agent checks (tool selection, arguments, forbidden and unnecessary tools, task
@@ -190,7 +199,8 @@ You do. A test case states what a person expects: a reference answer, phrases th
 must not appear, relevant documents, required tools and arguments, the expected outcome
 (`warranty_status: active`), or that the assistant should decline. GaugeLab never infers
 ground truth. Generated candidates are drafts until approved, and approval is recorded with
-the reviewer's name.
+the reviewer's name. A case does not need a written model answer: a question plus two or three
+phrases a correct answer cannot avoid is a useful case, and takes a minute to write.
 
 ## Deterministic checks vs LLM judges
 
@@ -203,7 +213,11 @@ that cannot be computed shows as *not applicable* or *not evaluated*, never as a
 
 ## BYOK and local judges
 
-- **Local:** connect Ollama or LM Studio in Settings > Models & keys. Nothing leaves the machine.
+- **Local:** Settings > Models & keys has an Ollama card: it detects the app, suggests a model
+  from this PC's free memory and graphics card (size, memory, seconds per grading call),
+  downloads it after you accept a third-party notice, connects and checks it. Free per call;
+  nothing leaves the machine, except with Ollama's `-cloud` models, which GaugeLab labels as
+  cloud and refuses under *local judges only*. See [docs/local-models.md](docs/local-models.md).
 - **Cloud:** in Settings > Models & keys, pick OpenAI (or another provider), paste the key once:
   it is stored in the operating system's credential store (Windows Credential Manager, macOS
   Keychain, Secret Service) and referenced as `keyring:OPENAI_API_KEY`. Or keep it in `.env`

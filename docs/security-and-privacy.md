@@ -25,7 +25,7 @@ sensitive as the data you put into it.
 | LLM-judge evaluators | the judge provider | only if you choose a cloud judge |
 | Generating candidate test cases | the generator provider | only when you click Generate |
 | The heuristic judge, deterministic, retrieval, agent and performance evaluators | nowhere | never |
-| A local Ollama judge or generator | nowhere (localhost) | never |
+| A local Ollama judge or generator | nowhere (localhost) | never, except Ollama `-cloud` models (Ollama's servers) |
 
 A cloud judge receives the question, the reference answer, the retrieved context, tool
 results and the answer being graded. Do not send confidential material to a provider unless
@@ -34,7 +34,13 @@ entirely: connect Ollama or LM Studio in Settings > Models & keys.
 
 **Local judges only.** A target can be marked *local grading models only* (on its page). Runs
 and re-grades of that target are then refused with any judge whose address is not on this
-machine, so a confidential bot's answers cannot reach a cloud API by a wrong click.
+machine, so a confidential bot's answers cannot reach a cloud API by a wrong click. Ollama
+models whose names end in `-cloud` or `:cloud` are reached through the local Ollama but run on
+Ollama's servers; GaugeLab treats them as cloud models and refuses them here too.
+
+**Third-party software.** GaugeLab never downloads or installs Ollama itself. A model download
+through the Ollama card starts only after the person accepted a third-party notice (recorded
+with its date in the workspace settings); see [local-models.md](local-models.md).
 
 ## Bring your own key
 

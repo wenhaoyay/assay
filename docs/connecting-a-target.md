@@ -1,6 +1,6 @@
 # Connecting a target
 
-## The quick way: Targets > Connect a chatbot
+## The quick way: Connections > Connect a chatbot
 
 1. **How to reach it.** Paste a curl command (DevTools > Network > right-click > Copy as cURL),
    type an HTTP request, pick streaming, OpenAI-compatible or Python, upload logs, or start
@@ -15,9 +15,23 @@
    with a reason for each guess. Fix any guess by clicking *Change* and then the right node.
    *Check the mapping* runs the whole connection and lists **what you'll get**: each piece of
    telemetry, whether it came back, and the checks it unlocks.
-4. **Safety and save.** Set up a clean-up request if each question saves a conversation, ask
-   three real questions for a time and cost estimate of a full run, name it, save. Nothing is
-   saved until a test question came back with an answer.
+4. **Safety and save.** Choose the chatbot first (it decides which question sets are offered).
+   If each question saves a conversation, turn on clean-up: GaugeLab reads the chat id where
+   the reply actually has it (for a streamed reply, often `done.conversation_id`) and warns
+   when the clean-up looks in the wrong place. Dry run: this chatbot's own question sets, three
+   questions you type, generic ones, or the test answer's timing at no extra cost; optionally
+   the same questions again all at once, to see whether the bot slows down when busy. The
+   table shows, per question set, the billed answers and the time at 1 and 4 in parallel. Name
+   the connection (where this copy of the bot runs) and say what is inside this version (model,
+   prompt, retriever). Nothing is saved until a test question came back with an answer.
+
+The three levels: a **chatbot** is the product (it holds question sets, gates and runs); a
+**connection** is one place it runs (local copy, test copy, server); a **version** is what is
+inside a connection now. Change the model or prompt: save a new version, not a new connection.
+
+On a connection's page: *Other people use this bot* (runs then ask 2 at a time by default)
+and *Cost per answer* for bots that report no token counts, so the spend cap and estimates can
+count their answers. *Max answers* on New run limits a run even when no price is known.
 
 *Advanced (JSON)* shows the configuration the wizard is writing, and editing it updates the
 steps: the configuration below is still the record of a connection.
