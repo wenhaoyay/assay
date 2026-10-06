@@ -8,7 +8,8 @@ import { Badge, Button, Card, Empty, ErrorState, Explain, Field, Input, Json, Lo
 import { api } from '../lib/api'
 import { useCrumbs } from '../lib/crumbs'
 import { when } from '../lib/format'
-import type { Candidate, CaseMatrix, Dataset, DatasetVersion, EditResult, Project, ProviderConfig, TestCase } from '../lib/types'
+import { usePrefs } from '../lib/prefs'
+import type { Candidate, CaseMatrix, Dataset, DatasetVersion, EditResult, Project, ProviderConfig, Settings, TestCase } from '../lib/types'
 
 export function VersionBadge({ v }: { v: Pick<DatasetVersion, 'version' | 'status' | 'run_count'> }) {
   return (
@@ -385,8 +386,12 @@ function GeneratePanel({ datasetId, versionId, onPromoted }: { datasetId: number
   const [status, setStatus] = useState<'unreviewed' | 'approved' | 'rejected' | ''>('unreviewed')
   const cands = useQuery({ queryKey: ['candidates', datasetId, status], queryFn: () => api.get<Candidate[]>(`/api/datasets/${datasetId}/candidates${status ? `?status=${status}` : ''}`) })
   const [selected, setSelected] = useState<number[]>([])
-  const [provider, setProvider] = useState<number | ''>('')
-  const [reviewer, setReviewer] = useState(() => { try { return localStorage.getItem('gl-reviewer') ?? '' } catch { return '' } })
+  const settings = useQuery({ queryKey: ['settings'], queryFn: () => api.get<{ values: Settings }>('/api/settings') })
+  const [picked, setProvider] = useState<number | ''>('')
+  // Until you pick, the default model for drafting test cases (Settings > Defaults).
+  const provider = picked || (settings.data?.values.default_generator?.provider_config_id ?? '')
+  const prefs = usePrefs()
+  const [reviewer, setReviewer] = useState(() => prefs.annotator)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editText, setEditText] = useState('')
   const refresh = () => { qc.invalidateQueries({ queryKey: ['candidates', datasetId] }); qc.invalidateQueries({ queryKey: ['dataset', String(datasetId)] }) }

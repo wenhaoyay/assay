@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { RunsTable } from '../components/RunsTable'
+import { Sparkline } from '../components/viz'
 import { Button, Card, Empty, ErrorState, Explain, Input, Loading, PageHeader, Segmented, Select, Term, linkButton } from '../components/ui'
 import { api } from '../lib/api'
 import { useCrumbs } from '../lib/crumbs'
@@ -67,7 +68,7 @@ export function RunsPage() {
             return (
               <Card key={r0.comparability_key ?? i} padded={false}
                 title={<span className="flex flex-wrap items-center gap-x-2">{r0.dataset} v{r0.dataset_version}<span className="font-normal text-ink-3">- {r0.n_cases ?? '?'} cases{r0.case_filter ? ' (reduced suite)' : ''} - judge {r0.judge ? (r0.judge.provider === 'heuristic' ? 'heuristic' : `${r0.judge.provider}/${r0.judge.model}`) : 'none'}</span></span>}
-                actions={<span className="text-xs text-ink-3" title="Runs with different checks count different things in their pass rate">setup {r0.comparability_key?.slice(0, 6)}</span>}
+                actions={<span className="flex items-center gap-3">{g.length > 1 && <Sparkline values={[...g].reverse().map((r) => r.metrics?.overall_pass_rate ?? null)} width={110} height={26} label="pass rate across these runs" />}<span className="text-xs text-ink-3" title="Runs with different checks count different things in their pass rate">setup {r0.comparability_key?.slice(0, 6)}</span></span>}
                 subtitle={`${g.length} comparable run(s)`}>
                 <RunsTable runs={g} selectable selected={selected} onToggle={toggle} keyboard={i === 0} />
               </Card>
