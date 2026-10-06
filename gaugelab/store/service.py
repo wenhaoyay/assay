@@ -5,6 +5,8 @@ Kept as plain functions over a SQLAlchemy session so both front doors behave the
 
 from __future__ import annotations
 
+import re
+
 import asyncio
 import hashlib
 import json
@@ -305,7 +307,7 @@ def record_evaluator_versions(s: Session, ids: list[str]) -> list[dict[str, Any]
 # --------------------------------------------------------------------------------------
 
 DEFAULT_RUN_CONFIG = {"trials": 1, "concurrency": 4, "seed": 7, "k": 5, "options": {}, "budget_usd": None,
-                      "redact_fields": [], "case_filter": None}
+                      "max_answers": None, "redact_fields": [], "case_filter": None}
 
 
 def select_cases(cases: list[TestCase], case_filter: dict[str, Any] | None) -> list[TestCase]:
@@ -461,10 +463,12 @@ async def execute_run(run_id: int) -> None:
         case_rows = {c.id: r.id for r, c in pairs}
         cfg = e.config
         adapter = adapter_for(s, tv)
+        target = get(s, m.Target, tv.target_id)
         spec = RunSpec(cases=[c for _, c in pairs], adapter=adapter, evaluators=cfg["evaluators"],
                        judge=build_judge(s, cfg.get("judge")), pricing=pricing(s), trials=cfg["trials"],
                        concurrency=cfg["concurrency"], seed=cfg["seed"], k=cfg["k"], options=cfg.get("options") or {},
                        budget_usd=cfg.get("budget_usd"), redact_fields=set(cfg.get("redact_fields") or []),
+                       max_answers=cfg.get("max_answers"), cost_per_answer_usd=target.cost_per_answer_usd,
                        run_id=str(run_id))
         run.status, run.started_at = "running", now()
     flag = ACTIVE.setdefault(run_id, {"cancel": False})
@@ -495,7 +499,7 @@ async def execute_run(run_id: int) -> None:
             run.status, run.stop_reason = "cancelled", "cancelled"
         else:
             errs = sum(1 for r in records if r.status == "error")
-            run.status = "completed_with_errors" if errs or stop == "budget" else "completed"
+            run.status = "completed_with_errors" if errs or stop in ("budget", "max_answers") else "completed"
             run.stop_reason = stop
         refresh_summary(s, run)
         auto_gate(s, run)
@@ -599,6 +603,7 @@ def run_header(s: Session, run: m.Run) -> dict[str, Any]:
         "variant_label": snap.get("target", {}).get("variant_label"),
         "dataset": snap.get("dataset", {}).get("name"), "dataset_version": snap.get("dataset", {}).get("version"),
         "trials_per_case": snap.get("experiment", {}).get("config", {}).get("trials"),
+        "concurrency": snap.get("experiment", {}).get("config", {}).get("concurrency"),
         "judge": snap.get("judge"),
         "progress_done": run.progress_done, "progress_total": run.progress_total,
         "created_at": run.created_at.isoformat() if run.created_at else None,
@@ -608,6 +613,17 @@ def run_header(s: Session, run: m.Run) -> dict[str, Any]:
         "failed_trials": summary.get("failed_trials"),
         "gate_status": gate.status if gate else None,
     }
+
+
+# Errors that usually mean "too many at once", not "the bot is broken".
+LOAD_ERROR = re.compile(r"\b429\b|rate.?limit|too many requests|timed? ?out|timeout|overloaded|\b503\b|server busy", re.I)
+
+
+def load_errors(s: Session, run_id: int) -> dict[str, Any]:
+    rows = s.execute(select(m.Trial.case_key, m.Trial.result).where(m.Trial.run_id == run_id,
+                                                                     m.Trial.status == "error")).all()
+    hit = [k for k, r in rows if LOAD_ERROR.search(str((r or {}).get("error") or ""))]
+    return {"count": len(hit), "case_ids": sorted(set(hit))}
 
 
 def trace_for(s: Session, trial_id: int) -> Trace | None:

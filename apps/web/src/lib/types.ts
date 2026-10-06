@@ -134,6 +134,7 @@ export interface RunHeader {
   dataset_id?: number | null
   comparability_key?: string
   case_filter?: Record<string, string[]> | null
+  concurrency?: number | null
   experiment: string
   status: RunStatus
   source: 'live' | 'imported' | 'reevaluated'
@@ -220,6 +221,7 @@ export interface RunDetail extends RunHeader {
   summary: RunSummary | null
   snapshot: Record<string, unknown>
   gate_results: GateResult[]
+  load_errors?: { count: number; case_ids: string[] }
 }
 
 export interface TrialRow {
@@ -527,7 +529,7 @@ export interface Lineage {
   key: string
   comparability: Comparability
   run_ids: number[]
-  points: { run_id: number; target: string; variant: string; pass_rate: number | null; p95_latency_ms: number | null; cost: number | null; at: string | null }[]
+  points: { run_id: number; target: string; variant: string; pass_rate: number | null; p95_latency_ms: number | null; cost: number | null; concurrency?: number | null; at: string | null }[]
 }
 
 export interface Stage {

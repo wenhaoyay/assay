@@ -52,7 +52,7 @@ export function HomePage() {
             </div>
           )}
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" data-tour="projects">
-            {h.projects.map((p, i) => <ProjectTile key={p.id} p={p} i={i} />)}
+            {h.projects.filter((p) => !(h.settings.hide_demo && p.is_demo)).map((p, i) => <ProjectTile key={p.id} p={p} i={i} />)}
             <Link to="/targets/new" viewTransition
               className="flex min-h-[200px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong text-[13px] text-ink-3 transition-colors hover:border-accent hover:text-accent-ink">
               <Plug className="size-5" />Connect another chatbot
@@ -76,9 +76,10 @@ function ProjectTile({ p, i }: { p: ProjectCard; i: number }) {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <h2 className="truncate text-[15px] font-semibold">{p.name}</h2>
+              {p.is_demo && <Badge title="Seeded sample data (Settings > Defaults can hide it)">Demo</Badge>}
               {p.active_runs > 0 && <Badge tone="info">running</Badge>}
             </div>
-            <p className="line-clamp-2 text-xs text-ink-3">{p.description || `${p.counts.targets} target(s), ${p.counts.datasets} dataset(s)`}</p>
+            <p className="line-clamp-2 text-xs text-ink-3">{p.description || `${p.counts.targets} connection(s), ${p.counts.datasets} dataset(s)`}</p>
           </div>
           <ArrowRight className="size-4 text-ink-3 opacity-0 transition-opacity group-hover:opacity-100" />
         </div>

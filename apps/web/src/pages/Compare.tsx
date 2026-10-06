@@ -165,6 +165,9 @@ function CompareView({ c }: { c: Comparison }) {
     }
   })
 
+  // Speed figures from runs that asked a different number of questions at a time are not comparable.
+  const loadDiffers = !!c.baseline_run.concurrency && !!c.candidate_run.concurrency && c.baseline_run.concurrency !== c.candidate_run.concurrency
+
   return (
     <div className="space-y-5">
       <Confetti fire={celebrate} />
@@ -194,6 +197,11 @@ function CompareView({ c }: { c: Comparison }) {
         </div>
       </section>
 
+      {loadDiffers && (
+        <Notice tone="warn" title={`Run #${c.baseline_run.id} asked ${c.baseline_run.concurrency} at a time, run #${c.candidate_run.id} asked ${c.candidate_run.concurrency}`}>
+          The latency difference may be load, not the bot: questions asked together wait for each other. Speed rows are marked; compare speed only between runs at the same setting (pass rates are unaffected).
+        </Notice>
+      )}
       {anyHeuristic && (
         <Notice title={<>Hatched rows come from the <Term k="heuristic">heuristic judge</Term></>}>
           They were scored by word overlap with the reference, not by an LLM: a cheap signal that cannot see paraphrase. Re-grade both runs with a grading model for meaning.
@@ -207,7 +215,7 @@ function CompareView({ c }: { c: Comparison }) {
             <ForestPlot rows={c.metrics} isHeuristic={isHeuristic} />
             <div>
               <div className="mb-1.5 text-xs font-medium text-ink-3"><Term k="point_estimate">Measured once</Term> (no interval): arrow = which way it moved, colour = better or worse</div>
-              <DeltaList rows={c.metrics} />
+              <DeltaList rows={c.metrics} caution={loadDiffers ? (m) => /latency/.test(m) : undefined} />
             </div>
           </div>
         ) : <MetricTable rows={c.metrics} />}

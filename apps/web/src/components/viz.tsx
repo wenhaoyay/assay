@@ -113,7 +113,8 @@ export function ForestPlot({ rows, isHeuristic, onPick }: { rows: ComparisonRow[
 }
 
 /** Latency, tokens, cost: measured once, no interval. Arrow = which way the number moved; colour = better/worse. */
-export function DeltaList({ rows }: { rows: ComparisonRow[] }) {
+/** `caution` marks rows that should not be read as a real change (e.g. latency under different load). */
+export function DeltaList({ rows, caution }: { rows: ComparisonRow[]; caution?: (metric: string) => boolean }) {
   const pts = rows.filter((r) => r.unit !== 'rate' && r.delta !== null)
   if (!pts.length) return null
   const max = Math.max(0.1, ...pts.map((r) => Math.abs(r.relative ?? 0)))
@@ -124,8 +125,9 @@ export function DeltaList({ rows }: { rows: ComparisonRow[] }) {
         const rel = r.relative ?? 0
         const Arrow = r.delta! > 0 ? ArrowUp : r.delta! < 0 ? ArrowDown : Minus
         return (
-          <div key={r.metric} className="grid grid-cols-[minmax(0,200px)_minmax(0,1fr)_170px] items-center gap-3 px-1 text-[13px] max-md:grid-cols-[minmax(0,1fr)_150px]" data-testid={`metric-${r.metric}`}>
-            <span className="truncate">{r.label}</span>
+          <div key={r.metric} className={clsx('grid grid-cols-[minmax(0,200px)_minmax(0,1fr)_170px] items-center gap-3 rounded px-1 text-[13px] max-md:grid-cols-[minmax(0,1fr)_150px]', caution?.(r.metric) && 'hatched-light')} data-testid={`metric-${r.metric}`}
+            title={caution?.(r.metric) ? 'Measured at a different number of questions at a time: may be load, not the bot' : undefined}>
+            <span className="truncate">{r.label}{caution?.(r.metric) && <span className="ml-1 text-[11px] text-warn-ink">(different load)</span>}</span>
             <div className="relative h-2 rounded-full bg-surface-2 max-md:hidden">
               <span className="absolute inset-y-[-3px] left-1/2 w-px bg-line-strong" />
               <motion.span className={clsx('absolute inset-y-0 rounded-full', d === 'better' ? 'bg-good' : d === 'worse' ? 'bg-bad' : 'bg-ink-3')}

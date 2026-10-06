@@ -88,6 +88,9 @@ export function RunPage() {
       {active && <LiveRun r={r} />}
       {r.error && <div className="mb-4"><Notice tone="bad" title="Run failed">{r.error}</Notice></div>}
       {r.stop_reason === 'budget' && <div className="mb-4"><Notice tone="warn" title="Stopped at the spend cap">Trials after the cap was reached were not run and are marked cancelled.</Notice></div>}
+      {r.stop_reason === 'max_answers' && <div className="mb-4"><Notice tone="warn" title="Stopped at the answer limit">The run reached its "Max answers" limit; the questions after it were not asked and are marked cancelled.</Notice></div>}
+      {!active && (r.load_errors?.count ?? 0) > 0 && <LoadErrors r={r} />}
+      {(r.concurrency ?? 0) >= 8 && !active && <p className="mb-3 text-xs text-ink-3">Asked {r.concurrency} at a time: speed figures include waiting for each other, so compare them only with runs at the same setting.</p>}
       <Tabs
         tabs={[
           { id: 'summary', label: 'Summary' },
@@ -489,6 +492,27 @@ function ConfigTab({ r }: { r: RunDetail }) {
         <p className="mb-2 text-xs text-ink-3">Connection configuration and version, dataset version and content hash, check versions, grading model and rubric hashes, and the run settings - frozen at launch.</p>
         <Json value={r.snapshot} maxHeight={640} />
       </Card>
+    </div>
+  )
+}
+
+/** Answers that failed with rate limits or timeouts: probably the load, not the bot. */
+function LoadErrors({ r }: { r: RunDetail }) {
+  const nav = useNavigate()
+  const qc = useQueryClient()
+  const e = r.load_errors!
+  const lower = Math.max(1, Math.min(2, (r.concurrency ?? 2) - 1))
+  const reask = useMutation({
+    mutationFn: () => api.post<RunHeader>(`/api/runs/${r.id}/reask-load-errors`, { concurrency: lower }),
+    onSuccess: (n) => { qc.invalidateQueries({ queryKey: ['runs'] }); nav(`/runs/${n.id}`, { viewTransition: true }) },
+  })
+  return (
+    <div className="mb-4">
+      <Notice tone="warn" title={`${e.count} answer${e.count === 1 ? '' : 's'} failed with "rate limited" or timed out${r.concurrency ? ` at ${r.concurrency} at a time` : ''}`}
+        action={<Button size="sm" loading={reask.isPending} onClick={() => reask.mutate()}>Re-ask {e.case_ids.length} at {lower} at a time</Button>}>
+        These are probably not the bot's fault: too many questions arrived at once. They count as errors in this run's pass rate. Re-asking them fewer at a time starts a small new run with just those questions.
+        {reask.isError && <div className="mt-2"><ErrorState error={reask.error} /></div>}
+      </Notice>
     </div>
   )
 }

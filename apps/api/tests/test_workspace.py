@@ -273,3 +273,61 @@ def test_demo_flag_template_and_plain_csv(client):
     cases = c.get(f"/api/dataset-versions/{r.json()['latest']['id']}").json()["cases"]
     assert cases[0]["expected"]["answer"]["must_mention"] == ["24 months", "receipt"]
     assert cases[2]["expected"]["refusal_expected"] is True
+
+
+def _python_target(c, name, fn, options=None, project_id=1):
+    return c.post("/api/targets", json={"project_id": project_id, "name": name, "adapter": "python",
+                                       "config": {"callable": f"slow_target:{fn}", "options": options or {}}}).json()
+
+
+def test_max_answers_and_cost_per_answer(client):
+    from test_api import wait
+
+    c, s = client, client.seeded
+    t = _python_target(c, "echo", "run", {"sleep": 0.01})
+    # The bot reports no tokens: invisible to the cap until a cost per answer is set.
+    body = {"target_version_id": t["latest_version"]["id"], "dataset_version_id": s["dataset_version_id"],
+            "evaluators": ["latency"], "trials": 1}
+    est = c.post("/api/estimate", json=body).json()
+    assert est["target_cost_visible"] is False and est["target_cost_usd"] is None
+    c.patch(f"/api/targets/{t['id']}/flags", json={"cost_per_answer_usd": 0.01, "shared": True})
+    est = c.post("/api/estimate", json=body).json()
+    assert est["target_cost_visible"] is True and abs(est["target_cost_usd"] - 0.58) < 1e-9 and est["shared"] is True
+    # Max answers stops the run without any price.
+    run = c.post("/api/runs/start", json={**body, "project_id": s["project_id"], "name": "capped", "max_answers": 5,
+                                          "concurrency": 1}).json()
+    done = wait(c, run["id"])
+    assert done["stop_reason"] == "max_answers" and done["summary"]["status_counts"].get("cancelled") == 53
+    # The per-answer cost lets the spend cap count this bot's answers.
+    run = c.post("/api/runs/start", json={**body, "project_id": s["project_id"], "name": "budget", "budget_usd": 0.03,
+                                          "concurrency": 1}).json()
+    done = wait(c, run["id"])
+    assert done["stop_reason"] == "budget" and done["summary"]["status_counts"].get("cancelled", 0) >= 50
+
+
+def test_rate_limited_answers_can_be_reasked(client):
+    from test_api import wait
+
+    c, s = client, client.seeded
+    t = _python_target(c, "busy", "busy")
+    run = c.post("/api/runs/start", json={"project_id": s["project_id"], "name": "busy", "target_version_id": t["latest_version"]["id"],
+                                          "dataset_version_id": s["dataset_version_id"], "evaluators": ["latency"],
+                                          "concurrency": 8}).json()
+    done = wait(c, run["id"])
+    errs = done["load_errors"]
+    assert errs["count"] > 0 and done["concurrency"] == 8
+    again = c.post(f"/api/runs/{run['id']}/reask-load-errors", json={"concurrency": 2})
+    assert again.status_code == 202
+    redo = wait(c, again.json()["id"])
+    assert redo["concurrency"] == 2 and redo["n_cases"] == len(errs["case_ids"])
+    assert c.post(f"/api/runs/{redo['id']}/reask-load-errors", json={}).status_code in (202, 409)
+
+
+def test_dry_run_typed_questions_and_load_check(client):
+    c = client
+    cfg = {"callable": "slow_target:run", "options": {"sleep": 0.05}}
+    r = c.post("/api/connect/dry-run", json={"adapter": "python", "config": cfg, "questions": ["Hi?", "What is ZP17?"],
+                                             "load_check": True}).json()
+    assert [x["question"] for x in r["calls"]] == ["Hi?", "What is ZP17?"]
+    assert r["load"]["n"] == 2 and r["load"]["verdict"] in ("copes", "slows", "queues")
+    assert r["per_answer_cost_usd"] is None

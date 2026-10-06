@@ -4,10 +4,10 @@ import { Activity, BookmarkPlus, Check, Pencil, Plug, RefreshCw, Send } from 'lu
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Sparkline } from '../components/viz'
-import { Badge, Button, Card, Empty, ErrorState, Explain, Input, Json, Loading, Notice, PageHeader, PageSkeleton, ProjectMark, Segmented, Table, Toggle, linkButton } from '../components/ui'
+import { Badge, Button, Card, Empty, ErrorState, Explain, Field, Input, Json, Loading, Notice, PageHeader, PageSkeleton, ProjectMark, Segmented, Table, Toggle, linkButton } from '../components/ui'
 import { api } from '../lib/api'
 import { useCrumbs } from '../lib/crumbs'
-import { ms, pct, when } from '../lib/format'
+import { ms, pct, usd, when } from '../lib/format'
 import type { Capability, Project, Target, TargetCheck, TargetResult } from '../lib/types'
 import { Capabilities } from './Connect'
 
@@ -56,6 +56,7 @@ export function TargetsPage() {
                       <td>
                         <Link className="font-medium hover:underline" to={`/targets/${t.id}`} viewTransition>{t.name}</Link>
                         {t.local_judges_only && <Badge tone="accent" className="ml-1.5">local judges only</Badge>}
+                        {t.shared && <Badge className="ml-1.5">shared</Badge>}
                         <div className="line-clamp-1 text-xs text-ink-3">{t.description}</div>
                       </td>
                       <td><Badge>{t.adapter === 'replay' ? 'imported' : t.adapter}</Badge>{(t.latest_version.config as { reply_shape?: string }).reply_shape === 'gaugelab' && <Badge tone="accent" className="ml-1">standard shape</Badge>}</td>
@@ -115,7 +116,8 @@ export function TargetPage() {
   const [cfgView, setCfgView] = useState<'summary' | 'json'>('summary')
   const test = useMutation({ mutationFn: () => api.post<TestResponse>('/api/connect/test', { adapter: t.data!.adapter, config: t.data!.latest_version.config, message }) })
   const check = useMutation({ mutationFn: () => api.post<TargetCheck>(`/api/targets/${id}/check`), onSuccess: () => qc.invalidateQueries({ queryKey: ['target', id] }) })
-  const flags = useMutation({ mutationFn: (v: boolean) => api.patch(`/api/targets/${id}/flags`, { local_judges_only: v }), onSuccess: () => { qc.invalidateQueries({ queryKey: ['target', id] }); qc.invalidateQueries({ queryKey: ['targets'] }) } })
+  const flags = useMutation({ mutationFn: (body: Record<string, unknown>) => api.patch(`/api/targets/${id}/flags`, body), onSuccess: () => { qc.invalidateQueries({ queryKey: ['target', id] }); qc.invalidateQueries({ queryKey: ['targets'] }); qc.invalidateQueries({ queryKey: ['estimate'] }) } })
+  const [costText, setCostText] = useState<string | null>(null)
   const template = useMutation({ mutationFn: () => api.post('/api/connector-templates', { name: t.data!.name, adapter: t.data!.adapter, config: t.data!.latest_version.config, description: t.data!.latest_version.variant_label }) })
   if (t.isLoading) return <PageSkeleton />
   if (t.isError) return <ErrorState error={t.error} />
@@ -181,8 +183,21 @@ export function TargetPage() {
         </div>
         <div className="space-y-5">
           <Card title="Grading privacy">
-            <Toggle checked={!!target.local_judges_only} onChange={(val) => flags.mutate(val)} label="Local grading models only"
+            <Toggle checked={!!target.local_judges_only} onChange={(val) => flags.mutate({ local_judges_only: val })} label="Local grading models only"
               hint="This bot's answers may only be graded by a model running on this machine (Ollama, LM Studio). Runs that pick a cloud model are refused." />
+          </Card>
+          <Card title="Load and cost">
+            <Toggle checked={!!target.shared} onChange={(val) => flags.mutate({ shared: val })} label="Other people use this bot"
+              hint="New runs then ask 2 questions at a time by default, and warn above that: test questions all at once would slow down real users' answers." />
+            <div className="mt-4">
+              <Field label="Cost per answer (USD, your estimate)" hint={<>For bots that report no token counts (GaugeLab cannot price them). With it, the spend cap and estimates can count this bot's answers. {target.cost_per_answer_usd != null ? 'Now: ' + usd(target.cost_per_answer_usd) + ' per answer.' : 'Not set: the cap cannot limit this bot.'}</>}>
+                <div className="flex gap-2">
+                  <Input className="w-32" type="number" min={0} step="0.001" aria-label="Cost per answer" placeholder="e.g. 0.04"
+                    value={costText ?? (target.cost_per_answer_usd != null ? String(target.cost_per_answer_usd) : '')} onChange={(e) => setCostText(e.target.value)} />
+                  <Button size="sm" disabled={costText === null} loading={flags.isPending} onClick={() => { flags.mutate(costText ? { cost_per_answer_usd: Number(costText) } : { clear_cost_per_answer: true }); setCostText(null) }}>Save</Button>
+                </div>
+              </Field>
+            </div>
           </Card>
           <Card title={`Configuration - v${v.version}`} actions={<Segmented size="sm" value={cfgView} onChange={setCfgView} options={[{ id: 'summary', label: 'Readable' }, { id: 'json', label: 'JSON' }]} />}>
             {cfgView === 'json' ? <Json value={v.config} maxHeight={420} /> : (

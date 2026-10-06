@@ -51,6 +51,7 @@ class ExperimentIn(BaseModel):
     k: int = Field(default=5, ge=1, le=50)
     options: dict[str, Any] = Field(default_factory=dict)
     budget_usd: float | None = Field(default=None, ge=0)
+    max_answers: int | None = Field(default=None, ge=1)  # stop after this many questions sent to the bot
     redact_fields: list[str] = Field(default_factory=list)
     case_filter: dict[str, list[str]] | None = None  # reduced suite: {categories, tags, ids}
     gate_id: int | None = None
@@ -151,7 +152,34 @@ def get_run(run_id: int, s: Session = Depends(get_session)) -> dict[str, Any]:
     gates = s.scalars(select(m.GateResult).where(m.GateResult.run_id == run_id).order_by(m.GateResult.id.desc())).all()
     out["gate_results"] = [{"id": g.id, "status": g.status, "baseline_run_id": g.baseline_run_id, "gate_id": g.gate_id,
                             "results": g.results, "created_at": ser.iso(g.created_at)} for g in gates]
+    out["load_errors"] = svc.load_errors(s, run_id)
     return out
+
+
+class ReaskIn(BaseModel):
+    concurrency: int = Field(default=2, ge=1, le=16)
+
+
+@router.post("/runs/{run_id}/reask-load-errors", status_code=202)
+async def reask_load_errors(run_id: int, body: ReaskIn, s: Session = Depends(get_session)) -> dict[str, Any]:
+    """Ask again, fewer at a time, only the questions that failed with rate limits or timeouts."""
+    run = svc.get(s, m.Run, run_id)
+    errs = svc.load_errors(s, run_id)
+    if not errs["count"]:
+        raise HTTPException(409, "No answers in this run failed with a rate limit or a timeout.")
+    e = svc.get(s, m.Experiment, run.experiment_id)
+    cfg = {k: v for k, v in (e.config or {}).items() if k not in ("evaluators", "judge")}
+    cfg["concurrency"] = body.concurrency
+    cfg["case_filter"] = {"ids": errs["case_ids"]}
+    exp = svc.create_experiment(s, e.project_id, f"{e.name} - re-ask {len(errs['case_ids'])} at {body.concurrency}",
+                                e.target_version_id, e.dataset_version_id, e.config["evaluators"], e.config.get("judge"),
+                                e.gate_id, description=f"Re-asked from run #{run_id}: rate-limited or timed-out answers.",
+                                **cfg)
+    s.flush()
+    new = svc.start_run(s, exp.id)
+    s.commit()
+    _spawn(svc.execute_run(new.id))
+    return svc.run_header(s, new)
 
 
 @router.get("/runs/{run_id}/trials")

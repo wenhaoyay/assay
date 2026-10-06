@@ -152,6 +152,7 @@ function TrendCard({ lineages }: { lineages: Lineage[] }) {
   const lin = lineages[Math.min(sel, lineages.length - 1)]
   if (!lin) return null
   const c = lin.comparability
+  const loads = [...new Set(lin.points.map((p) => p.concurrency).filter((x): x is number => !!x))].sort((a, b) => a - b)
   return (
     <Card title="Trend" subtitle={<>Only <Term k="comparable">comparable runs</Term> are drawn on one line.</>}
       actions={<Segmented size="sm" value={metric} onChange={setMetric} options={[{ id: 'pass_rate', label: 'Pass rate' }, { id: 'p95_latency_ms', label: 'p95 latency' }]} />}>
@@ -180,12 +181,16 @@ function TrendCard({ lineages }: { lineages: Lineage[] }) {
                 <div className="font-medium">Run #{pt.run_id}</div>
                 <div className="text-ink-3">{pt.target} - {pt.variant}</div>
                 <div className="num mt-1">pass rate <b>{pct(pt.pass_rate)}</b> - p95 <b>{ms(pt.p95_latency_ms)}</b></div>
+                {pt.concurrency ? <div className="text-ink-3">{pt.concurrency} at a time</div> : null}
               </div>
             )
           }} />
           <Line type="monotone" dataKey={metric} stroke="var(--accent)" strokeWidth={2} dot={{ r: 3.5, fill: 'var(--accent)', stroke: 'var(--surface)', strokeWidth: 1.5 }} activeDot={{ r: 5 }} isAnimationActive />
         </LineChart>
       </ResponsiveContainer>
+      {metric === 'p95_latency_ms' && loads.length > 1 && (
+        <p className="mt-2 text-xs text-warn-ink">These runs asked {loads.join(', ')} questions at a time: part of the latency change may be load, not the bot.</p>
+      )}
       <p className="mt-2 text-xs text-ink-3">{c.dataset} v{c.dataset_version} - {c.n_cases} cases{c.case_filter ? ' (reduced suite)' : ''} - judge {c.judge ?? 'none'} - {c.evaluators.length} checks. Click a point to open that run.</p>
     </Card>
   )

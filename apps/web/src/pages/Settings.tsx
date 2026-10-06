@@ -272,6 +272,10 @@ function DefaultsTab() {
           <Button variant="primary" loading={put.isPending} onClick={() => put.mutate({ spend_cap_usd: cap === '' || cap === null ? null : Number(cap) })}>Save</Button>
         </div>
       </Card>
+      <Card title="Demo data" subtitle="The seeded Acme Support Demo chatbot, for trying GaugeLab and for showing it">
+        <Toggle checked={!!s.hide_demo} onChange={(v) => { put.mutate({ hide_demo: v }); qc.invalidateQueries({ queryKey: ['projects'] }) }} label="Hide demo data"
+          hint="Drops the demo chatbot from the home page and from chatbot pickers. Nothing is deleted; turn it back on before a demo." />
+      </Card>
       <Notice title="No silent fallback">If a grading model fails or is rate-limited, those answers are marked <b>not evaluated</b>. GaugeLab never switches to another model in the middle of a run, so one run is always graded by one model.</Notice>
       {put.isError && <ErrorState error={put.error} />}
     </div>

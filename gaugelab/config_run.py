@@ -133,7 +133,7 @@ def prepare_run(s: Session, cfg: dict[str, Any]) -> tuple[m.Run, dict[str, Any]]
         s, project.id, exp.get("name", "experiment"), tv.id, dv.id, evaluators, judge, None,
         description=exp.get("description", ""), trials=cfg.get("trials", 1), concurrency=cfg.get("concurrency", 4),
         seed=cfg.get("seed", 7), k=cfg.get("k", 5), options=cfg.get("options") or {},
-        budget_usd=cfg.get("budget_usd"), redact_fields=cfg.get("redact_fields") or [],
+        budget_usd=cfg.get("budget_usd"), max_answers=cfg.get("max_answers"), redact_fields=cfg.get("redact_fields") or [],
         case_filter=cfg.get("case_filter"))
     run = svc.start_run(s, e.id)
     return run, cfg.get("gates") or {}

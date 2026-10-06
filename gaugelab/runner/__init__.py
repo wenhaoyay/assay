@@ -42,6 +42,11 @@ class RunSpec:
     k: int = 5
     options: dict[str, Any] = field(default_factory=dict)  # max_latency_ms, max_total_tokens, ...
     budget_usd: float | None = None
+    # Stop after this many questions were sent to the bot: a limit that works without a price.
+    max_answers: int | None = None
+    # What one answer costs when the bot reports no token counts (the user's estimate), so the
+    # spend cap can count answers it otherwise could not price.
+    cost_per_answer_usd: float | None = None
     redact_fields: set[str] = field(default_factory=set)
     max_retries: int = 3
     run_id: str | None = None
@@ -117,10 +122,11 @@ def _sum(values: list[float | None]) -> float | None:
 
 async def run_trials(spec: RunSpec, on_trial: Callable[[TrialRecord], Awaitable[None]] | None = None,
                      should_stop: Callable[[], bool] | None = None) -> tuple[list[TrialRecord], str | None]:
-    """Returns (records, stop_reason). stop_reason is None, 'cancelled' or 'budget'."""
+    """Returns (records, stop_reason). stop_reason is None, 'cancelled', 'budget' or 'max_answers'."""
     ctx = EvalContext(k=spec.k, judge=spec.judge, pricing=spec.pricing, options=spec.options)
     sem = asyncio.Semaphore(max(1, spec.concurrency))
     spent = 0.0
+    asked = 0  # questions sent to the bot so far
     stop_reason: str | None = None
     lock = asyncio.Lock()
     records: list[TrialRecord] = []
@@ -133,14 +139,17 @@ async def run_trials(spec: RunSpec, on_trial: Callable[[TrialRecord], Awaitable[
             stop_reason = "cancelled"
         elif spec.budget_usd is not None and spent >= spec.budget_usd:
             stop_reason = "budget"
+        elif spec.max_answers is not None and asked >= spec.max_answers:
+            stop_reason = "max_answers"
         return stop_reason is not None
 
     async def one(case: TestCase, trial: int) -> None:
-        nonlocal spent
+        nonlocal spent, asked
         async with sem:
             if stopping():
                 rec = TrialRecord(case.id, trial, "cancelled", None, None, [])
             else:
+                asked += 1
                 test_input = case.input.model_dump()
                 actx = AdapterContext(case_id=case.id, trial_index=trial,
                                       seed=zlib.crc32(f"{spec.seed}:{case.id}:{trial}".encode()), run_id=spec.run_id)
@@ -153,6 +162,9 @@ async def run_trials(spec: RunSpec, on_trial: Callable[[TrialRecord], Awaitable[
                     attempts = 1
                 result = call.result
                 t_cost = target_cost(result, spec.pricing)
+                if t_cost is None and spec.cost_per_answer_usd is not None and not result.error:
+                    t_cost = spec.cost_per_answer_usd
+                    result.metadata["cost_source"] = "cost per answer set on the connection"
                 if t_cost is not None:
                     result.metadata["estimated_cost_usd"] = t_cost
                 trace = build_trace(test_input, call, spec.pricing)

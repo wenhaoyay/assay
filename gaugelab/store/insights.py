@@ -141,6 +141,7 @@ def project_home(s: Session, project_id: int) -> dict[str, Any]:
                               "variant": r.snapshot.get("target", {}).get("variant_label"),
                               "pass_rate": met.get("overall_pass_rate"), "p95_latency_ms": met.get("p95_latency_ms"),
                               "cost": met.get("average_cost_usd"),
+                              "concurrency": (r.snapshot.get("experiment", {}).get("config") or {}).get("concurrency"),
                               "at": r.finished_at.isoformat() if r.finished_at else None})
     for lin in lineages.values():
         lin["points"].reverse()  # oldest -> newest for charts
@@ -306,6 +307,7 @@ def estimate_setup(s: Session, target_version_id: int, dataset_version_id: int, 
     from gaugelab.evaluators import get_evaluator
 
     tv = svc.get(s, m.TargetVersion, target_version_id)
+    target = svc.get(s, m.Target, tv.target_id)
     cases = svc.select_cases([c for _, c in svc.version_cases(s, dataset_version_id)], case_filter)
     n_calls = len(cases) * max(1, trials)
     lat, cost = [], []
@@ -334,10 +336,18 @@ def estimate_setup(s: Session, target_version_id: int, dataset_version_id: int, 
                 price = svc.pricing(s).find(pc.provider, pc.model)
                 judge_cost = 0.0 if local else (None if price is None else
                                                 judge_calls * (1500 * price.input_per_1m + 120 * price.output_per_1m) / 1e6)
+    # The bot's own cost: measured in past runs (token counts x price), or the per-answer figure
+    # the person set on the connection, or unknown (the bot reports no tokens).
+    target_cost = (statistics.median(cost) * n_calls) if cost else None
+    cost_source = "past runs" if cost else None
+    if target_cost is None and target.cost_per_answer_usd is not None:
+        target_cost, cost_source = target.cost_per_answer_usd * n_calls, "per answer (set on the connection)"
     total_ms = ((per_call_ms or 0) * n_calls + judge_ms * judge_calls) / max(1, concurrency if judge_ms < 10_000 else 1)
     return {"cases": len(cases), "trials": trials, "target_calls": n_calls,
             "per_call_ms": per_call_ms, "based_on_runs": len(lat),
-            "target_cost_usd": (statistics.median(cost) * n_calls) if cost else None,
+            "target_cost_usd": target_cost, "target_cost_source": cost_source,
+            "target_cost_visible": target_cost is not None,
+            "cost_per_answer_usd": target.cost_per_answer_usd, "shared": bool(target.shared),
             "judge_calls": judge_calls, "judge_cost_usd": judge_cost,
             "estimated_seconds": round(total_ms / 1000) if (per_call_ms is not None or judge_calls) else None,
             "note": ("From the median latency of past runs of this target." if lat else
