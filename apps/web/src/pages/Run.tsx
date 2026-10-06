@@ -13,6 +13,7 @@ import {
   PageSkeleton, ProgressBar, Segmented, Select, Stat, StatusBadge, Table, Tabs, Term, linkButton,
 } from '../components/ui'
 import { api, qs } from '../lib/api'
+import { whereLabel } from '../lib/models'
 import { useCrumbs } from '../lib/crumbs'
 import { duration, FAILURE_LABELS, ms, num, pct, score, usd, when } from '../lib/format'
 import { useHotkey, useListNav } from '../lib/hotkeys'
@@ -66,7 +67,7 @@ export function RunPage() {
         title={<span style={{ viewTransitionName: `run-title-${r.id}` }}>{r.experiment}</span>}
         description={
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
-            <Meta label="Target"><Link className="font-medium hover:underline" to={r.target_id ? `/targets/${r.target_id}` : '/targets'}>{r.target}</Link> v{r.target_version}</Meta>
+            <Meta label="Connection"><Link className="font-medium hover:underline" to={r.target_id ? `/targets/${r.target_id}` : '/targets'}>{r.target}</Link> v{r.target_version}</Meta>
             {r.variant_label && <Meta label="Variant">{r.variant_label}</Meta>}
             <Meta label="Dataset">{r.dataset_id ? <Link className="hover:underline" to={`/datasets/${r.dataset_id}`}>{r.dataset}</Link> : r.dataset} v{r.dataset_version}</Meta>
             <Meta label="Size"><span className="num">{r.n_cases ?? '?'} cases x {r.trials_per_case}</span>{r.case_filter && ' (reduced)'}</Meta>
@@ -477,7 +478,7 @@ function ConfigTab({ r }: { r: RunDetail }) {
             <Select className="w-72" value={judge} onChange={(e) => setJudge(e.target.value)} aria-label="Re-grade with">
               <option value="">Same as this run ({r.judge ? r.judge.model : 'none'})</option>
               <option value="heuristic">Heuristic (word overlap)</option>
-              {(models.data ?? []).map((m) => <option key={m.id} value={m.id}>{m.name} ({m.local ? 'local' : 'cloud'})</option>)}
+              {(models.data ?? []).map((m) => <option key={m.id} value={m.id}>{m.name} ({whereLabel(m)})</option>)}
             </Select>
           </Field>
           <Button variant="primary" loading={reeval.isPending} onClick={() => reeval.mutate()}><RotateCcw className="size-3.5" /> Re-grade</Button>
@@ -485,7 +486,7 @@ function ConfigTab({ r }: { r: RunDetail }) {
         {reeval.isError && <div className="mt-2"><ErrorState error={reeval.error} /></div>}
       </Card>
       <Card title="Snapshot (everything this run used)">
-        <p className="mb-2 text-xs text-ink-3">Target configuration and version, dataset version and content hash, check versions, grading model and rubric hashes, and the run settings - frozen at launch.</p>
+        <p className="mb-2 text-xs text-ink-3">Connection configuration and version, dataset version and content hash, check versions, grading model and rubric hashes, and the run settings - frozen at launch.</p>
         <Json value={r.snapshot} maxHeight={640} />
       </Card>
     </div>

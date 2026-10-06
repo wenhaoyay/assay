@@ -301,27 +301,37 @@ def _check_gate(config: dict[str, Any]) -> None:
         raise HTTPException(422, f"Invalid gate config: {exc}") from exc
 
 
+def _gate(g: m.RegressionGate) -> dict[str, Any]:
+    return {"id": g.id, "project_id": g.project_id, "name": g.name, "config": g.config, "created_at": ser.iso(g.created_at)}
+
+
 @router.get("/gates")
-def list_gates(s: Session = Depends(get_session)) -> list[dict[str, Any]]:
-    return [{"id": g.id, "project_id": g.project_id, "name": g.name, "config": g.config,
-             "created_at": ser.iso(g.created_at)} for g in s.scalars(select(m.RegressionGate).order_by(m.RegressionGate.id))]
+def list_gates(project_id: int | None = None, s: Session = Depends(get_session)) -> list[dict[str, Any]]:
+    q = select(m.RegressionGate).order_by(m.RegressionGate.id)
+    if project_id is not None:
+        q = q.where(m.RegressionGate.project_id == project_id)
+    return [_gate(g) for g in s.scalars(q)]
 
 
 @router.post("/gates", status_code=201)
 def create_gate(body: GateIn, s: Session = Depends(get_session)) -> dict[str, Any]:
     _check_gate(body.config)
+    svc.get(s, m.Project, body.project_id)
     g = m.RegressionGate(project_id=body.project_id, name=body.name, config=body.config)
     s.add(g)
     s.flush()
-    return {"id": g.id, "name": g.name, "config": g.config}
+    return _gate(g)
 
 
 @router.put("/gates/{gate_id}")
 def update_gate(gate_id: int, body: GateIn, s: Session = Depends(get_session)) -> dict[str, Any]:
     _check_gate(body.config)
     g = svc.get(s, m.RegressionGate, gate_id)
-    g.name, g.config = body.name, body.config  # past gate results keep the config they were judged with
-    return {"id": g.id, "name": g.name, "config": g.config}
+    svc.get(s, m.Project, body.project_id)
+    # Past gate results keep the config they were judged with.
+    g.name, g.config, g.project_id = body.name, body.config, body.project_id
+    s.flush()
+    return _gate(g)
 
 
 class ApplyGate(BaseModel):

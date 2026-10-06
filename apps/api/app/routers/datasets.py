@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from gaugelab.datasets import DatasetError, export_dataset, parse_dataset, validate_cases
+from gaugelab.datasets import BOM, DatasetError, export_dataset, parse_dataset, validate_cases
 from gaugelab.datasets.generate import extract_text, generate_candidates
 from gaugelab.providers import ProviderSpec, build_provider
 from gaugelab.schemas import TestCase
@@ -39,11 +39,78 @@ def _dataset_error(exc: DatasetError) -> HTTPException:
 
 
 @router.get("/datasets")
-def list_datasets(project_id: int | None = None, s: Session = Depends(get_session)) -> list[dict[str, Any]]:
+def list_datasets(project_id: int | None = None, include_archived: bool = False,
+                  s: Session = Depends(get_session)) -> list[dict[str, Any]]:
     q = select(m.Dataset).order_by(m.Dataset.id)
     if project_id is not None:
         q = q.where(m.Dataset.project_id == project_id)
+    if not include_archived:
+        q = q.where(m.Dataset.archived.is_(False))
     return [ser.dataset(s, d) for d in s.scalars(q)]
+
+
+class DatasetPatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    description: str | None = None
+    project_id: int | None = None  # move it to another chatbot
+    archived: bool | None = None
+
+
+@router.patch("/datasets/{dataset_id}")
+def patch_dataset(dataset_id: int, body: DatasetPatch, s: Session = Depends(get_session)) -> dict[str, Any]:
+    ds = svc.get(s, m.Dataset, dataset_id)
+    project_id = body.project_id if body.project_id is not None else ds.project_id
+    name = body.name if body.name is not None else ds.name
+    svc.get(s, m.Project, project_id)
+    if (project_id, name) != (ds.project_id, ds.name) and s.scalar(
+            select(m.Dataset).where(m.Dataset.project_id == project_id, m.Dataset.name == name, m.Dataset.id != ds.id)):
+        raise HTTPException(409, f"That chatbot already has a dataset named {name!r}")
+    ds.project_id, ds.name = project_id, name
+    if body.description is not None:
+        ds.description = body.description
+    if body.archived is not None:
+        ds.archived = body.archived
+    s.flush()
+    return ser.dataset(s, ds)
+
+
+def _dataset_runs(s: Session, dataset_id: int) -> list[int]:
+    return list(s.scalars(select(m.Run.id).join(m.Experiment, m.Experiment.id == m.Run.experiment_id)
+                          .join(m.DatasetVersion, m.DatasetVersion.id == m.Experiment.dataset_version_id)
+                          .where(m.DatasetVersion.dataset_id == dataset_id).order_by(m.Run.id)))
+
+
+@router.delete("/datasets/{dataset_id}")
+def delete_dataset(dataset_id: int, s: Session = Depends(get_session)) -> dict[str, Any]:
+    """Delete a dataset no run used. One that runs used is archived instead: deleting it would
+    leave those runs' results pointing at questions that no longer exist."""
+    ds = svc.get(s, m.Dataset, dataset_id)
+    runs = _dataset_runs(s, dataset_id)
+    if runs:
+        raise HTTPException(409, {"message": f"{len(runs)} run(s) used this dataset, so it cannot be deleted. "
+                                             "Archive it instead: it is hidden but those runs keep their questions.",
+                                  "run_ids": runs[:50]})
+    version_ids = [v.id for v in ds.versions]
+    if version_ids and s.scalar(select(m.Experiment.id).where(m.Experiment.dataset_version_id.in_(version_ids))):
+        raise HTTPException(409, {"message": "A saved run setup refers to this dataset. Archive it instead.", "run_ids": []})
+    for c in s.scalars(select(m.GeneratedTestCandidate).where(m.GeneratedTestCandidate.dataset_id == ds.id)):
+        s.delete(c)
+    s.flush()
+    if version_ids:
+        for link in s.scalars(select(m.DatasetVersionTestCase).where(
+                m.DatasetVersionTestCase.dataset_version_id.in_(version_ids))):
+            s.delete(link)
+        s.flush()
+        for v in sorted(ds.versions, key=lambda v: -v.version):  # children before parents
+            s.delete(v)
+            s.flush()
+    for row in s.scalars(select(m.TestCaseRow).where(m.TestCaseRow.dataset_id == ds.id)):
+        s.delete(row)
+    s.flush()
+    name = ds.name
+    s.delete(ds)
+    s.flush()
+    return {"deleted": dataset_id, "name": name}
 
 
 class DatasetIn(BaseModel):
@@ -74,6 +141,22 @@ async def import_dataset(project_id: int = Form(...), file: UploadFile = File(..
     v = svc.create_dataset(s, project_id, name or parsed.name, parsed.cases, parsed.description, origin="import",
                            change_summary=f"Imported from {file.filename}")
     return ser.dataset(s, svc.get(s, m.Dataset, v.dataset_id))
+
+
+TEMPLATE_CSV = (
+    "Question,Must mention (comma-separated),Must never say,Should refuse? (yes/no),Correct answer (optional),Topic\n"
+    "How long is the warranty on Device Alpha?,\"24 months, receipt\",lifetime,no,"
+    "Device Alpha has a 24-month warranty from the purchase date; keep the receipt.,warranty\n"
+    "Which tools do I need to install the bracket?,\"T20, torque\",,no,,installation\n"
+    "What will the weather be tomorrow?,,,yes,Out of scope: the assistant should say it cannot help with that.,out of scope\n"
+)
+
+
+@router.get("/datasets/template.csv")
+def template_csv() -> PlainTextResponse:
+    """A spreadsheet colleagues can fill in Excel without ever opening GaugeLab."""
+    return PlainTextResponse(BOM + TEMPLATE_CSV, media_type="text/csv",
+                             headers={"Content-Disposition": 'attachment; filename="gaugelab-questions-template.csv"'})
 
 
 @router.post("/datasets/validate")

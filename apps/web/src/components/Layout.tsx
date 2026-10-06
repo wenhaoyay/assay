@@ -41,7 +41,7 @@ const GROUPS = [
   {
     label: 'Setup',
     items: [
-      { to: '/targets', label: 'Targets', icon: Target },
+      { to: '/targets', label: 'Connections', icon: Target },
       { to: '/datasets', label: 'Datasets', icon: Database },
       { to: '/gates', label: 'Gates', icon: ShieldCheck },
     ],

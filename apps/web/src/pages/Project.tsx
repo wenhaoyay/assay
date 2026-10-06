@@ -74,7 +74,7 @@ export function ProjectPage() {
               <RunsTable runs={h.recent_runs.slice(0, 8)} compact />
             </Card>
             <div className="space-y-5">
-              <Card title="Targets (versions of this chatbot)" padded={false}>
+              <Card title="Connections (where this chatbot runs, and their versions)" padded={false}>
                 <ul className="divide-y divide-line">
                   {h.targets.map((t) => (
                     <li key={t.id}>

@@ -26,6 +26,7 @@ def seed(run: bool = False, trials: int = 3, force_runs: bool = False) -> dict[s
     out: dict[str, Any] = {}
     with db.session() as s:
         p = svc.ensure_project(s, PROJECT, "Fictional Acme Devices support agent - the GaugeLab demo system.")
+        p.is_demo = True
         dv = resolve_dataset(s, p.id, {"path": "dataset.yaml"}, str(BENCH))
         out["dataset_version_id"] = dv.id
         for name in ("baseline", "candidate"):

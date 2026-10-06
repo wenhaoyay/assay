@@ -23,7 +23,7 @@ export function HealthDot({ check, size = 10 }: { check: TargetCheck | null | un
 }
 
 export function TargetsPage() {
-  useCrumbs([{ label: 'Setup' }, { label: 'Targets' }], 'targets')
+  useCrumbs([{ label: 'Setup' }, { label: 'Connections' }], 'targets')
   const qc = useQueryClient()
   const targets = useQuery({ queryKey: ['targets'], queryFn: () => api.get<Target[]>('/api/targets') })
   const projects = useQuery({ queryKey: ['projects'], queryFn: () => api.get<Project[]>('/api/projects') })
@@ -35,8 +35,8 @@ export function TargetsPage() {
   return (
     <>
       <PageHeader
-        title="Targets"
-        description="The chatbot versions you test: anything reachable over HTTP, a Python function, or answers imported from logs. Changing a target makes a new version; runs keep the version they used."
+        title="Connections"
+        description="Where your chatbots run: anything reachable over HTTP, a Python function, or answers imported from logs. Changing a connection's model or prompt makes a new version; runs keep the version they used."
         actions={<Link to="/targets/new" viewTransition className={linkButton('primary')}><Plug className="size-3.5" /> Connect a chatbot</Link>}
       />
       {targets.isLoading ? <Loading /> : targets.isError ? <ErrorState error={targets.error} /> : targets.data!.length === 0 ? (
@@ -109,7 +109,7 @@ export function TargetPage() {
   const projects = useQuery({ queryKey: ['projects'], queryFn: () => api.get<Project[]>('/api/projects') })
   const health = useQuery({ queryKey: ['target-health', id], queryFn: () => api.get<{ runs: { id: number; pass_rate: number | null }[]; typical_latency_ms: number | null; telemetry: Record<string, number> }>(`/api/targets/${id}/health`) })
   const project = projects.data?.find((p) => p.id === t.data?.project_id)
-  useCrumbs([...(project ? [{ label: project.name, to: `/p/${project.id}` }] : [{ label: 'Targets', to: '/targets' }]), { label: t.data?.name ?? '...' }], `target-${id}-${t.data?.name}-${project?.name}`)
+  useCrumbs([...(project ? [{ label: project.name, to: `/p/${project.id}` }] : [{ label: 'Connections', to: '/targets' }]), { label: t.data?.name ?? '...' }], `target-${id}-${t.data?.name}-${project?.name}`)
   const [message, setMessage] = useState('What can you help me with?')
   const [view, setView] = useState<'seen' | 'raw'>('seen')
   const [cfgView, setCfgView] = useState<'summary' | 'json'>('summary')
@@ -169,7 +169,7 @@ export function TargetPage() {
               </div>
             )}
           </Card>
-          <Card title="Health" subtitle="From the latest runs of this target">
+          <Card title="Health" subtitle="From the latest runs of this connection">
             <div className="grid grid-cols-3 gap-3 text-[13px]">
               <div><div className="text-xs text-ink-3">Last check</div><div>{lc ? (lc.ok ? `ok - ${when(lc.at)}` : 'failed') : 'never'}</div></div>
               <div><div className="text-xs text-ink-3">Typical answer time</div><div className="num">{ms(health.data?.typical_latency_ms)}</div></div>

@@ -515,3 +515,82 @@ export function ProjectMark({ name, color, size = 28 }: { name: string; color?: 
     </span>
   )
 }
+
+/**
+ * A circled "?" beside a label: click (or Enter) to read a short explanation; Esc or a click
+ * elsewhere closes it. A span, not a button, so clicking a <label> around it still reaches the
+ * control instead of opening the help.
+ */
+export function Help({ title, children, label = 'What is this?', wide = false }: { title: ReactNode; children: ReactNode; label?: string; wide?: boolean }) {
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
+  const ref = useRef<HTMLSpanElement>(null)
+  const pop = useRef<HTMLDivElement>(null)
+  const w = wide ? 420 : 320
+  const toggle = (e: { preventDefault: () => void; stopPropagation: () => void }) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (pos) { setPos(null); return }
+    const r = ref.current?.getBoundingClientRect()
+    if (!r) return
+    const below = r.bottom + 6
+    setPos({ x: Math.max(8, Math.min(r.left - 12, window.innerWidth - w - 8)), y: below })
+  }
+  useEffect(() => {
+    if (!pos) return
+    const close = (e: MouseEvent | KeyboardEvent) => {
+      if (e instanceof KeyboardEvent) { if (e.key === 'Escape') setPos(null); return }
+      if (!pop.current?.contains(e.target as Node) && !ref.current?.contains(e.target as Node)) setPos(null)
+    }
+    const away = () => setPos(null)
+    document.addEventListener('mousedown', close)
+    document.addEventListener('keydown', close)
+    window.addEventListener('scroll', away, true)
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', close); window.removeEventListener('scroll', away, true) }
+  }, [pos])
+  return (
+    <>
+      <span ref={ref} role="button" tabIndex={0} aria-label={label} aria-expanded={!!pos} onClick={toggle}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggle(e) }}
+        className={clsx('ml-1 inline-flex size-4 cursor-pointer select-none items-center justify-center rounded-full border align-[-2px] text-[10px] font-bold leading-none transition-colors',
+          pos ? 'border-accent bg-accent text-on-accent' : 'border-ink-3/60 text-ink-3 hover:border-accent hover:text-accent-ink')}>
+        ?
+      </span>
+      {pos && createPortal(
+        <motion.div ref={pop} role="dialog" aria-label={typeof title === 'string' ? title : label} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.14 }}
+          className="fixed z-[85] rounded-xl border border-line bg-surface p-3.5 text-[13px] font-normal normal-case leading-relaxed tracking-normal text-ink-2 shadow-pop"
+          style={{ left: pos.x, top: pos.y, width: w, maxWidth: 'calc(100vw - 16px)' }}>
+          <div className="mb-1.5 flex items-start gap-2">
+            <div className="flex-1 font-semibold text-ink">{title}</div>
+            <button type="button" aria-label="Close" onClick={() => setPos(null)} className="text-ink-3 hover:text-ink"><X className="size-3.5" /></button>
+          </div>
+          <div className="space-y-2">{children}</div>
+        </motion.div>,
+        document.body,
+      )}
+    </>
+  )
+}
+
+/** A centred dialog over a dimmed page. Esc or the backdrop closes it. */
+export function Dialog({ open, onClose, title, children, width = 560 }: { open: boolean; onClose: () => void; title: ReactNode; children: ReactNode; width?: number }) {
+  useEffect(() => {
+    if (!open) return
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', key)
+    return () => document.removeEventListener('keydown', key)
+  }, [open, onClose])
+  if (!open) return null
+  return createPortal(
+    <div className="fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-[8vh]" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <motion.div role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined} initial={{ opacity: 0, y: 8, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.16 }}
+        className="w-full rounded-2xl border border-line bg-surface shadow-pop" style={{ maxWidth: width }}>
+        <div className="flex items-center gap-2 border-b border-line px-4 py-3">
+          <div className="flex-1 text-[15px] font-semibold">{title}</div>
+          <button type="button" aria-label="Close" onClick={onClose} className="rounded-md p-1 text-ink-3 hover:bg-surface-2 hover:text-ink"><X className="size-4" /></button>
+        </div>
+        <div className="p-4">{children}</div>
+      </motion.div>
+    </div>,
+    document.body,
+  )
+}

@@ -20,6 +20,7 @@ def target(s: Session, t: m.Target, with_versions: bool = False) -> dict[str, An
     out = {"id": t.id, "project_id": t.project_id, "name": t.name, "description": t.description,
            "adapter": t.adapter, "archived": t.archived, "created_at": iso(t.created_at),
            "local_judges_only": t.local_judges_only, "last_check": t.last_check,
+           "shared": bool(t.shared), "cost_per_answer_usd": t.cost_per_answer_usd,
            "latest_version": version(tv)}
     if with_versions:
         out["versions"] = [version(v) for v in t.versions]
@@ -52,6 +53,7 @@ def dataset(s: Session, d: m.Dataset) -> dict[str, Any]:
                        .where(m.GeneratedTestCandidate.dataset_id == d.id,
                               m.GeneratedTestCandidate.status == "unreviewed")) or 0
     return {"id": d.id, "project_id": d.project_id, "name": d.name, "description": d.description,
+            "archived": bool(d.archived), "run_count": sum(v["run_count"] for v in versions),
             "created_at": iso(d.created_at), "versions": versions, "latest": versions[-1] if versions else None,
             "unreviewed_candidates": pending}
 

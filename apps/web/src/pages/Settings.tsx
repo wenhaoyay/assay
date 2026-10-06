@@ -6,6 +6,7 @@ import { Fragment, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Badge, Button, Card, Empty, ErrorState, Explain, Field, Input, Json, Loading, Notice, PageHeader, Segmented, Select, Table, Tabs, Term, Toggle } from '../components/ui'
 import { api } from '../lib/api'
+import { whereLabel } from '../lib/models'
 import { useCrumbs } from '../lib/crumbs'
 import { ms, pct, usd } from '../lib/format'
 import { usePrefs } from '../lib/prefs'
@@ -113,7 +114,7 @@ function ModelCard({ m, settings, onChange }: { m: ProviderConfig; settings?: Se
               <Badge tone={m.key_status === 'set' ? 'good' : 'bad'}><Lock className="size-3" />{m.key_status === 'set' ? `${m.key_hint ?? 'key set'} (${m.key_kind === 'keyring' ? 'OS store' : 'environment'})` : `${m.api_key_ref} missing`}</Badge>
             ) : <Badge tone="good">no key needed</Badge>}
             <Badge tone={m.calibration?.n ? 'good' : 'warn'} title="Agreement with your own labels is measured per model"><Term k="calibrated">{m.calibration?.status ?? 'Uncalibrated'}</Term></Badge>
-            <span className="text-ink-3">{m.local ? 'answers stay on this machine' : 'answers are sent to the provider'}</span>
+            <span className="text-ink-3">{m.cloud_via_ollama ? "answers go to Ollama's servers (a cloud model)" : m.local ? 'answers stay on this machine' : 'answers are sent to the provider'}</span>
           </div>
         </div>
       </div>
@@ -255,7 +256,7 @@ function DefaultsTab() {
           onChange={(e) => put.mutate({ default_judge: e.target.value === '' ? null : e.target.value === 'heuristic' ? { provider: 'heuristic' } : { provider_config_id: Number(e.target.value) } })}>
           <option value="">None</option>
           <option value="heuristic">Heuristic (word overlap, free, not an LLM)</option>
-          {(models.data ?? []).map((m) => <option key={m.id} value={m.id}>{m.name} ({m.local ? 'local' : 'cloud'})</option>)}
+          {(models.data ?? []).map((m) => <option key={m.id} value={m.id}>{m.name} ({whereLabel(m)})</option>)}
         </Select>
         <Explain className="mt-2">Changing the default never re-grades old runs: each run keeps the grading model it used.</Explain>
       </Card>

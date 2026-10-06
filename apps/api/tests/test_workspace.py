@@ -215,3 +215,61 @@ def test_bakeoff_needs_labels_then_ranks_judges(client):
     assert j["n"] == 4 and j["agreement"]["n"] >= 0 and j["name"].startswith("heuristic/")
     st = c.get("/api/calibration/correctness/stats?judge=nobody/none").json()
     assert st["agreement"]["n"] == 0 and st["by_judge"]
+
+
+def test_datasets_move_delete_and_archive(client):
+    c, s = client, client.seeded
+    other = c.post("/api/projects", json={"name": "Second bot"}).json()
+    blank = c.post("/api/datasets", json={"project_id": s["project_id"], "name": "qwe", "cases": []}).json()
+    # Moving it to another chatbot: New run lists it there.
+    moved = c.patch(f"/api/datasets/{blank['id']}", json={"project_id": other["id"]}).json()
+    assert moved["project_id"] == other["id"]
+    assert [d["id"] for d in c.get(f"/api/datasets?project_id={other['id']}").json()] == [blank["id"]]
+    # Unused: deleted for good.
+    assert c.delete(f"/api/datasets/{blank['id']}").status_code == 200
+    assert c.get(f"/api/datasets/{blank['id']}").status_code == 404
+    # Used by a run: refused, archive instead; archived sets are hidden unless asked for.
+    launch(c, s["baseline_target_version_id"], s["dataset_version_id"], "base", evaluators=["must_mention"], trials=1)
+    ds_id = c.get("/api/datasets").json()[0]["id"]
+    r = c.delete(f"/api/datasets/{ds_id}")
+    assert r.status_code == 409 and "Archive" in r.json()["detail"]["message"] and r.json()["detail"]["run_ids"]
+    assert c.patch(f"/api/datasets/{ds_id}", json={"archived": True}).json()["archived"] is True
+    assert ds_id not in [d["id"] for d in c.get("/api/datasets").json()]
+    assert ds_id in [d["id"] for d in c.get("/api/datasets?include_archived=true").json()]
+
+
+def test_gates_by_chatbot_and_full_records(client):
+    c, s = client, client.seeded
+    other = c.post("/api/projects", json={"name": "Second bot"}).json()
+    g = c.post("/api/gates", json={"project_id": other["id"], "name": "G", "config": {"overall_pass_rate": {"min": 0.8}}}).json()
+    assert g["project_id"] == other["id"] and g["created_at"]
+    assert [x["id"] for x in c.get(f"/api/gates?project_id={other['id']}").json()] == [g["id"]]
+    moved = c.put(f"/api/gates/{g['id']}", json={"project_id": s["project_id"], "name": "G", "config": g["config"]}).json()
+    assert moved["project_id"] == s["project_id"]
+
+
+def test_ollama_cloud_models_are_not_local(client):
+    c, s = client, client.seeded
+    cloud = c.post("/api/models", json={"name": "oss cloud", "provider": "ollama", "model": "gpt-oss:120b-cloud"}).json()
+    assert cloud["local"] is False and cloud["cloud_via_ollama"] is True
+    tid = c.get("/api/targets").json()[1]["id"]
+    c.patch(f"/api/targets/{tid}/flags", json={"local_judges_only": True})
+    body = {"project_id": s["project_id"], "name": "x", "target_version_id": s["candidate_target_version_id"],
+            "dataset_version_id": s["dataset_version_id"], "evaluators": ["correctness"],
+            "judge": {"provider_config_id": cloud["id"]}}
+    r = c.post("/api/experiments", json=body)
+    assert r.status_code == 422 and "Ollama's servers" in r.json()["detail"]
+
+
+def test_demo_flag_template_and_plain_csv(client):
+    c, s = client, client.seeded
+    assert [p["is_demo"] for p in c.get("/api/projects").json()] == [True]
+    assert c.put("/api/settings", json={"hide_demo": True}).json()["values"]["hide_demo"] is True
+    tpl = c.get("/api/datasets/template.csv")
+    assert tpl.status_code == 200 and tpl.text.startswith("﻿Question,Must mention")
+    r = c.post("/api/datasets/import", data={"project_id": s["project_id"]},
+               files={"file": ("colleagues.csv", tpl.content, "text/csv")})
+    assert r.status_code == 201, r.text
+    cases = c.get(f"/api/dataset-versions/{r.json()['latest']['id']}").json()["cases"]
+    assert cases[0]["expected"]["answer"]["must_mention"] == ["24 months", "receipt"]
+    assert cases[2]["expected"]["refusal_expected"] is True

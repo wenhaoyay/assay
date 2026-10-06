@@ -39,6 +39,7 @@ class Project(Base):
     description: Mapped[str] = mapped_column(Text, default="")
     color: Mapped[str] = mapped_column(String(20), default="")  # a palette name chosen in the UI
     icon: Mapped[str] = mapped_column(String(40), default="")
+    is_demo: Mapped[bool] = mapped_column(Boolean, default=False)  # seeded sample data; can be hidden
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -66,6 +67,10 @@ class Target(Base):
     archived: Mapped[bool] = mapped_column(Boolean, default=False)
     # Its answers may only be graded by a judge running on this machine (Ollama, LM Studio...).
     local_judges_only: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Other people use this bot: runs default to few questions at a time.
+    shared: Mapped[bool] = mapped_column(Boolean, default=False)
+    # What one answer costs when the bot reports no token counts (set by the user; an estimate).
+    cost_per_answer_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
     # The last connection check: {"ok", "at", "elapsed_ms", "error", "explanation", "coverage"}.
     last_check: Mapped[dict[str, Any] | None] = mapped_column(NullableJSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -92,6 +97,7 @@ class Dataset(Base):
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"))
     name: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text, default="")
+    archived: Mapped[bool] = mapped_column(Boolean, default=False)  # hidden; kept because runs used it
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     versions: Mapped[list[DatasetVersion]] = relationship(back_populates="dataset", order_by="DatasetVersion.version")
 

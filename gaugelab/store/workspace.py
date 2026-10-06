@@ -21,12 +21,15 @@ from gaugelab.schemas import NormalizedTargetResult, TestCase
 from gaugelab.secrets import describe as describe_secret
 from gaugelab.store import models as m
 from gaugelab.store import service as svc
-from gaugelab.store.insights import is_local_provider
+from gaugelab.store.insights import is_cloud_model_name, is_local_provider
 
 DEFAULTS: dict[str, Any] = {
     "default_judge": None,  # {"provider_config_id": n} | {"provider": "heuristic"} | None
     "default_generator": None,  # {"provider_config_id": n} | None
     "spend_cap_usd": None,  # applied to new runs that do not set their own budget
+    "hide_demo": False,  # hide the seeded demo chatbot from lists
+    # When the person acknowledged the third-party notice before downloading a local model.
+    "ollama_notice_ack": None,
 }
 
 
@@ -67,7 +70,8 @@ def provider_public(s: Session, pc: m.ProviderConfig) -> dict[str, Any]:
     return {"id": pc.id, "name": pc.name, "provider": pc.provider, "model": pc.model, "base_url": pc.base_url,
             "api_key_ref": pc.api_key_ref, "key_status": key["status"], "key_hint": key["hint"],
             "key_kind": key["kind"], "temperature": pc.temperature, "max_tokens": pc.max_tokens,
-            "local": is_local_provider(pc), "catalog_id": guess_catalog_id(pc.provider, pc.base_url),
+            "local": is_local_provider(pc), "cloud_via_ollama": pc.provider == "ollama" and is_cloud_model_name(pc.model),
+            "catalog_id": guess_catalog_id(pc.provider, pc.base_url),
             "used_by_runs": used,
             "default_for": [k.removeprefix("default_") for k in ("default_judge", "default_generator")
                             if (settings.get(k) or {}).get("provider_config_id") == pc.id],
@@ -267,8 +271,9 @@ def judge_allowed(s: Session, target_id: int, judge: dict[str, Any] | None) -> s
         return None
     pc = s.get(m.ProviderConfig, judge.get("provider_config_id"))
     if pc is not None and not is_local_provider(pc):
+        where = "Ollama's servers (a cloud model, though reached through the local Ollama)"             if is_cloud_model_name(pc.model) else (pc.base_url or pc.provider)
         return (f"'{t.name}' is set to local judges only, and {pc.name} sends answers to "
-                f"{pc.base_url or pc.provider}. Pick a judge that runs on this machine.")
+                f"{where}. Pick a judge that runs on this machine.")
     return None
 
 
@@ -280,6 +285,31 @@ def dry_run_summary(calls: list[dict[str, Any]], dataset_cases: int, trials: int
     per = statistics.median(lat) if lat else None
     total_calls = dataset_cases * trials
     return {"calls": calls, "ok": len(ok), "median_ms": round(per) if per else None,
+            "per_answer_cost_usd": statistics.mean(costs) if costs else None,
             "full_run_calls": total_calls,
             "full_run_seconds": round(per * total_calls / max(1, concurrency) / 1000) if per else None,
             "full_run_cost_usd": (statistics.mean(costs) * total_calls) if costs else None}
+
+
+def load_summary(alone: list[dict[str, Any]], together: list[dict[str, Any]]) -> dict[str, Any]:
+    """The same questions one at a time, then all at once: does the bot slow down when busy?"""
+    def med(calls: list[dict[str, Any]]) -> float | None:
+        lat = [c["elapsed_ms"] for c in calls if c.get("ok") and c.get("elapsed_ms")]
+        return statistics.median(lat) if lat else None
+
+    a, b = med(alone), med(together)
+    errors = sum(1 for c in together if not c.get("ok"))
+    ratio = (b / a) if a and b else None
+    if errors:
+        verdict, suggest = "errors", 1
+    elif ratio is None:
+        verdict, suggest = "unknown", 2
+    elif ratio < 1.3:
+        verdict, suggest = "copes", 4
+    elif ratio < 2.0:
+        verdict, suggest = "slows", 2
+    else:
+        verdict, suggest = "queues", 1
+    return {"alone_ms": round(a) if a else None, "together_ms": round(b) if b else None, "n": len(together),
+            "ratio": round(ratio, 2) if ratio else None, "errors": errors, "verdict": verdict,
+            "suggested_concurrency": suggest, "calls": together}

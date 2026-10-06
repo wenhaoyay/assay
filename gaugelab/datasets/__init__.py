@@ -25,6 +25,7 @@ import csv
 import hashlib
 import io
 import json
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -105,12 +106,44 @@ CSV_COLUMNS = {"id", "question", "message", "reference_answer", "expected_answer
                "must_mention", "must_not_claim", "relevant_documents", "required_tools", "refusal_expected"}
 
 
+# Plain column names (the spreadsheet template for colleagues) and their technical names.
+BOM = "\ufeff"  # Excel writes one at the start of a UTF-8 CSV
+
+CSV_ALIASES = {
+    "question_people_ask": "question", "questions": "question",
+    "must_say": "must_mention", "must_contain": "must_mention", "must_mention_comma_separated": "must_mention",
+    "must_never_say": "must_not_claim", "must_not_say": "must_not_claim", "never_say": "must_not_claim",
+    "should_refuse": "refusal_expected", "should_refuse_yes_no": "refusal_expected", "refuse": "refusal_expected",
+    "correct_answer": "reference_answer", "reference": "reference_answer", "model_answer": "reference_answer",
+    "documents": "relevant_documents", "source_documents": "relevant_documents", "sources": "relevant_documents",
+    "tools": "required_tools", "type": "category", "topic": "category",
+}
+
+
+def _column(header: str) -> str:
+    """'Must mention (comma-separated)' -> 'must_mention'; unknown names come back normalised."""
+    h = re.sub(r"[^a-z0-9]+", "_", re.sub(r"\(.*?\)", "", header.strip().lstrip(BOM)).lower()).strip("_")
+    full = re.sub(r"[^a-z0-9]+", "_", header.strip().lstrip(BOM).lower()).strip("_")
+    for key in (full, h):
+        if key in CSV_COLUMNS:
+            return key
+        if key in CSV_ALIASES:
+            return CSV_ALIASES[key]
+    return h or header
+
+
 def _split(v: str | None) -> list[str]:
-    return [x.strip() for x in v.replace(";", "|").split("|") if x.strip()] if v else []
+    """'a | b' or 'a; b' always split; plain 'a, b' splits on comma-space ("1,000" stays whole)."""
+    if not v:
+        return []
+    parts = v.replace(";", "|").split("|") if "|" in v or ";" in v else re.split(r",\s+", v)
+    return [x.strip() for x in parts if x.strip()]
 
 
 def cases_from_csv(text: str) -> list[TestCase]:
-    reader = csv.DictReader(io.StringIO(text))
+    reader = csv.DictReader(io.StringIO(text.lstrip(BOM)))
+    if reader.fieldnames:
+        reader.fieldnames = [_column(h) for h in reader.fieldnames]
     cols = set(reader.fieldnames or [])
     if not cols & {"question", "message"}:
         raise DatasetError(["CSV header: needs a 'question' (or 'message') column"])

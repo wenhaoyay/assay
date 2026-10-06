@@ -105,10 +105,12 @@ def project_card(s: Session, p: m.Project) -> dict[str, Any]:
         gate = g.status if g else None
     return {
         "id": p.id, "name": p.name, "description": p.description, "color": p.color or "", "icon": p.icon or "",
+        "is_demo": bool(p.is_demo),
         "created_at": p.created_at.isoformat() if p.created_at else None,
         "counts": {
             "targets": len(s.scalars(select(m.Target.id).where(m.Target.project_id == p.id, m.Target.archived.is_(False))).all()),
-            "datasets": len(s.scalars(select(m.Dataset.id).where(m.Dataset.project_id == p.id)).all()),
+            "datasets": len(s.scalars(select(m.Dataset.id).where(m.Dataset.project_id == p.id,
+                                                                 m.Dataset.archived.is_(False))).all()),
             "runs": len(runs),
         },
         "active_runs": len([r for r in runs if r.status in ("queued", "running")]),
@@ -342,7 +344,16 @@ def estimate_setup(s: Session, target_version_id: int, dataset_version_id: int, 
                      "No past runs of this target: time unknown until the first run.")}
 
 
+def is_cloud_model_name(model: str | None) -> bool:
+    """Ollama's hosted models ("gpt-oss:120b-cloud", "...:cloud") are reached through the local
+    Ollama but run on Ollama's servers: the question and answer leave this machine."""
+    name = (model or "").lower()
+    return name.endswith("-cloud") or name.endswith(":cloud")
+
+
 def is_local_provider(pc: m.ProviderConfig) -> bool:
+    if is_cloud_model_name(pc.model):
+        return False
     if pc.provider == "ollama":
         return True
     url = (pc.base_url or "").lower()

@@ -5,7 +5,8 @@ import { useState } from 'react'
 import { Badge, Button, Card, Empty, ErrorState, Explain, Field, Input, Loading, PageHeader, Segmented, Select, Textarea } from '../components/ui'
 import { api } from '../lib/api'
 import { useCrumbs } from '../lib/crumbs'
-import type { EvaluatorInfo, Gate, Project } from '../lib/types'
+import { projectOption, useProjects } from '../lib/projects'
+import type { EvaluatorInfo, Gate } from '../lib/types'
 
 type Rule = { metric: string; kind: 'min' | 'max' | 'drop'; value: string }
 
@@ -52,7 +53,7 @@ export function GatesPage() {
   useCrumbs([{ label: 'Setup' }, { label: 'Gates' }], 'gates')
   const qc = useQueryClient()
   const gates = useQuery({ queryKey: ['gates'], queryFn: () => api.get<Gate[]>('/api/gates') })
-  const projects = useQuery({ queryKey: ['projects'], queryFn: () => api.get<Project[]>('/api/projects') })
+  const projects = useProjects()
   const evs = useQuery({ queryKey: ['evaluators'], queryFn: () => api.get<{ evaluators: EvaluatorInfo[] }>('/api/evaluators') })
   const [editing, setEditing] = useState<Gate | 'new' | null>(null)
   const [name, setName] = useState('')
@@ -65,15 +66,24 @@ export function GatesPage() {
   const save = useMutation({
     mutationFn: () => {
       const config = mode === 'json' ? JSON.parse(text) : rulesToGate(rules)
-      const body = { project_id: projectId || projects.data?.[0]?.id || 1, name, config }
-      return editing === 'new' ? api.post('/api/gates', body) : api.put(`/api/gates/${(editing as Gate).id}`, body)
+      const body = { project_id: projectId || projects.visible[0]?.id || 1, name, config }
+      return editing === 'new' ? api.post<Gate>('/api/gates', body) : api.put<Gate>(`/api/gates/${(editing as Gate).id}`, body)
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['gates'] }); setEditing(null) },
+    // Show the saved gate at once (no wait for the refetch), then confirm with the server.
+    onSuccess: (g) => {
+      qc.setQueryData<Gate[]>(['gates'], (old) => {
+        const list = old ?? []
+        return list.some((x) => x.id === g.id) ? list.map((x) => (x.id === g.id ? g : x)) : [...list, g]
+      })
+      qc.invalidateQueries({ queryKey: ['gates'] })
+      qc.invalidateQueries({ queryKey: ['home'] })
+      setEditing(null)
+    },
   })
   const start = (g: Gate | 'new') => {
     setEditing(g)
     setName(g === 'new' ? 'Release gate' : g.name)
-    setProjectId(g === 'new' ? projects.data?.[0]?.id ?? '' : g.project_id)
+    setProjectId(g === 'new' ? (projects.visible.find((p) => !p.is_demo) ?? projects.visible[0])?.id ?? '' : g.project_id)
     const cfg = g === 'new' ? { overall_pass_rate: { min: 0.85 }, p95_latency_ms: { max: 3000 }, regression: { overall_pass_rate: { maximum_drop: 0.03 } } } : g.config
     setRules(gateToRules(cfg))
     setText(JSON.stringify(cfg, null, 2))
@@ -91,7 +101,7 @@ export function GatesPage() {
             <Card title={editing === 'new' ? 'New gate' : `Edit ${editing.name}`} actions={<Segmented size="sm" value={mode} onChange={(m) => { if (m === 'json') setText(JSON.stringify(rulesToGate(rules), null, 2)); else { try { setRules(gateToRules(JSON.parse(text))) } catch { /* keep */ } } setMode(m) }} options={[{ id: 'form', label: 'Rules' }, { id: 'json', label: 'JSON' }]} />}>
               <div className="grid gap-3 md:grid-cols-2">
                 <Field label="Name"><Input value={name} onChange={(e) => setName(e.target.value)} /></Field>
-                <Field label="Chatbot"><Select value={projectId} onChange={(e) => setProjectId(Number(e.target.value))}>{(projects.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
+                <Field label="Chatbot"><Select value={projectId} onChange={(e) => setProjectId(Number(e.target.value))} aria-label="Gate chatbot">{projects.visible.map((p) => <option key={p.id} value={p.id}>{projectOption(p)}</option>)}</Select></Field>
               </div>
               {mode === 'form' ? (
                 <div className="mt-4 space-y-2">
@@ -122,7 +132,7 @@ export function GatesPage() {
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
           {gates.data!.map((g) => (
-            <Card key={g.id} title={<span className="flex items-center gap-2"><ShieldCheck className="size-4 text-accent" />{g.name}</span>} subtitle={projects.data?.find((p) => p.id === g.project_id)?.name}
+            <Card key={g.id} title={<span className="flex items-center gap-2"><ShieldCheck className="size-4 text-accent" />{g.name}</span>} subtitle={projects.all.find((p) => p.id === g.project_id)?.name}
               actions={<Button size="sm" variant="ghost" onClick={() => start(g)}>Edit</Button>}>
               <ul className="space-y-1.5">
                 {gateToRules(g.config).map((r, i) => <li key={i} className="flex items-center gap-2 text-[13px]"><Badge tone={r.kind === 'drop' ? 'info' : 'neutral'}>{r.kind === 'drop' ? 'vs baseline' : 'absolute'}</Badge>{describe(r)}</li>)}

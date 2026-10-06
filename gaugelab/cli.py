@@ -194,7 +194,7 @@ def cmd_export(args) -> int:
 
     with _session()() as s:
         resp = export(args.run_id, args.format, args.baseline, s)
-    text = resp.body.decode("utf-8")
+    text = bytes(resp.body).decode("utf-8")
     if args.out:
         Path(args.out).write_text(text, encoding="utf-8")
         print(f"Wrote {args.out}", file=sys.stderr)

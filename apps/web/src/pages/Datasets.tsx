@@ -1,14 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { Download, FileUp, Lock, Plus, Sparkles } from 'lucide-react'
+import { Archive, ArchiveRestore, Download, Lock, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { DatasetAdd } from '../components/DatasetAdd'
 import { CaseMatrixView, MatrixLegend } from '../components/viz'
 import { Badge, Button, Card, Empty, ErrorState, Explain, Field, Input, Json, Loading, Notice, PageHeader, Segmented, Select, StatusBadge, Table, Tabs, Textarea } from '../components/ui'
 import { api } from '../lib/api'
 import { useCrumbs } from '../lib/crumbs'
 import { when } from '../lib/format'
 import { usePrefs } from '../lib/prefs'
+import { projectOption, useProjects } from '../lib/projects'
 import type { Candidate, CaseMatrix, Dataset, DatasetVersion, EditResult, Project, ProviderConfig, Settings, TestCase } from '../lib/types'
 
 export function VersionBadge({ v }: { v: Pick<DatasetVersion, 'version' | 'status' | 'run_count'> }) {
@@ -36,72 +38,99 @@ function GroundTruthNote() {
 
 export function DatasetsPage() {
   useCrumbs([{ label: 'Setup' }, { label: 'Datasets' }], 'datasets')
-  const qc = useQueryClient()
-  const datasets = useQuery({ queryKey: ['datasets'], queryFn: () => api.get<Dataset[]>('/api/datasets') })
-  const projects = useQuery({ queryKey: ['projects'], queryFn: () => api.get<Project[]>('/api/projects') })
-  const [file, setFile] = useState<File | null>(null)
-  const [name, setName] = useState('')
-  const [newName, setNewName] = useState('')
-  const projectId = async () => projects.data?.[0]?.id ?? (await api.post<Project>('/api/projects', { name: 'Default' })).id
-  const upload = useMutation({
-    mutationFn: async () => {
-      const form = new FormData()
-      form.set('project_id', String(await projectId()))
-      if (name) form.set('name', name)
-      form.set('file', file!)
-      return api.upload<Dataset>('/api/datasets/import', form)
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['datasets'] }); setFile(null); setName('') },
-  })
-  const create = useMutation({
-    mutationFn: async () => api.post<Dataset>('/api/datasets', { project_id: await projectId(), name: newName, cases: [] }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['datasets'] }); setNewName('') },
-  })
+  const [params] = useSearchParams()
+  const [showArchived, setShowArchived] = useState(false)
+  const datasets = useQuery({ queryKey: ['datasets', 'with-archived'], queryFn: () => api.get<Dataset[]>('/api/datasets?include_archived=true') })
+  const projects = useProjects()
+  const fromProject = Number(params.get('project')) || ''
+  const all = (datasets.data ?? []).filter((d) => !projects.hideDemo || !projects.all.find((p) => p.id === d.project_id)?.is_demo)
+  const shown = all.filter((d) => showArchived || !d.archived)
+  const archivedCount = all.filter((d) => d.archived).length
 
   return (
     <>
       <PageHeader title="Datasets" description="Versioned golden datasets: test cases with the outcomes a person expects. A version used by a run is frozen for good." />
-      <div className="mb-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
-        <GroundTruthNote />
-        <Card title="Add a dataset">
-          <div className="space-y-3">
-            <div className="flex gap-2">
-              <Input placeholder="New empty dataset name" value={newName} onChange={(e) => setNewName(e.target.value)} />
-              <Button disabled={!newName.trim()} loading={create.isPending} onClick={() => create.mutate()}><Plus className="size-3.5" /> Create</Button>
-            </div>
-            <div className="border-t border-line pt-3">
-              <Field label="Or import JSON / YAML / CSV" hint="CSV columns: id, question, reference_answer, must_mention, must_not_claim, relevant_documents, required_tools, refusal_expected, category, difficulty, tags.">
-                <input type="file" accept=".json,.yaml,.yml,.csv" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="block w-full text-xs file:mr-3 file:rounded-md file:border file:border-line-strong file:bg-surface file:px-2.5 file:py-1 file:text-xs" />
-              </Field>
-              <div className="mt-2 flex gap-2">
-                <Input placeholder="Name (optional)" value={name} onChange={(e) => setName(e.target.value)} />
-                <Button disabled={!file} loading={upload.isPending} onClick={() => upload.mutate()}><FileUp className="size-3.5" /> Import</Button>
-              </div>
-              {upload.isError && <div className="mt-2"><ErrorState error={upload.error} /></div>}
-              {create.isError && <div className="mt-2"><ErrorState error={create.error} /></div>}
-            </div>
-          </div>
+      <div className="mb-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
+        <div className="space-y-5">
+          <GroundTruthNote />
+          <WaysToBuild />
+        </div>
+        <Card title="Add questions">
+          <DatasetAdd key={fromProject} defaultProjectId={fromProject} />
         </Card>
       </div>
-      {datasets.isLoading ? <Loading /> : datasets.isError ? <ErrorState error={datasets.error} /> : datasets.data!.length === 0 ? (
-        <Empty title="No datasets yet">Import a file above, or run <code>gaugelab seed</code> for the 58-case Acme golden set.</Empty>
+      {datasets.isLoading ? <Loading /> : datasets.isError ? <ErrorState error={datasets.error} /> : all.length === 0 ? (
+        <Empty title="No datasets yet">Add questions above, or run <code>gaugelab seed</code> for the 58-case Acme golden set.</Empty>
       ) : (
-        <Card padded={false}>
+        <Card padded={false} title={<span className="flex items-center gap-2">{shown.length} dataset{shown.length === 1 ? '' : 's'}</span>}
+          actions={archivedCount > 0 && <Button size="sm" variant="ghost" onClick={() => setShowArchived((v) => !v)}>{showArchived ? 'Hide' : 'Show'} {archivedCount} archived</Button>}>
           <Table>
-            <thead><tr><th>Dataset</th><th>Latest version</th><th className="text-right">Cases</th><th>Change</th><th>Review queue</th></tr></thead>
+            <thead><tr><th>Dataset</th><th>Chatbot</th><th>Latest version</th><th className="text-right">Cases</th><th>Review queue</th><th className="w-40" /></tr></thead>
             <tbody>
-              {datasets.data!.map((d) => (
-                <tr key={d.id} className="hover:bg-surface-2/60">
-                  <td><Link to={`/datasets/${d.id}`} className="font-medium hover:underline">{d.name}</Link><div className="max-w-xl truncate text-xs text-ink-3">{d.description}</div></td>
-                  <td>{d.latest && <VersionBadge v={d.latest} />}</td>
-                  <td className="num text-right">{d.latest?.case_count ?? 0}</td>
-                  <td className="max-w-72 truncate text-xs text-ink-2">{d.latest?.change_summary}</td>
-                  <td>{d.unreviewed_candidates > 0 ? <Badge tone="warn">{d.unreviewed_candidates} unreviewed</Badge> : <span className="text-xs text-ink-3">-</span>}</td>
-                </tr>
-              ))}
+              {shown.map((d) => <DatasetRow key={d.id} d={d} projects={projects.all} />)}
             </tbody>
           </Table>
         </Card>
+      )}
+    </>
+  )
+}
+
+/** Where golden questions can come from, each one click away. */
+function WaysToBuild() {
+  return (
+    <Card title="Ways to build a set" subtitle="The machine does the typing; you vouch for every case">
+      <ul className="grid gap-2 text-[13px] sm:grid-cols-2">
+        <li><b>Approve good answers</b><span className="block text-xs text-ink-3">Open a dataset → <i>Build</i>: mark a bot's answers right or wrong; GaugeLab suggests what a correct answer must mention.</span></li>
+        <li><b>Prompt kit</b><span className="block text-xs text-ink-3">Copy a ready prompt into your own ChatGPT or Claude with your documents; the result lands in the review queue.</span></li>
+        <li><b>Real questions</b><span className="block text-xs text-ink-3">Upload chat history; similar questions are grouped by how often they were asked.</span></li>
+        <li><b>Colleagues</b><span className="block text-xs text-ink-3">Send the <a className="text-accent-ink underline" href="/api/datasets/template.csv">spreadsheet template</a> or use expert interview mode.</span></li>
+      </ul>
+    </Card>
+  )
+}
+
+function DatasetRow({ d, projects }: { d: Dataset; projects: Project[] }) {
+  const qc = useQueryClient()
+  const [confirm, setConfirm] = useState(false)
+  const refresh = () => { qc.invalidateQueries({ queryKey: ['datasets'] }); qc.invalidateQueries({ queryKey: ['home'] }) }
+  const patch = useMutation({ mutationFn: (body: Record<string, unknown>) => api.patch<Dataset>(`/api/datasets/${d.id}`, body), onSuccess: refresh })
+  const del = useMutation({ mutationFn: () => api.del(`/api/datasets/${d.id}`), onSuccess: () => { setConfirm(false); refresh() } })
+  const used = (d.run_count ?? 0) > 0
+  return (
+    <>
+      <tr className={clsx('hover:bg-surface-2/60', d.archived && 'opacity-60')}>
+        <td>
+          <Link to={`/datasets/${d.id}`} className="font-medium hover:underline">{d.name}</Link>
+          {d.archived && <Badge className="ml-2">archived</Badge>}
+          <div className="max-w-md truncate text-xs text-ink-3">{d.description || d.latest?.change_summary}</div>
+        </td>
+        <td>
+          <Select className="w-52" value={d.project_id} aria-label={`Chatbot of ${d.name}`} onChange={(e) => patch.mutate({ project_id: Number(e.target.value) })}>
+            {projects.map((p) => <option key={p.id} value={p.id}>{projectOption(p)}</option>)}
+          </Select>
+        </td>
+        <td>{d.latest && <VersionBadge v={d.latest} />}</td>
+        <td className="num text-right">{d.latest?.case_count ?? 0}</td>
+        <td>{d.unreviewed_candidates > 0 ? <Badge tone="warn">{d.unreviewed_candidates} unreviewed</Badge> : <span className="text-xs text-ink-3">-</span>}</td>
+        <td className="text-right">
+          {d.archived ? <Button size="sm" variant="ghost" onClick={() => patch.mutate({ archived: false })}><ArchiveRestore className="size-3.5" />Restore</Button>
+            : used ? <Button size="sm" variant="ghost" title="Runs used this set: archiving hides it and keeps their questions" onClick={() => patch.mutate({ archived: true })}><Archive className="size-3.5" />Archive</Button>
+            : <Button size="sm" variant="ghost" onClick={() => setConfirm(true)}><Trash2 className="size-3.5" />Delete</Button>}
+        </td>
+      </tr>
+      {(confirm || patch.isError || del.isError) && (
+        <tr><td colSpan={6} className="bg-surface-2/50">
+          {confirm && (
+            <div className="flex flex-wrap items-center gap-2 text-[13px]">
+              <span>Delete <b>{d.name}</b> and its {d.latest?.case_count ?? 0} question(s)? No run used it. This cannot be undone.</span>
+              <Button size="sm" variant="bad" loading={del.isPending} onClick={() => del.mutate()}>Delete</Button>
+              <Button size="sm" variant="ghost" onClick={() => setConfirm(false)}>Cancel</Button>
+            </div>
+          )}
+          {patch.isError && <ErrorState error={patch.error} />}
+          {del.isError && <ErrorState error={del.error} />}
+        </td></tr>
       )}
     </>
   )

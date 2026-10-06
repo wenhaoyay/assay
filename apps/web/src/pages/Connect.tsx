@@ -7,12 +7,14 @@ import {
   ArrowLeft, ArrowRight, Check, CircleAlert, Code2, FileUp, KeyRound, Lock, MousePointerClick, Plug, Radio, Send, Sparkles, Terminal, Wand2, X,
 } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { CleanupMethodHelp, ConnectionHelp, MethodHelp } from '../components/helpTexts'
 import { JsonTree } from '../components/JsonTree'
-import { Badge, Button, Card, ErrorState, Explain, Field, Input, Json, Notice, PageHeader, PageSkeleton, Segmented, Select, Textarea, Toggle } from '../components/ui'
+import { Badge, Button, Card, ErrorState, Explain, Field, Input, Json, Notice, PageHeader, PageSkeleton, Segmented, Select, Table, Textarea, Toggle } from '../components/ui'
 import { api } from '../lib/api'
 import { useCrumbs } from '../lib/crumbs'
+import { projectOption, useProjects } from '../lib/projects'
 import { ms, usd } from '../lib/format'
 import type { Capability, ConnectorTemplate, Dataset, Project, Target, TargetResult } from '../lib/types'
 
@@ -67,10 +69,10 @@ export function ConnectPage() {
 
 function ConnectWizard({ editing }: { editing: Target | null }) {
   const fromId = editing ? String(editing.id) : null
-  useCrumbs([{ label: 'Targets', to: '/targets' }, { label: fromId ? 'Edit connection' : 'Connect a chatbot' }], `connect-${fromId}`)
+  useCrumbs([{ label: 'Connections', to: '/targets' }, { label: fromId ? 'Edit connection' : 'Connect a chatbot' }], `connect-${fromId}`)
   const nav = useNavigate()
   const qc = useQueryClient()
-  const projects = useQuery({ queryKey: ['projects'], queryFn: () => api.get<Project[]>('/api/projects') })
+  const projects = useProjects()
   const templates = useQuery({ queryKey: ['connector-templates'], queryFn: () => api.get<ConnectorTemplate[]>('/api/connector-templates') })
   const editCfg = editing?.latest_version.config as Cfg | undefined
   const [step, setStep] = useState(editing ? 2 : 0)
@@ -151,18 +153,19 @@ function ConnectWizard({ editing }: { editing: Target | null }) {
         <div className="min-w-0" data-tour="connect">
           <AnimatePresence mode="wait">
             <motion.div key={step} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.18 }}>
-              {step === 0 && <StepRoute route={route} onRoute={chooseRoute} templates={templates.data ?? []} onTemplate={applyTemplate} standard={standard} setStandard={setStandard} projects={projects.data ?? []} />}
+              {step === 0 && <StepRoute route={route} onRoute={chooseRoute} templates={templates.data ?? []} onTemplate={applyTemplate} standard={standard} setStandard={setStandard} projects={projects.visible} />}
               {step === 1 && (route === 'logs' ? null : <StepRequest route={route} adapter={adapter} cfg={cfg} setCfg={setCfg} />)}
               {step === 2 && (
                 <StepMap adapter={adapter} cfg={cfg} setCfg={setCfg} standard={standard} setStandard={setStandard} message={message} setMessage={setMessage}
                   probe={probe} runProbe={() => runProbe.mutate()} probing={runProbe.isPending} test={test} runTest={() => runTest.mutate()} testing={runTest.isPending}
                   picking={picking} setPicking={(p) => { setPicking(p); setPickError(null) }} pickError={pickError} setPickError={setPickError} />
               )}
-              {step === 3 && <StepSave adapter={adapter} cfg={cfg} setCfg={setCfg} projects={projects.data ?? []} editing={editing}
+              {step === 3 && <StepSave adapter={adapter} cfg={cfg} setCfg={setCfg} projects={projects.visible} editing={editing}
+                reply={test?.raw ?? probe?.json} testMs={test?.elapsed_ms ?? probe?.elapsed_ms ?? null}
                 onSaved={(id) => { qc.invalidateQueries({ queryKey: ['targets'] }); qc.invalidateQueries({ queryKey: ['projects'] }); nav(`/targets/${id}`, { viewTransition: true }) }} />}
             </motion.div>
           </AnimatePresence>
-          {route === 'logs' && step === 0 && <div className="mt-5"><LogsImport projects={projects.data ?? []} onDone={(id) => nav(`/targets/${id}`)} /></div>}
+          {route === 'logs' && step === 0 && <div className="mt-5"><LogsImport projects={projects.visible} onDone={(id) => nav(`/targets/${id}`)} /></div>}
           {!(route === 'logs' && step === 0) && (
             <div className="mt-5 flex items-center gap-2">
               {step > 0 && <Button onClick={() => setStep(step - 1)}><ArrowLeft className="size-3.5" />Back</Button>}
@@ -237,6 +240,39 @@ function StepRoute({ route, onRoute, templates, onTemplate, standard, setStandar
   )
 }
 
+/** String values that look like JSON literals: "null", "true", "false" (usually a typo for the literal). */
+export function quotedLiterals(body: unknown, path = 'body'): { path: string; value: string }[] {
+  if (typeof body === 'string') return ['null', 'true', 'false'].includes(body.trim().toLowerCase()) ? [{ path, value: body.trim().toLowerCase() }] : []
+  if (Array.isArray(body)) return body.flatMap((v, i) => quotedLiterals(v, `${path}[${i}]`))
+  if (body && typeof body === 'object') return Object.entries(body).flatMap(([k, v]) => quotedLiterals(v, `${path}.${k}`))
+  return []
+}
+
+function unquote(body: unknown, path: string): unknown {
+  const keys = path.replace(/\[(\d+)\]/g, '.$1').split('.').slice(1)
+  const out = JSON.parse(JSON.stringify(body)) as Record<string, unknown>
+  let node: Record<string, unknown> = out
+  keys.slice(0, -1).forEach((k) => { node = node[k] as Record<string, unknown> })
+  const last = keys[keys.length - 1]
+  const v = String(node[last]).trim().toLowerCase()
+  node[last] = v === 'null' ? null : v === 'true'
+  return out
+}
+
+/** Where a conversation id sits in a reply, e.g. "done.conversation_id" for a streamed reply. */
+export function findChatId(raw: unknown, path = ''): string | null {
+  if (!raw || typeof raw !== 'object') return null
+  const entries = Array.isArray(raw) ? [] : Object.entries(raw as Record<string, unknown>)
+  for (const [k, v] of entries) {
+    if (/^(conversation|session|chat|thread)_?id$/i.test(k) && (typeof v === 'string' || typeof v === 'number') && String(v).length > 0) return path ? `${path}.${k}` : k
+  }
+  for (const [k, v] of entries) {
+    const found = v && typeof v === 'object' && !Array.isArray(v) ? findChatId(v, path ? `${path}.${k}` : k) : null
+    if (found) return found
+  }
+  return null
+}
+
 function StepRequest({ route, adapter, cfg, setCfg }: { route: Route; adapter: 'http' | 'python'; cfg: Cfg; setCfg: (f: (c: Cfg) => Cfg) => void }) {
   const [curl, setCurl] = useState('')
   const [parsed, setParsed] = useState<null | { secrets: { header: string; prefix: string; value: string; hint: string }[]; session_fields: string[]; question_path: string | null; looks_streaming: boolean }>(null)
@@ -291,13 +327,22 @@ function StepRequest({ route, adapter, cfg, setCfg }: { route: Route; adapter: '
         <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_110px]">
           <Field label="Base URL"><Input value={field('base_url')} onChange={(e) => set('base_url', e.target.value)} /></Field>
           <Field label="Endpoint"><Input value={field('endpoint')} onChange={(e) => set('endpoint', e.target.value)} /></Field>
-          <Field label="Method"><Select value={field('method') || 'POST'} onChange={(e) => set('method', e.target.value)}><option>POST</option><option>GET</option></Select></Field>
+          <Field label={<>Method<MethodHelp /></>}><Select value={field('method') || 'POST'} onChange={(e) => set('method', e.target.value)} aria-label="Method"><option>POST</option><option>GET</option></Select></Field>
         </div>
         <div className="mt-3">
           <Field label="Body (JSON)" error={bodyErr ?? undefined} hint={<>Placeholders: <code>{'{{input.message}}'}</code> the question, <code>{'{{uuid}}'}</code> a fresh id per call, <code>{'{{input.fields.x}}'}</code> a per-case field.</>}>
             <Textarea rows={7} value={bodyText} spellCheck={false} onChange={(e) => { setBodyText(e.target.value); try { set('body', JSON.parse(e.target.value)); setBodyErr(null) } catch { setBodyErr('Not valid JSON yet') } }} />
           </Field>
         </div>
+        {field('method') === 'GET' && Object.keys((cfg.body as object) ?? {}).length > 0 && (
+          <p className="mt-2 text-xs text-warn-ink">GET sends no body: the fields above are ignored. Put what the bot needs in the address instead, or switch back to POST.</p>
+        )}
+        {quotedLiterals(cfg.body).map((w) => (
+          <p key={w.path} className="mt-2 text-xs text-warn-ink">
+            <code>{w.path}</code> is the <i>text</i> "{w.value}" because of its quotes. If you meant the empty value, write <code>{w.value}</code> without quotes (a bot that expects an id refuses the text "null").
+            <button type="button" className="ml-1 text-accent-ink underline" onClick={() => { const fixed = unquote(cfg.body, w.path); set('body', fixed); setBodyText(JSON.stringify(fixed, null, 2)) }}>Remove the quotes</button>
+          </p>
+        ))}
         {!!cfg.auth && <p className="mt-2 flex items-center gap-1.5 text-xs text-good-ink"><Lock className="size-3.5" />Sends {(cfg.auth as { header: string }).header} from {(cfg.auth as { secret_ref: string }).secret_ref} - the key itself is not in this configuration.</p>}
       </Card>
     </div>
@@ -539,32 +584,82 @@ export function Capabilities({ caps }: { caps: Capability[] }) {
 // Step 4: safety and save
 // --------------------------------------------------------------------------------------
 
-function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved }: {
+interface DryCall { question: string; ok: boolean; elapsed_ms?: number; answer?: string; error?: string; explanation?: string; cost_usd?: number | null; cleanup?: string }
+interface DryResult {
+  calls: DryCall[]; median_ms: number | null; per_answer_cost_usd: number | null
+  full_run_calls: number; full_run_seconds: number | null; full_run_cost_usd: number | null
+  load?: { alone_ms: number | null; together_ms: number | null; n: number; ratio: number | null; errors: number; verdict: 'copes' | 'slows' | 'queues' | 'errors' | 'unknown'; suggested_concurrency: number }
+}
+
+const LOAD_TEXT: Record<string, string> = {
+  copes: 'barely slows down when several questions arrive together: 4 at a time is fine.',
+  slows: 'slows down noticeably when busy: use 2 at a time, and 1 when you compare speed.',
+  queues: 'answers one at a time (the others wait): use 1 at a time; more only makes speed figures worse.',
+  errors: 'returned errors when asked several at once: use 1 at a time.',
+  unknown: 'could not be measured.',
+}
+
+const dur = (msTotal: number) => {
+  const s = Math.round(msTotal / 1000)
+  return s < 60 ? `~${Math.max(1, s)} s` : s < 3600 ? `~${Math.round(s / 60)} min` : `~${(s / 3600).toFixed(1)} h`
+}
+
+function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved, reply, testMs }: {
   adapter: 'http' | 'python'; cfg: Cfg; setCfg: (f: (c: Cfg) => Cfg) => void; projects: Project[]; editing: Target | null; onSaved: (id: number) => void
+  reply: unknown; testMs: number | null
 }) {
   const datasets = useQuery({ queryKey: ['datasets'], queryFn: () => api.get<Dataset[]>('/api/datasets') })
-  const [projectMode, setProjectMode] = useState<'existing' | 'new'>(projects.length ? 'existing' : 'new')
-  const [projectId, setProjectId] = useState<number | ''>(editing?.project_id ?? projects[0]?.id ?? '')
+  const realProjects = projects.filter((p) => !p.is_demo)
+  const [projectMode, setProjectMode] = useState<'existing' | 'new'>(editing || realProjects.length ? 'existing' : 'new')
+  const [projectId, setProjectId] = useState<number | ''>(editing?.project_id ?? realProjects[0]?.id ?? '')
   const [newProject, setNewProject] = useState('')
   const [name, setName] = useState(editing?.name ?? '')
   const [label, setLabel] = useState(editing?.latest_version.variant_label ?? '')
   const [notes, setNotes] = useState('')
   const [asTemplate, setAsTemplate] = useState(false)
   const [savesChats, setSavesChats] = useState(!!cfg.cleanup)
-  const [dsv, setDsv] = useState<number | ''>('')
-  const cleanup = (cfg.cleanup as { method?: string; endpoint?: string; only_if?: string } | undefined) ?? { method: 'DELETE', endpoint: '/api/conversations/{{raw.conversation_id}}', only_if: 'conversation_id' }
-  useEffect(() => {
+  const chosenProject = projectMode === 'existing' ? projectId : ''
+  const projectName = projectMode === 'existing' ? projects.find((p) => p.id === projectId)?.name ?? '' : newProject
+
+  // Clean-up: read the chat id from where the reply actually has it.
+  const idPath = findChatId(reply)
+  const suggested = { method: 'DELETE', endpoint: `/api/conversations/{{raw.${idPath ?? 'conversation_id'}}}`, only_if: idPath ?? 'conversation_id' }
+  const cleanup = (cfg.cleanup as { method?: string; endpoint?: string; only_if?: string } | undefined) ?? suggested
+  const setCleanup = (on: boolean) => {
+    setSavesChats(on)
     if (adapter !== 'http') return
     setCfg((c) => {
-      if (savesChats && !c.cleanup) return { ...c, cleanup }
-      if (!savesChats && c.cleanup) { const { cleanup: _x, ...rest } = c; return rest }
+      if (on && !c.cleanup) return { ...c, cleanup: suggested }
+      if (!on && c.cleanup) { const { cleanup: _x, ...rest } = c; return rest }
       return c
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [savesChats])
+  }
+  const mismatch = savesChats && !!idPath && !!cleanup.only_if && cleanup.only_if !== idPath && !cleanup.endpoint?.includes(idPath)
+
+  // Dry run: where the questions come from.
+  const own = (datasets.data ?? []).filter((d) => d.project_id === chosenProject)
+  const others = (datasets.data ?? []).filter((d) => d.project_id !== chosenProject)
+  const [source, setSource] = useState<string>('')
+  const [showOthers, setShowOthers] = useState(false)
+  const [typed, setTyped] = useState(['', '', ''])
+  const [loadCheck, setLoadCheck] = useState(false)
+  const src = source || (own[0]?.latest ? `dsv:${own[0].latest.id}` : 'typed')
+  const dsvId = src.startsWith('dsv:') ? Number(src.slice(4)) : null
+  const pickedSet = (datasets.data ?? []).find((d) => d.versions.some((v) => v.id === dsvId))
+  const foreign = pickedSet && pickedSet.project_id !== chosenProject ? pickedSet : null
+  const foreignOwner = foreign ? projects.find((p) => p.id === foreign.project_id)?.name ?? 'another chatbot' : null
+  const typedQs = typed.map((q) => q.trim()).filter(Boolean)
   const dry = useMutation({
-    mutationFn: () => api.post<{ calls: { question: string; ok: boolean; elapsed_ms?: number; answer?: string; error?: string; explanation?: string; cost_usd?: number | null; cleanup?: string }[]; median_ms: number | null; full_run_calls: number; full_run_seconds: number | null; full_run_cost_usd: number | null }>('/api/connect/dry-run', { adapter, config: cfg, dataset_version_id: dsv || null, n: 3 }),
+    mutationFn: () => api.post<DryResult>('/api/connect/dry-run', {
+      adapter, config: cfg, n: 3, load_check: loadCheck,
+      dataset_version_id: dsvId, questions: src === 'typed' ? typedQs : null,
+    }),
   })
+  const perMs = src === 'test' ? testMs : dry.data?.median_ms ?? null
+  const perCost = src === 'test' ? null : dry.data?.per_answer_cost_usd ?? null
+  const asked = src === 'test' ? 0 : src === 'typed' ? typedQs.length : 3
+  const canAsk = src !== 'test' && (src !== 'typed' || typedQs.length > 0)
+
   const save = useMutation({
     mutationFn: async () => {
       let t: Target
@@ -581,33 +676,112 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved }: {
     },
     onSuccess: (t) => onSaved(t.id),
   })
+  const saveWhy = editing ? null
+    : projectMode === 'existing' && !projectId ? 'Choose the chatbot first (top of this step).'
+    : projectMode === 'new' && !newProject.trim() ? 'Name the new chatbot first (top of this step).'
+    : !name.trim() ? 'Name this connection first.' : null
+  const initials = projectName ? projectName.split(/\s+/).map((w) => w[0]).join('').toUpperCase().slice(0, 4) : 'Bot'
+
   return (
     <div className="space-y-5">
+      {!editing && (
+        <Card title="Which chatbot is this?" subtitle="Decides which question sets are offered below and where its runs appear">
+          <div className="flex flex-wrap items-center gap-2">
+            <Segmented size="sm" value={projectMode} onChange={setProjectMode} options={[{ id: 'existing', label: 'Existing' }, { id: 'new', label: 'New' }]} />
+            {projectMode === 'existing'
+              ? (
+                <Select className="w-80" value={projectId} onChange={(e) => { setProjectId(Number(e.target.value)); setSource('') }} aria-label="Chatbot">
+                  {!projectId && <option value="">Choose a chatbot...</option>}
+                  {projects.map((p) => <option key={p.id} value={p.id}>{projectOption(p)}</option>)}
+                </Select>
+              )
+              : <Input className="w-80" placeholder="e.g. Production Planning Assistant" value={newProject} onChange={(e) => setNewProject(e.target.value)} aria-label="New chatbot name" />}
+            <ConnectionHelp />
+          </div>
+        </Card>
+      )}
       {adapter === 'http' && (
         <Card title="Side effects">
-          <Toggle checked={savesChats} onChange={setSavesChats} label="Each question saves a conversation in the bot" hint="Then GaugeLab deletes it right after the answer, so test runs do not pile up in the bot's history." />
+          <Toggle checked={savesChats} onChange={setCleanup} label="Each question saves a conversation in the bot" hint="Then GaugeLab deletes it right after the answer, so test runs do not pile up in the bot's history." />
+          {!savesChats && idPath && (
+            <div className="mt-3">
+              <Notice tone="info" title={<>The reply carries a chat id (<code>{idPath}</code>)</>} action={<Button size="sm" onClick={() => setCleanup(true)}>Clean up after each question</Button>}>
+                The bot probably saves every question as a conversation. Without clean-up, test chats pile up in its history.
+              </Notice>
+            </div>
+          )}
           {savesChats && (
-            <div className="mt-3 grid gap-3 md:grid-cols-[110px_minmax(0,1fr)_200px]">
-              <Field label="Method"><Select value={cleanup.method} onChange={(e) => setCfg((c) => ({ ...c, cleanup: { ...cleanup, method: e.target.value } }))}><option>DELETE</option><option>POST</option></Select></Field>
-              <Field label="Clean-up endpoint" hint="{{raw.x}} reads a field of the reply"><Input value={cleanup.endpoint} onChange={(e) => setCfg((c) => ({ ...c, cleanup: { ...cleanup, endpoint: e.target.value } }))} /></Field>
-              <Field label="Only if the reply has"><Input value={cleanup.only_if ?? ''} onChange={(e) => setCfg((c) => ({ ...c, cleanup: { ...cleanup, only_if: e.target.value || undefined } }))} /></Field>
+            <div className="mt-3 grid gap-3 md:grid-cols-[120px_minmax(0,1fr)_220px]">
+              <Field label={<>Method<CleanupMethodHelp /></>}>
+                <Select value={cleanup.method} aria-label="Clean-up method" onChange={(e) => setCfg((c) => ({ ...c, cleanup: { ...cleanup, method: e.target.value } }))}><option>DELETE</option><option>POST</option></Select>
+              </Field>
+              <Field label="Clean-up endpoint" hint={idPath ? <>The reply has the chat id at <code>{idPath}</code>. <code>{'{{raw.x}}'}</code> reads a field of the reply.</> : '{{raw.x}} reads a field of the reply'}>
+                <Input aria-label="Clean-up endpoint" value={cleanup.endpoint} onChange={(e) => setCfg((c) => ({ ...c, cleanup: { ...cleanup, endpoint: e.target.value } }))} />
+              </Field>
+              <Field label="Only if the reply has">
+                <Input aria-label="Clean-up only if" value={cleanup.only_if ?? ''} onChange={(e) => setCfg((c) => ({ ...c, cleanup: { ...cleanup, only_if: e.target.value || undefined } }))} />
+              </Field>
+            </div>
+          )}
+          {mismatch && (
+            <div className="mt-3">
+              <Notice tone="warn" title="The clean-up looks for the chat id in the wrong place" action={<Button size="sm" onClick={() => setCfg((c) => ({ ...c, cleanup: { ...cleanup, endpoint: suggested.endpoint, only_if: idPath ?? undefined } }))}>Use {idPath}</Button>}>
+                It reads <code>{cleanup.only_if}</code>, but this bot's reply has the id at <code>{idPath}</code>: the delete would be skipped silently.
+              </Notice>
             </div>
           )}
           <Explain className="mt-3">Also check what else a question writes (usage tables, shared logs, budgets) before pointing GaugeLab at a shared instance. When that is not acceptable, use an isolated copy or import logs instead.</Explain>
         </Card>
       )}
-      <Card title="Dry run" subtitle="A few real questions, to see speed and cost before a full run">
+      <Card title="Dry run" subtitle="Speed (and cost, when the bot reports it) before a full run">
         <div className="flex flex-wrap items-end gap-2">
-          <Field label="Questions from (optional)">
-            <Select className="w-72" value={dsv} onChange={(e) => setDsv(e.target.value ? Number(e.target.value) : '')}>
-              <option value="">Three generic questions</option>
-              {(datasets.data ?? []).flatMap((d) => d.versions.map((v) => <option key={v.id} value={v.id}>{d.name} v{v.version} ({v.case_count} cases)</option>))}
+          <Field label="Questions from">
+            <Select className="w-80" value={src} onChange={(e) => setSource(e.target.value)} aria-label="Dry-run questions">
+              {own.length > 0 && (
+                <optgroup label={`${projectName || 'This chatbot'}'s question sets`}>
+                  {own.map((d) => d.latest && <option key={d.latest.id} value={`dsv:${d.latest.id}`}>{d.name} v{d.latest.version} ({d.latest.case_count} questions)</option>)}
+                </optgroup>
+              )}
+              <optgroup label="Other">
+                <option value="typed">Type my own questions</option>
+                <option value="generic">Three generic questions</option>
+                {testMs !== null && <option value="test">Use the test answer's timing (no extra cost)</option>}
+              </optgroup>
+              {showOthers && others.length > 0 && (
+                <optgroup label="Written for other chatbots">
+                  {others.map((d) => d.latest && <option key={d.latest.id} value={`dsv:${d.latest.id}`}>{d.name} v{d.latest.version} - {projects.find((p) => p.id === d.project_id)?.name ?? 'another chatbot'}</option>)}
+                </optgroup>
+              )}
             </Select>
           </Field>
-          <Button loading={dry.isPending} onClick={() => dry.mutate()}><Send className="size-3.5" />Ask 3 questions</Button>
+          {canAsk && <Button loading={dry.isPending} onClick={() => dry.mutate()}><Send className="size-3.5" />Ask {asked} question{asked === 1 ? '' : 's'}{loadCheck ? `, then ${asked} at once` : ''}</Button>}
         </div>
+        {others.length > 0 && (
+          <label className="mt-2 flex items-center gap-2 text-xs text-ink-3">
+            <input type="checkbox" className="accent-[var(--accent)]" checked={showOthers} onChange={(e) => setShowOthers(e.target.checked)} />Also list question sets written for other chatbots ({others.length})
+          </label>
+        )}
+        {src === 'typed' && (
+          <div className="mt-3 grid gap-2 md:grid-cols-3">
+            {typed.map((q, i) => <Input key={i} value={q} placeholder={i === 0 ? 'A question users really ask' : 'Another (optional)'} aria-label={`Dry-run question ${i + 1}`} onChange={(e) => setTyped((t) => t.map((x, k) => (k === i ? e.target.value : x)))} />)}
+          </div>
+        )}
+        {foreign && (
+          <div className="mt-3">
+            <Notice tone="warn" title={`These questions were written for ${foreignOwner}`}>
+              {projectName || 'This chatbot'} will be answering off-topic questions, and each answer may be billed by the bot. Type your own instead, or pick one of its own sets.
+            </Notice>
+          </div>
+        )}
+        {src !== 'test' && (
+          <label className="mt-2 flex items-center gap-2 text-xs text-ink-2">
+            <input type="checkbox" className="accent-[var(--accent)]" checked={loadCheck} onChange={(e) => setLoadCheck(e.target.checked)} />
+            Also check how it copes when busy: ask the same questions again, all at once ({asked} more answer{asked === 1 ? '' : 's'})
+          </label>
+        )}
+        {src === 'test' && <p className="mt-2 text-xs text-ink-3">No new questions: the estimate below uses the {ms(testMs)} the test question took. One answer is a rough guide; three are steadier.</p>}
         {dry.isError && <div className="mt-2"><ErrorState error={dry.error} /></div>}
-        {dry.data && (
+        {dry.data && src !== 'test' && (
           <div className="mt-3 space-y-2">
             {dry.data.calls.map((c, i) => (
               <div key={i} className="flex items-start gap-2 text-[13px]">
@@ -616,33 +790,56 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved }: {
                 <span className="num text-xs text-ink-3">{ms(c.elapsed_ms)}{c.cleanup && ` - clean-up ${c.cleanup}`}</span>
               </div>
             ))}
-            <Notice tone="info" title={`A full run (${dry.data.full_run_calls} questions): ${dry.data.full_run_seconds !== null ? `~${Math.max(1, Math.round(dry.data.full_run_seconds / 60))} min` : 'time unknown'}, ${dry.data.full_run_cost_usd !== null ? usd(dry.data.full_run_cost_usd) : 'cost unknown (no token counts or price)'}`}>
-              At 4 questions in parallel, from the median of these answers ({ms(dry.data.median_ms)}).
-            </Notice>
+            {dry.data.load && (
+              <Notice tone={dry.data.load.verdict === 'copes' ? 'good' : dry.data.load.verdict === 'unknown' ? 'info' : 'warn'}
+                title={`Alone: ${ms(dry.data.load.alone_ms)} per answer. ${dry.data.load.n} at once: ${ms(dry.data.load.together_ms)}${dry.data.load.ratio ? ` (x${dry.data.load.ratio})` : ''}${dry.data.load.errors ? `, ${dry.data.load.errors} error(s)` : ''}.`}>
+                This bot {LOAD_TEXT[dry.data.load.verdict]} Suggested <b>In parallel: {dry.data.load.suggested_concurrency}</b>.
+              </Notice>
+            )}
+          </div>
+        )}
+        {perMs !== null && perMs !== undefined && (src === 'test' || dry.data) && (
+          <div className="mt-3">
+            <div className="mb-1 text-xs font-medium text-ink-2">
+              What a full run would take{perCost === null ? '. The bot reports no token counts, so its price is unknown: count the billed answers.' : ''}
+            </div>
+            <Table>
+              <thead><tr><th>Question set</th><th className="text-right">Answers (1 try)</th><th className="text-right">Time at 1 / 4 in parallel</th><th className="text-right">Bot cost</th></tr></thead>
+              <tbody>
+                {[...own.map((d) => ({ key: d.id, label: d.name, n: d.latest?.case_count ?? 0 })), { key: 0, label: 'Per 10 questions', n: 10 }].map((r) => (
+                  <tr key={r.key}>
+                    <td>{r.label}</td>
+                    <td className="num text-right">{r.n} billed</td>
+                    <td className="num text-right">{dur(r.n * perMs)} / {dur((r.n * perMs) / 4)}</td>
+                    <td className="num text-right">{perCost !== null ? usd(perCost * r.n) : 'unknown'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+            <p className="mt-1 text-xs text-ink-3">Tries multiply everything: 3 tries per question = 3x the answers. Grading-model calls are extra (shown on New run).</p>
           </div>
         )}
       </Card>
       <Card title={editing ? `Save as version ${editing.latest_version.version + 1}` : 'Name and save'}>
         <div className="grid gap-3 md:grid-cols-2">
           {!editing && (
-            <Field label="Chatbot" hint="A chatbot groups its versions, datasets and gates.">
-              <div className="flex gap-2">
-                <Segmented size="sm" value={projectMode} onChange={setProjectMode} options={[{ id: 'existing', label: 'Existing' }, { id: 'new', label: 'New' }]} />
-                {projectMode === 'existing'
-                  ? <Select value={projectId} onChange={(e) => setProjectId(Number(e.target.value))}>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select>
-                  : <Input placeholder="e.g. Support Assistant" value={newProject} onChange={(e) => setNewProject(e.target.value)} />}
-              </div>
+            <Field label={<>Name this connection<ConnectionHelp /></>} hint="Where this copy of the bot runs. You may add others later (a test copy, the server).">
+              <Input aria-label="Connection name" placeholder={`e.g. ${initials} – local dev (:8120)`} value={name} onChange={(e) => setName(e.target.value)} />
             </Field>
           )}
-          {!editing && <Field label="Name of this target"><Input placeholder="e.g. Support bot - staging" value={name} onChange={(e) => setName(e.target.value)} /></Field>}
-          <Field label="What distinguishes this version" hint="Model, prompt, retriever..."><Input placeholder="e.g. gpt-x / hybrid top-20" value={label} onChange={(e) => setLabel(e.target.value)} /></Field>
+          <Field label="What's inside this version" hint={'Model, prompt, retriever. Say what it is ("gpt-6-sol answer, high effort"), not just "v1": in six months it still tells you what changed.'}>
+            <Input aria-label="Version description" placeholder="e.g. gpt-x answer / hybrid top-20 / prompt v3" value={label} onChange={(e) => setLabel(e.target.value)} />
+          </Field>
           {editing && <Field label="What changed"><Input value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>}
         </div>
         <label className="mt-3 flex items-center gap-2 text-[13px]"><input type="checkbox" className="accent-[var(--accent)]" checked={asTemplate} onChange={(e) => setAsTemplate(e.target.checked)} />Also save as a template for connecting similar bots</label>
         {save.isError && <div className="mt-3"><ErrorState error={save.error} /></div>}
-        <Button variant="primary" size="lg" className="mt-4" loading={save.isPending} disabled={!editing && !name.trim()} onClick={() => save.mutate()}>
-          <Check className="size-4" />{editing ? `Save version ${editing.latest_version.version + 1}` : 'Save connection'}
-        </Button>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <Button variant="primary" size="lg" loading={save.isPending} disabled={!!saveWhy} onClick={() => save.mutate()}>
+            <Check className="size-4" />{editing ? `Save version ${editing.latest_version.version + 1}` : 'Save connection'}
+          </Button>
+          {saveWhy && <span className="text-xs text-ink-3">{saveWhy}</span>}
+        </div>
       </Card>
     </div>
   )
@@ -729,7 +926,7 @@ function LogsImport({ projects, onDone }: { projects: Project[]; onDone: (target
           </div>
           {imp.isError && <ErrorState error={imp.error} />}
           <Button variant="primary" loading={imp.isPending} disabled={!roles.message} onClick={() => imp.mutate()}><FileUp className="size-3.5" />Import</Button>
-          <Explain>Creates a dataset of the logged questions and a "replay" target that answers with what was logged - graded without calling the bot.</Explain>
+          <Explain>Creates a dataset of the logged questions and a "replay" connection that answers with what was logged - graded without calling the bot.</Explain>
         </div>
       )}
     </Card>

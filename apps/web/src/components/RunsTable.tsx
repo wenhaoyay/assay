@@ -24,7 +24,7 @@ export function RunsTable({ runs, compact = false, selectable = false, selected 
           {selectable && <th className="w-8"><span className="sr-only">Compare</span></th>}
           <th>Run</th>
           <th>Name</th>
-          {!compact && <th>Target</th>}
+          {!compact && <th>Connection</th>}
           {!compact && <th>Cases / judge</th>}
           <th className="text-right">Pass rate</th>
           {!compact && <th className="text-right">Tool acc.</th>}

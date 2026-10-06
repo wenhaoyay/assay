@@ -336,45 +336,60 @@ class DryRunIn(BaseModel):
     adapter: str = Field(default="http", pattern="^(http|python)$")
     config: dict[str, Any]
     dataset_version_id: int | None = None
+    questions: list[str] | None = Field(default=None, max_length=5)  # typed by the person
     n: int = Field(default=3, ge=1, le=5)
     trials: int = Field(default=1, ge=1, le=10)
     concurrency: int = Field(default=4, ge=1, le=16)
+    load_check: bool = False  # ask the same questions again, all at once
+
+
+GENERIC_QUESTIONS = ["What can you help me with?", "How do I get started?", "Who should I contact?"]
 
 
 @router.post("/connect/dry-run")
 async def dry_run(body: DryRunIn, s: Session = Depends(get_session)) -> dict[str, Any]:
-    """A few real questions from a dataset: latency, tokens, and what a full run would take."""
-    questions: list[str] = []
+    """A few real questions: latency, tokens, and what a full run would take. With load_check, the
+    same questions are asked again all at once, to see whether the bot slows down when busy."""
+    questions: list[str] = [q.strip() for q in (body.questions or []) if q.strip()][: body.n]
     n_cases = body.n
-    if body.dataset_version_id:
+    if not questions and body.dataset_version_id:
         cases = [c for _, c in svc.version_cases(s, body.dataset_version_id) if c.enabled]
         n_cases = len(cases)
         questions = [c.input.message for c in cases[: body.n]]
-    questions = questions or ["What can you help me with?", "How do I get started?", "Who should I contact?"][: body.n]
+    questions = questions or GENERIC_QUESTIONS[: body.n]
     pricing = svc.pricing(s)
     try:
         adapter = build_adapter(body.adapter, body.config)
     except Exception as exc:
         raise HTTPException(422, f"Invalid configuration: {exc}") from exc
-    calls = []
+
+    async def ask(q: str) -> dict[str, Any]:
+        t0 = time.perf_counter()
+        try:
+            call = await adapter.call({"message": q, "history": [], "fields": {}}, AdapterContext(case_id="dry-run"))
+            r = call.result
+            prov = r.provider
+            cost = pricing.cost(prov.provider if prov else None, prov.model if prov else None, r.usage)
+            return {"question": q, "ok": not r.error and bool(r.answer),
+                    "elapsed_ms": round((time.perf_counter() - t0) * 1000), "answer": (r.answer or "")[:300],
+                    "tokens": r.usage.total_tokens if r.usage else None, "cost_usd": cost,
+                    "error": r.error, "cleanup": r.metadata.get("cleanup")}
+        except Exception as exc:
+            err = f"{type(exc).__name__}: {exc}"
+            return {"question": q, "ok": False, "error": err, "explanation": cx.explain_error(err),
+                    "elapsed_ms": round((time.perf_counter() - t0) * 1000)}
+
+    together: list[dict[str, Any]] = []
     try:
-        for q in questions:
-            t0 = time.perf_counter()
-            try:
-                call = await adapter.call({"message": q, "history": [], "fields": {}}, AdapterContext(case_id="dry-run"))
-                r = call.result
-                prov = r.provider
-                cost = pricing.cost(prov.provider if prov else None, prov.model if prov else None, r.usage)
-                calls.append({"question": q, "ok": not r.error and bool(r.answer),
-                              "elapsed_ms": round((time.perf_counter() - t0) * 1000), "answer": (r.answer or "")[:300],
-                              "tokens": r.usage.total_tokens if r.usage else None, "cost_usd": cost,
-                              "error": r.error, "cleanup": r.metadata.get("cleanup")})
-            except Exception as exc:
-                err = f"{type(exc).__name__}: {exc}"
-                calls.append({"question": q, "ok": False, "error": err, "explanation": cx.explain_error(err)})
+        calls = [await ask(q) for q in questions]
+        if body.load_check:
+            together = list(await asyncio.gather(*(ask(q) for q in questions)))
     finally:
         await adapter.aclose()
-    return workspace.dry_run_summary(calls, n_cases, body.trials, body.concurrency, pricing)
+    out = workspace.dry_run_summary(calls, n_cases, body.trials, body.concurrency, pricing)
+    if body.load_check:
+        out["load"] = workspace.load_summary(calls, together)
+    return out
 
 
 @router.get("/connect/standard-shape")
@@ -408,6 +423,9 @@ async def check_target(target_id: int, s: Session = Depends(get_session)) -> dic
 
 class TargetFlags(BaseModel):
     local_judges_only: bool | None = None
+    shared: bool | None = None
+    cost_per_answer_usd: float | None = Field(default=None, ge=0)
+    clear_cost_per_answer: bool = False
 
 
 @router.patch("/targets/{target_id}/flags")
@@ -415,7 +433,14 @@ def target_flags(target_id: int, body: TargetFlags, s: Session = Depends(get_ses
     t = svc.get(s, m.Target, target_id)
     if body.local_judges_only is not None:
         t.local_judges_only = body.local_judges_only
-    return {"id": t.id, "local_judges_only": t.local_judges_only}
+    if body.shared is not None:
+        t.shared = body.shared
+    if body.cost_per_answer_usd is not None:
+        t.cost_per_answer_usd = body.cost_per_answer_usd
+    if body.clear_cost_per_answer:
+        t.cost_per_answer_usd = None
+    return {"id": t.id, "local_judges_only": t.local_judges_only, "shared": t.shared,
+            "cost_per_answer_usd": t.cost_per_answer_usd}
 
 
 @router.get("/targets/{target_id}/health")

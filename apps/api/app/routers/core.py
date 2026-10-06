@@ -37,7 +37,7 @@ class ProjectIn(BaseModel):
 @router.get("/projects")
 def list_projects(s: Session = Depends(get_session)) -> list[dict[str, Any]]:
     return [{"id": p.id, "name": p.name, "description": p.description, "color": p.color, "icon": p.icon,
-             "created_at": ser.iso(p.created_at)} for p in s.scalars(select(m.Project).order_by(m.Project.id))]
+             "is_demo": bool(p.is_demo), "created_at": ser.iso(p.created_at)} for p in s.scalars(select(m.Project).order_by(m.Project.id))]
 
 
 @router.post("/projects", status_code=201)

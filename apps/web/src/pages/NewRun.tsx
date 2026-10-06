@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Badge, Button, Card, ErrorState, Explain, Field, Input, Notice, PageHeader, PageSkeleton, Select, Term } from '../components/ui'
 import { api } from '../lib/api'
+import { whereLabel } from '../lib/models'
 import { validateSetup } from '../lib/compare'
 import { useCrumbs } from '../lib/crumbs'
 import { usd } from '../lib/format'
@@ -153,8 +154,8 @@ export function NewRunPage() {
                   <option value="">All chatbots</option>{(projects.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </Select>
               </Field>
-              <Field label="Version (target)">
-                <Select value={targetVersionId} onChange={(ev) => setTargetVersionId(ev.target.value ? Number(ev.target.value) : '')} aria-label="Target">
+              <Field label="Connection and version">
+                <Select value={targetVersionId} onChange={(ev) => setTargetVersionId(ev.target.value ? Number(ev.target.value) : '')} aria-label="Connection">
                   <option value="">Choose...</option>
                   {projectTargets.map((t) => <option key={t.id} value={t.latest_version.id}>{t.name} - v{t.latest_version.version}{t.latest_version.variant_label ? ` (${t.latest_version.variant_label})` : ''}</option>)}
                 </Select>
@@ -167,7 +168,7 @@ export function NewRunPage() {
               </Field>
               <Field label="Run name"><Input value={name} onChange={(ev) => setName(ev.target.value)} aria-label="Run name" /></Field>
             </div>
-            {tv?.local_judges_only && <p className="mt-2 text-xs text-accent-ink">This target is set to local grading models only.</p>}
+            {tv?.local_judges_only && <p className="mt-2 text-xs text-accent-ink">This connection is set to local grading models only.</p>}
           </Card>
 
           <Card title="2. How thoroughly">
@@ -219,7 +220,7 @@ export function NewRunPage() {
                 <Select value={judgeValue} onChange={(ev) => setJudge(ev.target.value)} aria-label="Judge">
                   <option value="">None</option>
                   <option value="heuristic">Heuristic (word overlap, free, not an LLM)</option>
-                  {(models.data ?? []).map((m) => <option key={m.id} value={m.id}>{m.name} ({m.local ? 'local' : 'cloud'}){m.key_status === 'missing' ? ' - key missing' : ''}</option>)}
+                  {(models.data ?? []).map((m) => <option key={m.id} value={m.id}>{m.name} ({whereLabel(m)}){m.key_status === 'missing' ? ' - key missing' : ''}</option>)}
                 </Select>
               </Field>
               <Field label={<>Tries per question <Term k="flaky">(flakiness)</Term></>}>

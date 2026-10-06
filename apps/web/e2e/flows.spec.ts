@@ -16,7 +16,7 @@ test('home shows each chatbot with its verdict, and opens its page', async ({ pa
 
 test('start a run from the UI and see its gate verdict', async ({ page }) => {
   await page.goto('/runs/new')
-  const target = page.getByLabel('Target')
+  const target = page.getByLabel('Connection', { exact: true })
   const value = await target.locator('option', { hasText: 'candidate - v1' }).first().getAttribute('value')
   await target.selectOption(value!)
   await page.getByLabel('Dataset version').selectOption({ index: 1 })
@@ -92,17 +92,25 @@ test('connect a Python chatbot through the wizard', async ({ page }) => {
   await page.getByRole('button', { name: 'Check the mapping' }).click()
   await expect(page.getByText("What you'll get")).toBeVisible()
   await page.getByRole('button', { name: /Next: Safety and save/ }).click()
-  await page.getByPlaceholder('e.g. Support bot - staging').fill('Wizard bot')
+  // The chatbot is chosen first: only the demo exists, so this is a new one.
+  await page.getByLabel('New chatbot name').fill('Wizard chatbot')
+  await page.getByLabel('Connection name').fill('Wizard bot')
   await page.getByRole('button', { name: 'Save connection' }).click()
   await expect(page).toHaveURL(/\/targets\/\d+/)
   await expect(page.getByRole('heading', { name: /Wizard bot/ })).toBeVisible()
 })
 
-test('gates are edited as rules', async ({ page }) => {
+test('gates are edited as rules, and a new gate shows at once', async ({ page }) => {
   await page.goto('/gates')
+  const cards = page.getByRole('button', { name: 'Edit' })
+  const before = await cards.count()
   await page.getByRole('button', { name: 'New gate' }).first().click()
   await expect(page.getByLabel('Metric').first()).toBeVisible()
+  const name = `E2E gate ${Date.now()}`
+  await page.getByRole('textbox').first().fill(name)
   await page.getByRole('button', { name: 'Add rule' }).click()
   await page.getByRole('button', { name: 'Save gate' }).click()
-  await expect(page.getByText('Release gate').first()).toBeVisible()
+  // The new card itself, without a reload (the page title "Release gates" must not count).
+  await expect(page.getByText(name, { exact: true })).toBeVisible()
+  await expect(cards).toHaveCount(before + 1)
 })

@@ -10,6 +10,7 @@ export interface Project {
   description: string
   color?: string
   icon?: string
+  is_demo?: boolean
 }
 
 export interface TargetVersion {
@@ -29,6 +30,8 @@ export interface Target {
   description: string
   adapter: 'http' | 'python' | 'replay'
   local_judges_only?: boolean
+  shared?: boolean
+  cost_per_answer_usd?: number | null
   last_check?: TargetCheck | null
   latest_version: TargetVersion
   versions?: TargetVersion[]
@@ -96,6 +99,8 @@ export interface Dataset {
   versions: DatasetVersion[]
   latest: DatasetVersion | null
   unreviewed_candidates: number
+  archived?: boolean
+  run_count?: number
 }
 
 export interface EditResult extends DatasetVersion {
@@ -366,6 +371,7 @@ export interface ProviderConfig {
   temperature: number
   max_tokens: number
   local?: boolean
+  cloud_via_ollama?: boolean
   catalog_id?: string
   used_by_runs?: boolean
   default_for?: string[]
@@ -478,6 +484,7 @@ export interface ProjectCard {
   description: string
   color: string
   icon: string
+  is_demo?: boolean
   created_at: string | null
   counts: { targets: number; datasets: number; runs: number }
   active_runs: number
@@ -494,6 +501,8 @@ export interface Settings {
   default_judge: { provider_config_id?: number; provider?: 'heuristic' } | null
   default_generator: { provider_config_id?: number } | null
   spend_cap_usd: number | null
+  hide_demo?: boolean
+  ollama_notice_ack?: string | null
 }
 
 export interface HomeData {

@@ -7,6 +7,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { Confetti } from '../components/viz'
 import { Badge, Button, Card, Empty, ErrorState, Explain, Field, Input, Kbd, Loading, Notice, PageHeader, ProgressBar, Select, Stat, Table, Tabs, Term } from '../components/ui'
 import { api, qs } from '../lib/api'
+import { whereLabel } from '../lib/models'
 import { useCrumbs } from '../lib/crumbs'
 import { ms, pct, usd } from '../lib/format'
 import { useHotkey } from '../lib/hotkeys'
@@ -286,10 +287,10 @@ function BakeoffTab({ dimension }: { dimension: string }) {
         {n === 0 ? <Notice tone="warn" title="Label some answers first">The bake-off needs your PASS/FAIL labels. Label a few on the first tab.</Notice> : (
           <>
             <div className="flex flex-wrap gap-2">
-              {[{ id: 'heuristic', name: 'Heuristic (word overlap)', local: true }, ...(models.data ?? []).map((m) => ({ id: String(m.id), name: m.name, local: !!m.local }))].map((m) => (
+              {[{ id: 'heuristic', name: 'Heuristic (word overlap)', local: true }, ...(models.data ?? []).map((m) => ({ id: String(m.id), name: m.name, local: !!m.local, where: whereLabel(m) }))].map((m) => (
                 <button key={m.id} type="button" onClick={() => toggle(m.id)} aria-pressed={picked.includes(m.id)}
                   className={clsx('flex items-center gap-2 rounded-lg border px-3 py-2 text-[13px] transition-colors', picked.includes(m.id) ? 'border-accent bg-accent-wash text-accent-ink' : 'border-line hover:bg-surface-2')}>
-                  {picked.includes(m.id) ? <Check className="size-3.5" /> : <span className="size-3.5" />}{m.name}<Badge>{m.local ? 'local' : 'cloud'}</Badge>
+                  {picked.includes(m.id) ? <Check className="size-3.5" /> : <span className="size-3.5" />}{m.name}<Badge>{'where' in m ? m.where : 'local'}</Badge>
                 </button>
               ))}
             </div>

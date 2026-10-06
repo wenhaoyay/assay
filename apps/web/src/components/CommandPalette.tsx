@@ -83,7 +83,7 @@ export function CommandPalette({ open, onClose, onShortcuts, onTour }: { open: b
     if (runId) out.push({ id: 'run', group: 'Jump', label: <>Open run <b>#{runId[1]}</b></>, icon: Rows3, run: go(`/runs/${runId[1]}`) })
     const actions: Item[] = [
       { id: 'a-run', group: 'Actions', label: 'New run', hint: 'Start a run on a chatbot version', icon: Play, run: go('/runs/new'), keywords: 'experiment start evaluate' },
-      { id: 'a-connect', group: 'Actions', label: 'Connect a chatbot', hint: 'Paste a curl command, map the reply', icon: Plug, run: go('/targets/new'), keywords: 'target add wizard new' },
+      { id: 'a-connect', group: 'Actions', label: 'Connect a chatbot', hint: 'Paste a curl command, map the reply', icon: Plug, run: go('/targets/new'), keywords: 'target connection add wizard new' },
       { id: 'a-compare', group: 'Actions', label: 'Compare two runs', icon: GitCompareArrows, run: go('/compare'), keywords: 'diff baseline candidate' },
       { id: 'a-models', group: 'Actions', label: 'Models & keys', hint: 'Grading models, API keys', icon: Sparkles, run: go('/settings?tab=models'), keywords: 'judge openai api key provider settings' },
       { id: 'a-calibrate', group: 'Actions', label: 'Label answers (calibration)', icon: Scale, run: go('/calibration'), keywords: 'judge trust human label' },
@@ -96,7 +96,7 @@ export function CommandPalette({ open, onClose, onShortcuts, onTour }: { open: b
       { id: 'a-tour', group: 'Help', label: 'Take the tour', hint: 'A two-minute walk through GaugeLab', icon: Lightbulb, run: () => { onClose(); onTour() }, keywords: 'demo guide tour interview' },
       { id: 'p-home', group: 'Go to', label: 'Home', icon: LayoutDashboard, run: go('/') },
       { id: 'p-runs', group: 'Go to', label: 'Runs', icon: FlaskConical, run: go('/runs') },
-      { id: 'p-targets', group: 'Go to', label: 'Targets', icon: Target, run: go('/targets') },
+      { id: 'p-targets', group: 'Go to', label: 'Connections', icon: Target, run: go('/targets') },
       { id: 'p-datasets', group: 'Go to', label: 'Datasets', icon: Database, run: go('/datasets') },
       { id: 'p-gates', group: 'Go to', label: 'Gates', icon: ShieldCheck, run: go('/gates') },
       { id: 'p-evaluators', group: 'Go to', label: 'Evaluators', icon: FileText, run: go('/evaluators') },
@@ -108,7 +108,7 @@ export function CommandPalette({ open, onClose, onShortcuts, onTour }: { open: b
       r.projects.forEach((p) => out.push({ id: `pr${p.id}`, group: 'Chatbots', label: p.name, icon: Bot, run: go(`/p/${p.id}`) }))
       r.runs.forEach((x) => out.push({ id: `r${x.id}`, group: 'Runs', label: <><span className="font-mono">#{x.id}</span> {x.name}</>, icon: Rows3, run: go(`/runs/${x.id}`) }))
       r.cases.forEach((c) => out.push({ id: `c${c.dataset_id}${c.id}`, group: 'Test cases', label: <><span className="font-mono">{c.id}</span> {c.title}</>, hint: c.dataset, icon: FileText, run: go(`/datasets/${c.dataset_id}?case=${encodeURIComponent(c.id)}`) }))
-      r.targets.forEach((t) => out.push({ id: `t${t.id}`, group: 'Targets', label: t.name, icon: Target, run: go(`/targets/${t.id}`) }))
+      r.targets.forEach((t) => out.push({ id: `t${t.id}`, group: 'Connections', label: t.name, icon: Target, run: go(`/targets/${t.id}`) }))
       r.datasets.forEach((d) => out.push({ id: `d${d.id}`, group: 'Datasets', label: d.name, icon: Database, run: go(`/datasets/${d.id}`) }))
     }
     return out
@@ -183,7 +183,7 @@ export const SHORTCUTS: { group: string; keys: string[]; label: string }[] = [
   { group: 'Anywhere', keys: ['G', 'H'], label: 'Go home' },
   { group: 'Anywhere', keys: ['G', 'R'], label: 'Go to runs' },
   { group: 'Anywhere', keys: ['G', 'C'], label: 'Go to compare' },
-  { group: 'Anywhere', keys: ['G', 'T'], label: 'Go to targets' },
+  { group: 'Anywhere', keys: ['G', 'T'], label: 'Go to connections' },
   { group: 'Anywhere', keys: ['G', 'S'], label: 'Go to settings' },
   { group: 'Anywhere', keys: ['N'], label: 'New run' },
   { group: 'Lists', keys: ['J'], label: 'Next row' },
