@@ -144,7 +144,13 @@ async def run_trials(spec: RunSpec, on_trial: Callable[[TrialRecord], Awaitable[
                 test_input = case.input.model_dump()
                 actx = AdapterContext(case_id=case.id, trial_index=trial,
                                       seed=zlib.crc32(f"{spec.seed}:{case.id}:{trial}".encode()), run_id=spec.run_id)
-                call, attempts = await call_with_retry(spec.adapter, test_input, actx, spec.max_retries)
+                try:
+                    call, attempts = await call_with_retry(spec.adapter, test_input, actx, spec.max_retries)
+                except Exception as exc:  # a target bug or an unmappable reply is this trial's error, not the run's
+                    t = now()
+                    call = TargetCall(result=NormalizedTargetResult(error=f"{type(exc).__name__}: {exc}"[:500]),
+                                      started_at=t, ended_at=t)
+                    attempts = 1
                 result = call.result
                 t_cost = target_cost(result, spec.pricing)
                 if t_cost is not None:
@@ -164,7 +170,12 @@ async def run_trials(spec: RunSpec, on_trial: Callable[[TrialRecord], Awaitable[
                 if on_trial:
                     await on_trial(rec)
 
-    jobs = [one(c, t) for c in spec.cases if c.enabled for t in range(spec.trials)]
-    await asyncio.gather(*jobs)
+    # A TaskGroup cancels every sibling if one trial fails unexpectedly (e.g. the database), so no
+    # orphaned task keeps writing after the run has been marked failed.
+    async with asyncio.TaskGroup() as tg:
+        for c in spec.cases:
+            if c.enabled:
+                for t in range(spec.trials):
+                    tg.create_task(one(c, t))
     records.sort(key=lambda r: ([c.id for c in spec.cases].index(r.case_id), r.trial_index))
     return records, stop_reason

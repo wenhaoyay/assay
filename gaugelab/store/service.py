@@ -316,6 +316,8 @@ def select_cases(cases: list[TestCase], case_filter: dict[str, Any] | None) -> l
     if not case_filter:
         return enabled
     cats, tags, ids = (set(case_filter.get(k) or []) for k in ("categories", "tags", "ids"))
+    if not (cats or tags or ids):
+        return enabled  # an empty filter means "no filter", not "no cases"
     return [c for c in enabled if c.category in cats or c.id in ids or tags & set(c.tags)]
 
 
@@ -342,8 +344,9 @@ def estimate_judge_cost(s: Session, experiment: m.Experiment) -> dict[str, Any]:
     """Pre-run estimate: calls x prompt size x price. Unknown price -> cost None."""
     cfg = experiment.config
     judge = build_judge(s, cfg.get("judge"))
-    judge_ids = [e for e in cfg["evaluators"] if get_evaluator(e).kind == "llm_judge"]
     cases = select_cases([c for _, c in version_cases(s, experiment.dataset_version_id)], cfg.get("case_filter"))
+    listed = set(cfg["evaluators"]) | {e for c in cases for e in (c.evaluators or [])}
+    judge_ids = sorted(e for e in listed if get_evaluator(e).kind == "llm_judge")
     if not judge_ids or judge is None:
         return {"judge_calls": 0, "estimated_cost_usd": 0.0 if judge_ids == [] else None,
                 "note": "No judge evaluators selected." if not judge_ids else "No judge configured."}
@@ -636,11 +639,37 @@ async def execute_reevaluation(new_run_id: int) -> None:
         ctx = EvalContext(k=e2.config["k"], judge=j, pricing=pricing(s), options=e2.config.get("options") or {})
         new_run_id, evs = run.id, e2.config["evaluators"]
     flag = ACTIVE.setdefault(new_run_id, {"cancel": False})
-    cancelled = False
+    cancelled, failed, error = False, 0, None
+    try:
+        await _regrade(jobs, cases, evs, ctx, new_run_id, flag, session)
+    except _Cancelled:
+        cancelled = True
+    except Exception as exc:
+        error = f"{type(exc).__name__}: {exc}"[:2000]
+    finally:
+        ACTIVE.pop(new_run_id, None)
+    with session() as s:
+        run = get(s, m.Run, new_run_id)
+        failed = s.scalar(select(func.count(m.Trial.id)).where(m.Trial.run_id == new_run_id,
+                                                                  m.Trial.status == "error")) or 0
+        run.finished_at = now()
+        if error:
+            run.status, run.error = "failed", error
+        elif cancelled:
+            run.status, run.stop_reason = "cancelled", "cancelled"
+        else:
+            run.status = "completed_with_errors" if failed else "completed"
+        refresh_summary(s, run)
+
+
+class _Cancelled(Exception):
+    pass
+
+
+async def _regrade(jobs, cases, evs, ctx, new_run_id, flag, session) -> None:
     for key, idx, result_json, raw, tcost, attempts, trace in jobs:
         if flag["cancel"]:
-            cancelled = True
-            break
+            raise _Cancelled
         if key not in cases:
             continue
         result = NormalizedTargetResult.model_validate(result_json)
@@ -655,12 +684,6 @@ async def execute_reevaluation(new_run_id: int) -> None:
         with session() as s:
             _save_trial(s, new_run_id, {k: v[0].id for k, v in cases.items()}, rec)
             get(s, m.Run, new_run_id).progress_done += 1
-    ACTIVE.pop(new_run_id, None)
-    with session() as s:
-        run = get(s, m.Run, new_run_id)
-        run.status, run.finished_at = ("cancelled" if cancelled else "completed"), now()
-        run.stop_reason = "cancelled" if cancelled else None
-        refresh_summary(s, run)
 
 
 # --------------------------------------------------------------------------------------
@@ -671,6 +694,8 @@ async def execute_reevaluation(new_run_id: int) -> None:
 def apply_gate(s: Session, run_id: int, config: dict[str, Any], baseline_run_id: int | None = None,
                gate_id: int | None = None) -> m.GateResult:
     run = get(s, m.Run, run_id)
+    if run.status not in ("completed", "completed_with_errors"):
+        raise Conflict(f"Run {run_id} is {run.status}; gates apply to completed runs only")
     if run.summary is None:
         refresh_summary(s, run)
     base_metrics = None
@@ -743,7 +768,8 @@ def calibration_stats(s: Session, dimension: str, run_id: int | None = None) -> 
     q = (select(m.HumanAnnotation, m.Score, m.Trial)
          .join(m.Score, (m.Score.trial_id == m.HumanAnnotation.trial_id) & (m.Score.evaluator_id == m.HumanAnnotation.dimension))
          .join(m.Trial, m.Trial.id == m.HumanAnnotation.trial_id)
-         .where(m.HumanAnnotation.dimension == dimension))
+         .where(m.HumanAnnotation.dimension == dimension,
+                m.Score.status.in_(["pass", "fail", "unknown"])))  # the judge must have given a verdict
     if run_id is not None:
         q = q.where(m.Trial.run_id == run_id)
     rows = s.execute(q).all()

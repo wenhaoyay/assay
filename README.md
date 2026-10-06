@@ -176,7 +176,7 @@ belongs in `local/`, which git ignores. See [docs/connecting-a-target.md](docs/c
 
 ## Repository layout
 
-```
+```text
 gaugelab/                    core package: adapters, evaluators, judge, runner, statistics, gates, store, CLI
 apps/api/                    FastAPI app, Alembic migrations, API tests
 apps/web/                    React + TypeScript + Vite + Tailwind + Recharts; Vitest and Playwright tests
@@ -202,7 +202,7 @@ make ci-regression   # the same gate on a deliberately regressed candidate (exit
 `.github/workflows/ci.yml` runs lint, types and tests, the migrations and the full demo on
 Postgres, the Playwright flows, and the evaluation gate:
 
-```
+```text
 ## GaugeLab evaluation
 | | Metric | Baseline | Candidate | Delta | 95% CI (paired) |
 | - | Overall pass rate | 73.0% | 67.2% | -5.7pp | ... |
@@ -227,6 +227,10 @@ to prove that the gate fails when it should.
   itself. Semantic grading needs an LLM judge, and an LLM judge needs calibration.
 - **Small samples.** Fifty-eight cases give intervals of roughly ±13 percentage points.
   GaugeLab reports that rather than hiding it.
+- **Verified locally, not yet in CI.** Development and every test ran on SQLite on Windows.
+  The Docker Compose stack and the GitHub Actions workflows (including the Postgres job) are
+  written but had not been run when this was written: the development machine has no Docker,
+  and the repository had not been pushed.
 - **Not implemented:** OpenTelemetry export, multi-turn conversation simulation, parallel
   annotators with inter-annotator agreement in the UI.
 

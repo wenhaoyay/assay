@@ -286,7 +286,7 @@ def compare(base_trials: list[TrialView], cand_trials: list[TrialView], cases: d
             sb = _mean([float(s["score"]) for t in gb[cid] if (s := t.score(eid)) and s.get("score") is not None
                         and s["status"] in DECIDED])
             if sa is not None and sb is not None and abs(sb - sa) >= score_change and eid not in ("latency",):
-                if get_kind(ga[cid], eid) in ("performance",):
+                if get_kind(ga[cid], eid) in ("performance", "llm_judge"):  # judge score = confidence
                     continue
                 changed.append({"case_id": cid, "evaluator_id": eid, "baseline": sa, "candidate": sb})
 

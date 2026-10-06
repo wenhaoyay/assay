@@ -6,9 +6,11 @@ Config (YAML or dict)::
     groundedness:      {min: 0.90}
     p95_latency_ms:    {max: 3000}
     average_cost_usd:  {max: 0.01}
-    regression:                      # relative to a baseline run
-      overall_pass_rate: {maximum_drop: 0.03}
-      tool_accuracy:     {maximum_drop: 0.02}
+    regression:                      # vs a baseline run, in the metric's own units
+      overall_pass_rate: {maximum_drop: 0.03}   # at most 3 points lower
+      p95_latency_ms:    {maximum_drop: 250}    # "worse" = higher for latency, cost, tokens
+    relative_regression:             # the same, as a fraction of the baseline value
+      average_cost_usd:  {maximum_drop: 0.10}   # at most 10% more expensive
 
 A metric is a key of ``aggregate()["metrics"]``: overall_pass_rate, tool_accuracy,
 p50/p95_latency_ms, average_total_tokens, average_cost_usd, any evaluator id (its pass
@@ -34,6 +36,13 @@ def _check(name: str, metric: str, value: float | None, rule: str, limit: float,
     return out
 
 
+LOWER_IS_BETTER = ("latency", "cost", "tokens")
+
+
+def lower_is_better(metric: str) -> bool:
+    return any(w in metric for w in LOWER_IS_BETTER)
+
+
 def evaluate_gates(config: dict[str, Any], metrics: dict[str, Any],
                    baseline_metrics: dict[str, Any] | None = None) -> dict[str, Any]:
     results = []
@@ -45,11 +54,15 @@ def evaluate_gates(config: dict[str, Any], metrics: dict[str, Any],
                 cur = metrics.get(metric)
                 base = (baseline_metrics or {}).get(metric)
                 if base is None or cur is None:
-                    res = _check(f"regression:{metric}", metric, None, "max", drop, "relative", base)
+                    res = _check(f"{name}:{metric}", metric, None, "max", drop, "relative", base)
                     if baseline_metrics is None:
                         res["reason"] = "no baseline run to compare against"
                 else:
-                    res = _check(f"regression:{metric}", metric, round(base - cur, 12), "max", drop, "relative", base)
+                    # "Drop" = getting worse: a fall for rates, a rise for latency, cost and tokens.
+                    worse = (cur - base) if lower_is_better(metric) else (base - cur)
+                    if name == "relative_regression" and base:
+                        worse = worse / abs(base)  # as a fraction of the baseline
+                    res = _check(f"{name}:{metric}", metric, round(worse, 12), "max", drop, "relative", base)
                     res["candidate"] = cur
                 results.append(res)
             continue

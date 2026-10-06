@@ -194,10 +194,10 @@ class LatencyThreshold(Evaluator):
 
     async def evaluate(self, case, result, trace, ctx):
         limit = case.expected.max_latency_ms or ctx.options.get("max_latency_ms")
-        if result.latency_ms is None:
-            return self.missing("latency")
         if not limit:
             return self.result(EvalStatus.NOT_APPLICABLE, score=result.latency_ms, explanation="No latency limit set.")
+        if result.latency_ms is None:
+            return self.missing("latency")
         return self.passed(result.latency_ms <= limit, score=result.latency_ms, threshold=limit,
                            explanation=f"{result.latency_ms:.0f} ms vs limit {limit:.0f} ms")
 

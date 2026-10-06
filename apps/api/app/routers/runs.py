@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from gaugelab.analysis import FAILURE_TYPES
-from gaugelab.evaluators import get_evaluator
+from gaugelab.evaluators import REGISTRY, get_evaluator
 from gaugelab.report import markdown_summary
 from gaugelab.store import models as m
 from gaugelab.store import service as svc
@@ -177,6 +177,14 @@ async def reevaluate(run_id: int, body: ReevaluateIn, s: Session = Depends(get_s
     run = svc.get(s, m.Run, run_id)
     if run.status in ("queued", "running"):
         raise HTTPException(409, "Wait for the run to finish before re-evaluating it.")
+    evaluators = body.evaluators if body.evaluators is not None else svc.get(s, m.Experiment, run.experiment_id).config["evaluators"]
+    unknown = [e for e in evaluators if e not in REGISTRY]
+    if unknown:
+        raise HTTPException(422, f"Unknown evaluator(s): {', '.join(unknown)}")
+    judge = body.judge if body.judge is not None else svc.get(s, m.Experiment, run.experiment_id).config.get("judge")
+    judges = [e for e in evaluators if REGISTRY[e].kind == "llm_judge"]
+    if judges and not judge:
+        raise HTTPException(422, f"Judge evaluators selected ({', '.join(judges)}) but no judge configured.")
     new = svc.prepare_reevaluation(s, run_id, body.evaluators, body.judge, body.name)
     s.commit()
     _spawn(svc.execute_reevaluation(new.id))

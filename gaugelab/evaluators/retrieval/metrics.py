@@ -31,16 +31,26 @@ def groups(relevant: set[str] | list[str]) -> Groups:
 
 
 def _gains(retrieved: list[str], gs: Groups, k: int | None = None) -> list[bool]:
-    """For each ranked doc: does it satisfy a requirement not yet satisfied?"""
-    open_ = list(gs)
-    out = []
+    """For each ranked doc: does it satisfy a requirement? Documents are matched to requirements
+    by maximum bipartite matching (augmenting paths, in rank order), so overlapping groups such
+    as ["a|b", "b"] are satisfied whenever any assignment satisfies them."""
     ranked = _dedupe(retrieved)
-    for d in ranked[:k] if k is not None else ranked:
-        hit = next((g for g in open_ if d in g), None)
-        if hit is not None:
-            open_.remove(hit)
-        out.append(hit is not None)
-    return out
+    docs = ranked[:k] if k is not None else ranked
+    owner: dict[int, int] = {}  # requirement index -> doc index
+
+    def augment(di: int, seen: set[int]) -> bool:
+        for gi, g in enumerate(gs):
+            if docs[di] in g and gi not in seen:
+                seen.add(gi)
+                if gi not in owner or augment(owner[gi], seen):
+                    owner[gi] = di
+                    return True
+        return False
+
+    for di in range(len(docs)):
+        augment(di, set())
+    matched = set(owner.values())
+    return [di in matched for di in range(len(docs))]
 
 
 def precision_at_k(retrieved: list[str], relevant: set[str] | list[str], k: int) -> float:

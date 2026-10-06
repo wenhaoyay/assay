@@ -69,8 +69,8 @@ def tool_selection(required: list[str], called: list[str], policy: str = "contai
         if extra:
             problems.append(f"not in the exact set: {', '.join(extra)}")
     if policy == "ordered" and not missing:
-        positions = [called.index(t) for t in required]
-        if positions != sorted(positions):
+        it = iter(called)
+        if not all(any(c == t for c in it) for t in required):  # subsequence test
             problems.append(f"order: expected {' -> '.join(required)}, got {' -> '.join(called)}")
     return not problems, problems
 
@@ -205,8 +205,10 @@ class StepCount(_AgentEvaluator):
         if result.tool_calls is None and result.steps is None:
             return self.missing("tool calls or steps")
         tools = len(result.tool_calls or [])
-        models = sum(1 for s in (result.steps or []) if s.type == "model_call")
-        total = tools + len(result.steps or [])
+        steps = result.steps or []
+        models = sum(1 for s in steps if s.type == "model_call")
+        # A target that reports its tool calls as steps too must not have them counted twice.
+        total = len(steps) + max(0, tools - sum(1 for s in steps if s.type == "tool_call"))
         meta = {"tool_calls": tools, "model_calls": models, "steps": total}
         limit = case.expected.max_steps
         if limit is None:
@@ -238,6 +240,7 @@ class TaskSuccess(_AgentEvaluator):
             if result.tool_calls is None and result.structured_output is None:
                 return self.missing("tool results or structured output")
             return self.passed(False, score=0.0, explanation="No successful tool result or structured output to check.")
+        expected = flatten(expected)
         found, problems = 0, []
         for key, val in expected.items():
             actuals = [s[key] for s in sources if key in s]
@@ -270,8 +273,11 @@ class ToolResultConsistency(_AgentEvaluator):
         if not values:
             return self.result(EvalStatus.NOT_APPLICABLE,
                                explanation=f"No successful tool result reported {cfg['field']!r}.")
-        actual = str(values[-1])
-        phrases: dict[str, list[str]] = cfg["phrases"]
+        def key(v: Any) -> str:  # True / "true" / "True" are the same value in a YAML phrase table
+            return str(v).strip().lower()
+
+        actual = key(values[-1])
+        phrases: dict[str, list[str]] = {key(k): v for k, v in cfg["phrases"].items()}
         says_actual = any(contains_phrase(result.answer, p) for p in phrases.get(actual, [actual]))
         contradicting = [p for v, ps in phrases.items() if v != actual for p in ps if contains_phrase(result.answer, p)]
         ok = says_actual and not contradicting
