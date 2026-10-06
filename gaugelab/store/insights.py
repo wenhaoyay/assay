@@ -348,7 +348,8 @@ def estimate_setup(s: Session, target_version_id: int, dataset_version_id: int, 
             "target_cost_usd": target_cost, "target_cost_source": cost_source,
             "target_cost_visible": target_cost is not None,
             "cost_per_answer_usd": target.cost_per_answer_usd, "shared": bool(target.shared),
-            "judge_calls": judge_calls, "judge_cost_usd": judge_cost,
+            "judge_calls": judge_calls, "judge_cost_usd": judge_cost, "judge_ms_per_call": judge_ms or None,
+            "judge_local": bool(judge and judge.get("provider") != "heuristic" and judge_ms >= 10_000),
             "estimated_seconds": round(total_ms / 1000) if (per_call_ms is not None or judge_calls) else None,
             "note": ("From the median latency of past runs of this target." if lat else
                      "No past runs of this target: time unknown until the first run.")}

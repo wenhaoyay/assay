@@ -11,6 +11,7 @@ import { useCrumbs } from '../lib/crumbs'
 import { ms, pct, usd } from '../lib/format'
 import { usePrefs } from '../lib/prefs'
 import type { CatalogEntry, ConnectorTemplate, ModelCheck, ProviderConfig, Settings } from '../lib/types'
+import { LocalModelsCard } from '../components/LocalModels'
 import { Pricing } from './Evaluators'
 
 type STab = 'models' | 'defaults' | 'appearance' | 'shape' | 'templates' | 'pricing' | 'server'
@@ -65,6 +66,7 @@ function ModelsTab() {
           </div>
         )}
       </section>
+      <LocalModelsCard models={models.data ?? []} onChange={refresh} />
       <section>
         <h2 className="mb-1 text-[15px] font-semibold">Connect a provider</h2>
         <p className="mb-3 text-[13px] text-ink-3">Model lists come from the provider itself, so they are never out of date.</p>

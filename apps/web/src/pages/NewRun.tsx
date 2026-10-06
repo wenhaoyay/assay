@@ -49,6 +49,8 @@ interface Estimate {
   target_cost_source?: string | null
   cost_per_answer_usd?: number | null
   shared?: boolean
+  judge_ms_per_call?: number | null
+  judge_local?: boolean
 }
 
 type Purpose = 'correctness' | 'speed' | 'large'
@@ -271,7 +273,11 @@ export function NewRunPage() {
 
           <Card title="3. Grading and limits">
             <div className="grid gap-3 md:grid-cols-3">
-              <Field label="Grading model (judge)" hint={judge === null && defaultJudge ? 'Your default (Settings).' : 'Only for meaning checks.'}>
+              <Field label="Grading model (judge)" hint={e && e.judge_calls > 0 && e.judge_ms_per_call ? (
+                e.judge_local
+                  ? <>{e.judge_calls} grading calls on this PC: about {duration(Math.round((e.judge_calls * e.judge_ms_per_call) / 1000))}, free.</>
+                  : <>{e.judge_calls} grading calls: about {duration(Math.round((e.judge_calls * e.judge_ms_per_call) / 1000 / concurrency))}, {e.judge_cost_usd !== null ? usd(e.judge_cost_usd) : 'price unknown'}.</>
+              ) : judge === null && defaultJudge ? 'Your default (Settings).' : 'Only for meaning checks.'}>
                 <Select value={judgeValue} onChange={(ev) => setJudge(ev.target.value)} aria-label="Judge">
                   <option value="">None</option>
                   <option value="heuristic">Heuristic (word overlap, free, not an LLM)</option>

@@ -331,3 +331,25 @@ def test_dry_run_typed_questions_and_load_check(client):
     assert [x["question"] for x in r["calls"]] == ["Hi?", "What is ZP17?"]
     assert r["load"]["n"] == 2 and r["load"]["verdict"] in ("copes", "slows", "queues")
     assert r["per_answer_cost_usd"] is None
+
+
+def test_local_models_notice_gates_downloads(client, monkeypatch):
+    from gaugelab import local_models
+
+    c = client
+    adv = c.get("/api/local-models/advice").json()
+    assert adv["suggestions"] and "memory" in adv
+    st = c.get("/api/local-models/status?base_url=http://127.0.0.1:9").json()
+    assert st["running"] is False
+    # No download before the third-party notice is accepted.
+    r = c.post("/api/local-models/pull", json={"model": "llama3.2:3b"})
+    assert r.status_code == 409 and "notice" in r.json()["detail"]
+    c.put("/api/settings", json={"ollama_notice_ack": "2026-10-06T00:00:00Z"})
+
+    async def fake_status(base_url=local_models.DEFAULT_URL):
+        return {"running": False, "models": [], "base_url": base_url}
+
+    monkeypatch.setattr(local_models, "status", fake_status)
+    r = c.post("/api/local-models/pull", json={"model": "llama3.2:3b"})
+    assert r.status_code == 409 and "not answering" in r.json()["detail"]
+    assert c.post("/api/local-models/pull", json={"model": "bad name;rm"}).status_code == 422

@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from gaugelab import local_models
 from gaugelab.adapters import AdapterContext, build_adapter
 from gaugelab.adapters import connect as cx
 from gaugelab.providers.catalog import CATALOG, list_models
@@ -595,3 +596,38 @@ def get_bakeoff(bakeoff_id: int, s: Session = Depends(get_session)) -> dict[str,
 @router.get("/calibration/{dimension}/labelled-count")
 def labelled_count(dimension: str, s: Session = Depends(get_session)) -> dict[str, Any]:
     return {"n": len(workspace.labelled_items(s, dimension))}
+
+
+# --------------------------------------------------------------------------------------
+# Local models (Ollama): status, advice for this machine, downloads after the notice
+# --------------------------------------------------------------------------------------
+
+
+@router.get("/local-models/status")
+async def local_status(base_url: str = local_models.DEFAULT_URL) -> dict[str, Any]:
+    return await local_models.status(base_url)
+
+
+@router.get("/local-models/advice")
+def local_advice() -> dict[str, Any]:
+    return local_models.advice()
+
+
+class PullIn(BaseModel):
+    model: str = Field(min_length=1, max_length=200, pattern=r"^[A-Za-z0-9._:/-]+$")
+    base_url: str = local_models.DEFAULT_URL
+
+
+@router.post("/local-models/pull", status_code=202)
+async def local_pull(body: PullIn, s: Session = Depends(get_session)) -> dict[str, Any]:
+    if not workspace.get_settings(s).get("ollama_notice_ack"):
+        raise HTTPException(409, "Read and accept the third-party notice before downloading a model.")
+    st = await local_models.status(body.base_url)
+    if not st["running"]:
+        raise HTTPException(409, f"Ollama is not answering at {body.base_url}. Start the Ollama app first.")
+    return local_models.start_pull(body.model, body.base_url)
+
+
+@router.get("/local-models/pull")
+def local_pull_progress(model: str) -> dict[str, Any]:
+    return local_models.PULLS.get(model) or {"model": model, "status": "not started", "done": False, "error": None}
