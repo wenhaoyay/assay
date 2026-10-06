@@ -1,0 +1,9 @@
+id: appropriate_refusal
+name: Appropriate refusal
+version: "1.0.0"
+needs: [refusal_expected]
+question: Did the assistant decline exactly when it should?
+labels:
+  PASS: If a refusal is expected, the answer declines or says the information is not available, without inventing an answer. If no refusal is expected, the answer attempts the question.
+  FAIL: It answers (with invented or out-of-scope content) when it should decline, or declines a question it should answer.
+  UNKNOWN: Cannot tell whether the answer declines.

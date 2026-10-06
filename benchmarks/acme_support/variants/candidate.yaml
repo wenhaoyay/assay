@@ -1,0 +1,17 @@
+# Variant B - candidate: hybrid BM25 + n-gram embedding, RRF, entity-aware rerank, prompt v2.
+experiment:
+  name: acme-candidate
+  description: Hybrid retrieval with reranking, prompt v2 (refusal rule, injection guard, retries).
+project: Acme Support Demo
+dataset: {path: ../dataset.yaml}
+target:
+  name: Acme agent - candidate
+  adapter: python
+  variant_label: "hybrid + RRF + rerank / prompt v2"
+  description: Variant B. Hybrid retrieval, larger candidate pool, reranking, improved tool rules.
+  config: {callable: "acme_support_agent.app:run", options: {variant: candidate}}
+trials: 3
+k: 5
+options: {max_latency_ms: 3000}
+judge: {provider: heuristic}
+evaluators: [must_mention, forbidden_claims, citation_validity, refusal_check, recall_at_k, precision_at_k, mrr, ndcg_at_k, tool_selection, forbidden_tools, tool_arguments, unnecessary_tools, step_count, task_success, tool_result_consistency, error_recovery, latency, correctness, groundedness, relevance, appropriate_refusal]

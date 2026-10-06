@@ -1,0 +1,10 @@
+id: groundedness
+name: Groundedness (faithfulness)
+version: "1.0.0"
+needs: [context]
+question: Is every factual claim in the answer supported by the retrieved context or tool results shown?
+labels:
+  PASS: Every factual claim in the answer is supported by the provided context or tool results. Saying that something is not covered, or asking a clarifying question, is supported.
+  FAIL: The answer contains at least one factual claim that the provided context and tool results do not support, even if the claim might be true in the real world.
+  UNKNOWN: The context is empty or unreadable, so support cannot be assessed.
+notes: Groundedness is not correctness. A grounded answer can still be wrong if the retrieved context was wrong; a correct answer can be ungrounded if it relies on knowledge not in the context.

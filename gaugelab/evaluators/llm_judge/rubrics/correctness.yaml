@@ -1,0 +1,9 @@
+id: correctness
+name: Answer correctness
+version: "1.0.0"
+needs: [reference]
+question: Do the answer's material factual claims agree with the reference?
+labels:
+  PASS: All material factual claims in the answer agree with the reference answer or reference evidence, and the task outcome (e.g. a status, a yes/no) is the same.
+  FAIL: At least one material factual claim contradicts the reference, or the answer gives a different task outcome. Extra correct detail is not a failure; wrong detail is.
+  UNKNOWN: The reference is insufficient to decide whether the answer is correct.
