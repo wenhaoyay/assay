@@ -207,13 +207,19 @@ function AnswerReview({ dataset, version, onEdited }: { dataset: Dataset; versio
   const [runId, setRunId] = useState<number | ''>('')
   const rid = runId || own[0]?.id || ''
   const trials = useQuery({ queryKey: ['run-trials', rid], enabled: !!rid, queryFn: () => api.get<TrialRow[]>(`/api/runs/${rid}/trials`) })
-  const known = useMemo(() => new Set((version.cases ?? []).map((c) => c.input.message.trim().toLowerCase())), [version.cases])
+  // Questions already in this set: those with expectations are done; those without (typed or real
+  // questions) are exactly what needs reviewing, and a verdict fills in their expectations.
+  const inSet = useMemo(() => new Map((version.cases ?? []).map((c) => [c.input.message.trim().toLowerCase(), c])), [version.cases])
   const ids = useMemo(() => new Set((version.cases ?? []).map((c) => c.id)), [version.cases])
-  // One card per question (the first try), skipping questions already in this set.
   const cards = useMemo(() => {
     const seen = new Set<string>()
-    return (trials.data ?? []).filter((t) => t.question && t.answer && !seen.has(t.case_id) && seen.add(t.case_id) && !known.has(t.question.trim().toLowerCase()))
-  }, [trials.data, known])
+    return (trials.data ?? []).filter((t) => {
+      if (!t.question || !t.answer || seen.has(t.case_id)) return false
+      seen.add(t.case_id)
+      const existing = inSet.get(t.question.trim().toLowerCase())
+      return !existing || !hasExpectations(existing)
+    })
+  }, [trials.data, inSet])
   const [i, setI] = useState(0)
   const [mode, setMode] = useState<'judge' | 'right' | 'wrong'>('judge')
   const [chips, setChips] = useState<string[]>([])
@@ -222,18 +228,28 @@ function AnswerReview({ dataset, version, onEdited }: { dataset: Dataset; versio
   const [saved, setSaved] = useState(0)
   const add = useAddCase(version.id, onEdited)
   const card = cards[i]
+  const existing = card?.question ? inSet.get(card.question.trim().toLowerCase()) : undefined
   const next = () => { setI((x) => x + 1); setMode('judge'); setChips([]); setCorrection(''); setKeepRef(true) }
   const toggle = (t: string) => setChips((c) => (c.includes(t) ? c.filter((x) => x !== t) : [...c, t]))
   const save = () => {
     if (!card?.question) return
     const right = mode === 'right'
-    add.mutate(makeCase(card.question, ids, {
+    const built = makeCase(card.question, ids, {
       reference: right ? (keepRef ? card.answer : undefined) : correction,
       must_mention: chips,
       category: card.category ?? undefined,
       provenance: { source: right ? 'approved-answer' : 'corrected-answer', drafted_by: right ? 'the bot' : prefs.annotator || 'you', approved_by: prefs.annotator || 'you', run_id: card.run_id, trial_id: card.id },
-    }), { onSuccess: () => { setSaved((n) => n + 1); next() } })
+    })
+    const done = { onSuccess: () => { setSaved((n) => n + 1); next() } }
+    if (existing) {
+      // Fill in the expectations of the question already in the set (same id, its other fields kept).
+      update.mutate({ ...existing, expected: { ...existing.expected, answer: { ...existing.expected.answer, ...built.expected.answer } }, metadata: { ...existing.metadata, ...built.metadata } }, done)
+    } else add.mutate(built, done)
   }
+  const update = useMutation({
+    mutationFn: (c: TestCase) => api.put<EditResult>(`/api/dataset-versions/${version.id}/cases/${encodeURIComponent(c.id)}`, c),
+    onSuccess: onEdited,
+  })
 
   return (
     <Card title={<span className="flex items-center gap-2"><ListChecks className="size-4 text-accent-ink" />Approve good answers</span>}
@@ -245,7 +261,7 @@ function AnswerReview({ dataset, version, onEdited }: { dataset: Dataset; versio
       )}>
       {!own.length ? <Empty title="No answers to review yet">Run this chatbot once (any question set), then come back: its answers appear here as cards.</Empty>
         : trials.isLoading ? <Loading rows={3} />
-        : !card ? <Notice tone="good" title={saved ? `${saved} case${saved === 1 ? '' : 's'} added` : 'Nothing left to review in this run'}>Every question in run #{rid} is either reviewed or already in this set. Pick another run above.</Notice>
+        : !card ? <Notice tone="good" title={saved ? `${saved} question${saved === 1 ? '' : 's'} saved` : 'Nothing left to review in this run'}>Every question in run #{rid} already has expectations in this set. Pick another run above.</Notice>
         : (
           <div onKeyDown={(e) => {
             if ((e.target as HTMLElement).tagName === 'TEXTAREA' || (e.target as HTMLElement).tagName === 'INPUT') return
@@ -275,7 +291,7 @@ function AnswerReview({ dataset, version, onEdited }: { dataset: Dataset; versio
                 <div className="text-[13px] font-medium">Which phrases must a correct answer contain?</div>
                 <TermChips text={card.answer} picked={chips} onToggle={toggle} />
                 <label className="flex items-center gap-2 text-xs"><input type="checkbox" className="accent-[var(--accent)]" checked={keepRef} onChange={(e) => setKeepRef(e.target.checked)} />Keep this answer as the reference answer</label>
-                <div className="flex gap-2"><Button variant="primary" loading={add.isPending} onClick={save}><Check className="size-3.5" />Add case</Button><Button variant="ghost" onClick={() => setMode('judge')}>Back</Button></div>
+                <div className="flex gap-2"><Button variant="primary" loading={add.isPending || update.isPending} onClick={save}><Check className="size-3.5" />{existing ? "Save expectations" : "Add case"}</Button><Button variant="ghost" onClick={() => setMode('judge')}>Back</Button></div>
               </div>
             )}
             {mode === 'wrong' && (
@@ -284,10 +300,10 @@ function AnswerReview({ dataset, version, onEdited }: { dataset: Dataset; versio
                   <Textarea rows={2} className="font-sans text-[13px]" value={correction} autoFocus onChange={(e) => setCorrection(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && correction.trim()) { e.preventDefault(); save() } }} />
                 </Field>
                 <TermChips text={correction} picked={chips} onToggle={toggle} />
-                <div className="flex gap-2"><Button variant="primary" disabled={!correction.trim()} loading={add.isPending} onClick={save}><Check className="size-3.5" />Add case</Button><Button variant="ghost" onClick={() => setMode('judge')}>Back</Button></div>
+                <div className="flex gap-2"><Button variant="primary" disabled={!correction.trim()} loading={add.isPending || update.isPending} onClick={save}><Check className="size-3.5" />{existing ? "Save expectations" : "Add case"}</Button><Button variant="ghost" onClick={() => setMode('judge')}>Back</Button></div>
               </div>
             )}
-            {add.isError && <div className="mt-2"><ErrorState error={add.error} /></div>}
+            {(add.isError || update.isError) && <div className="mt-2"><ErrorState error={add.error ?? update.error} /></div>}
           </div>
         )}
     </Card>
@@ -533,4 +549,12 @@ export function AddVariations({ versionId, caseId }: { versionId: number; caseId
       </Dialog>
     </>
   )
+}
+
+/** Does a case say anything about a correct answer yet? (A typed or real question may not.) */
+export function hasExpectations(c: TestCase): boolean {
+  const e = c.expected
+  const a = e.answer
+  return !!(a.reference || a.exact || a.must_mention.length || a.must_not_claim.length || a.regex.length || e.relevant_documents.length
+    || e.required_tools.length || e.tool_calls.length || e.refusal_expected != null || e.min_citations != null || e.required_citations.length)
 }

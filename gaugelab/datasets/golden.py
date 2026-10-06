@@ -85,7 +85,8 @@ def lint(cases: list[TestCase], documents: list[str] | None = None,
         a = c.expected.answer
         for phrase in a.must_mention:
             parts = [p.strip() for p in phrase.split("|")]
-            if any(p.lower() in GENERIC or len(p) < 3 for p in parts):
+            # A number is a specific fact ("32" days); only words can be too common to test anything.
+            if any(p.lower() in GENERIC or (len(p) < 3 and not p.isdigit()) or (p.isdigit() and len(p) < 2) for p in parts):
                 add(c.id, "too_generic", f"Must-mention \"{phrase}\" is too common to prove anything: almost any answer contains it.")
             elif _norm(phrase) and _norm(phrase) in _norm(c.input.message):
                 add(c.id, "in_question", f"Must-mention \"{phrase}\" is already in the question: an answer that repeats the question passes.")

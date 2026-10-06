@@ -773,7 +773,7 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved, reply, tes
             </Notice>
           </div>
         )}
-        {src !== 'test' && (
+        {src !== 'test' && asked > 0 && (
           <label className="mt-2 flex items-center gap-2 text-xs text-ink-2">
             <input type="checkbox" className="accent-[var(--accent)]" checked={loadCheck} onChange={(e) => setLoadCheck(e.target.checked)} />
             Also check how it copes when busy: ask the same questions again, all at once ({asked} more answer{asked === 1 ? '' : 's'})

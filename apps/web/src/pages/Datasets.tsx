@@ -108,7 +108,7 @@ function DatasetRow({ d, projects }: { d: Dataset; projects: Project[] }) {
           <div className="max-w-md truncate text-xs text-ink-3">{d.description || d.latest?.change_summary}</div>
         </td>
         <td>
-          <Select className="w-52" value={d.project_id} aria-label={`Chatbot of ${d.name}`} onChange={(e) => patch.mutate({ project_id: Number(e.target.value) })}>
+          <Select className="w-64" value={d.project_id} aria-label={`Chatbot of ${d.name}`} onChange={(e) => patch.mutate({ project_id: Number(e.target.value) })}>
             {projects.map((p) => <option key={p.id} value={p.id}>{projectOption(p)}</option>)}
           </Select>
         </td>

@@ -115,10 +115,10 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
             <thead><tr><th>Model</th><th className="text-right">Download</th><th className="text-right">Needs memory</th><th className="text-right">Per grading call here</th><th /></tr></thead>
             <tbody>
               {a.suggestions.map((s) => (
-                <tr key={s.model} className={clsx(!s.fits && 'opacity-55')}>
+                <tr key={s.model} className={clsx(!s.fits && !installed.has(s.model) && 'opacity-55')}>
                   <td>
                     <code className="text-[12px]">{s.model}</code>{s.model === a.recommended && <Badge tone="accent" className="ml-1.5">suggested</Badge>}
-                    <div className="text-xs text-ink-3">{s.note}{!s.fits && ' Needs more free memory than this PC has now.'}</div>
+                    <div className="text-xs text-ink-3">{s.note}{!s.fits && (installed.has(s.model) ? ' Installed: free memory is tight now, so it may run slower.' : ' Needs more free memory than this PC has now.')}</div>
                   </td>
                   <td className="num text-right">~{s.size_gb} GB</td>
                   <td className="num text-right">~{s.needs_gb} GB</td>
@@ -126,7 +126,7 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
                   <td className="text-right">
                     {installed.has(s.model) ? (connected.has(s.model) ? <Badge tone="good"><Check className="size-3" />connected</Badge>
                       : <Button size="sm" variant="primary" loading={connect.isPending && connect.variables === s.model} onClick={() => connect.mutate(s.model)}>Use for grading</Button>)
-                      : <Button size="sm" disabled={!st?.running || !acked || downloading} loading={startPull.isPending && startPull.variables === s.model} onClick={() => startPull.mutate(s.model)}><Download className="size-3.5" />Download</Button>}
+                      : <Button size="sm" disabled={!st?.running || !acked || downloading} title={!acked ? 'Accept the third-party notice below first' : undefined} loading={startPull.isPending && startPull.variables === s.model} onClick={() => startPull.mutate(s.model)}><Download className="size-3.5" />Download</Button>}
                   </td>
                 </tr>
               ))}

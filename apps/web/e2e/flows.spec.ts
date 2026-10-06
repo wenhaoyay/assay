@@ -103,6 +103,7 @@ test('connect a Python chatbot through the wizard', async ({ page }) => {
 test('gates are edited as rules, and a new gate shows at once', async ({ page }) => {
   await page.goto('/gates')
   const cards = page.getByRole('button', { name: 'Edit' })
+  await expect(cards.first()).toBeVisible() // the seeded gate, so the count below is the loaded list
   const before = await cards.count()
   await page.getByRole('button', { name: 'New gate' }).first().click()
   await expect(page.getByLabel('Metric').first()).toBeVisible()
