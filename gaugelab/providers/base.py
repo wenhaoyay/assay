@@ -7,7 +7,6 @@ object never exposes the key in ``repr``, ``describe()`` or error messages.
 from __future__ import annotations
 
 import asyncio
-import os
 import random
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -42,11 +41,14 @@ class TransientProviderError(ProviderError):
 
 
 def resolve_key(ref: str | None) -> str | None:
+    from gaugelab.secrets import SecretError, resolve
+
     if not ref:
         return None
-    if ref.startswith("env:"):
-        return os.environ.get(ref[4:]) or None
-    raise ProviderError("API keys must be referenced as env:NAME")
+    try:
+        return resolve(ref)
+    except SecretError as exc:
+        raise ProviderError("API keys must be referenced as env:NAME or keyring:NAME") from exc
 
 
 class LLMProvider(ABC):

@@ -78,6 +78,11 @@ def create_experiment(body: ExperimentIn, s: Session = Depends(get_session)) -> 
     if judges and not body.judge:
         raise HTTPException(422, f"Judge evaluators selected ({', '.join(judges)}) but no judge configured. "
                                  "Pick a judge provider, or remove the judge evaluators.")
+    tv = svc.get(s, m.TargetVersion, body.target_version_id)
+    from gaugelab.store.workspace import judge_allowed
+
+    if reason := judge_allowed(s, tv.target_id, body.judge):
+        raise HTTPException(422, reason)
     data = body.model_dump()
     e = svc.create_experiment(s, data.pop("project_id"), data.pop("name"), data.pop("target_version_id"),
                               data.pop("dataset_version_id"), data.pop("evaluators"), data.pop("judge"),
@@ -98,6 +103,16 @@ def estimate(experiment_id: int, s: Session = Depends(get_session)) -> dict[str,
 @router.post("/experiments/{experiment_id}/run", status_code=202)
 async def launch(experiment_id: int, s: Session = Depends(get_session)) -> dict[str, Any]:
     run = svc.start_run(s, experiment_id)
+    s.commit()
+    _spawn(svc.execute_run(run.id))
+    return svc.run_header(s, run)
+
+
+@router.post("/runs/start", status_code=202)
+async def start(body: ExperimentIn, s: Session = Depends(get_session)) -> dict[str, Any]:
+    """Create the saved run settings and start a run in one step (what the UI calls "New run")."""
+    exp = create_experiment(body, s)
+    run = svc.start_run(s, exp["id"])
     s.commit()
     _spawn(svc.execute_run(run.id))
     return svc.run_header(s, run)
@@ -185,6 +200,10 @@ async def reevaluate(run_id: int, body: ReevaluateIn, s: Session = Depends(get_s
     judges = [e for e in evaluators if REGISTRY[e].kind == "llm_judge"]
     if judges and not judge:
         raise HTTPException(422, f"Judge evaluators selected ({', '.join(judges)}) but no judge configured.")
+    from gaugelab.store.workspace import judge_allowed
+
+    if reason := judge_allowed(s, run.snapshot.get("target", {}).get("id"), judge):
+        raise HTTPException(422, reason)
     new = svc.prepare_reevaluation(s, run_id, body.evaluators, body.judge, body.name)
     s.commit()
     _spawn(svc.execute_reevaluation(new.id))
@@ -347,8 +366,9 @@ def annotate(body: AnnotationIn, s: Session = Depends(get_session)) -> dict[str,
 
 
 @router.get("/calibration/{dimension}/stats")
-def calibration_stats(dimension: str, run_id: int | None = None, s: Session = Depends(get_session)) -> dict[str, Any]:
-    return svc.calibration_stats(s, dimension, run_id)
+def calibration_stats(dimension: str, run_id: int | None = None, judge: str | None = None,
+                      s: Session = Depends(get_session)) -> dict[str, Any]:
+    return svc.calibration_stats(s, dimension, run_id, judge)
 
 
 @router.get("/calibration")

@@ -18,7 +18,7 @@ from gaugelab.store import db
 from gaugelab.store import models as m
 from gaugelab.store.service import Conflict, NotFound
 
-from .routers import core, datasets, runs
+from .routers import core, datasets, runs, workspace
 
 load_dotenv()
 log = logging.getLogger("gaugelab")
@@ -65,6 +65,7 @@ def health() -> dict[str, str]:
 app.include_router(core.router)
 app.include_router(datasets.router)
 app.include_router(runs.router)
+app.include_router(workspace.router)
 
 
 @app.get("/{path:path}", include_in_schema=False)

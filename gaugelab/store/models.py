@@ -37,6 +37,8 @@ class Project(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(200), unique=True)
     description: Mapped[str] = mapped_column(Text, default="")
+    color: Mapped[str] = mapped_column(String(20), default="")  # a palette name chosen in the UI
+    icon: Mapped[str] = mapped_column(String(40), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -62,6 +64,10 @@ class Target(Base):
     description: Mapped[str] = mapped_column(Text, default="")
     adapter: Mapped[str] = mapped_column(String(20))  # http | python | replay
     archived: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Its answers may only be graded by a judge running on this machine (Ollama, LM Studio...).
+    local_judges_only: Mapped[bool] = mapped_column(Boolean, default=False)
+    # The last connection check: {"ok", "at", "elapsed_ms", "error", "explanation", "coverage"}.
+    last_check: Mapped[dict[str, Any] | None] = mapped_column(NullableJSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     versions: Mapped[list[TargetVersion]] = relationship(back_populates="target", order_by="TargetVersion.version")
 
@@ -345,4 +351,39 @@ class PriceOverride(Base):
     output_per_1m: Mapped[float] = mapped_column(Float)
     effective_from: Mapped[str] = mapped_column(String(10))
     source_note: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class AppSetting(Base):
+    """Workspace-wide defaults (judge, generator, spend cap). Values are JSON; never secrets."""
+
+    __tablename__ = "app_settings"
+    key: Mapped[str] = mapped_column(String(80), primary_key=True)
+    value: Mapped[Any] = mapped_column(NullableJSON, nullable=True)
+
+
+class ConnectorTemplate(Base):
+    """A target configuration saved for reuse ("connect another bot like this one")."""
+
+    __tablename__ = "connector_templates"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str] = mapped_column(Text, default="")
+    adapter: Mapped[str] = mapped_column(String(20))
+    config: Mapped[dict[str, Any]] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class JudgeBakeoff(Base):
+    """Several judges graded the same human-labelled answers; who agrees with the person most?"""
+
+    __tablename__ = "judge_bakeoffs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    dimension: Mapped[str] = mapped_column(String(80))
+    status: Mapped[str] = mapped_column(String(20), default="running")  # running | completed | failed
+    judges: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    progress_done: Mapped[int] = mapped_column(Integer, default=0)
+    progress_total: Mapped[int] = mapped_column(Integer, default=0)
+    results: Mapped[dict[str, Any] | None] = mapped_column(NullableJSON, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

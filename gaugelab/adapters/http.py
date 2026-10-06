@@ -15,7 +15,6 @@ when the whole string is one placeholder). Scope: ``input``, ``case`` (id), ``tr
 from __future__ import annotations
 
 import json
-import os
 import re
 import uuid
 from typing import Any, Literal
@@ -40,7 +39,7 @@ _PLACEHOLDER = re.compile(r"\{\{\s*([^}]+?)\s*\}\}")
 
 class AuthConfig(BaseModel):
     header: str = "Authorization"
-    secret_ref: str  # "env:NAME" - the secret itself is never stored in GaugeLab's database
+    secret_ref: str  # "env:NAME" or "keyring:NAME" - the secret itself is never stored in GaugeLab's database
     prefix: str = "Bearer "
 
 
@@ -75,6 +74,9 @@ class HttpTargetConfig(BaseModel):
     query: dict[str, Any] = Field(default_factory=dict)
     stream: StreamConfig | None = None
     response: dict[str, Any] = Field(default_factory=lambda: {"answer": "answer"})
+    # "gaugelab": the bot replies in the standard shape (answer, sources, citations, tool_calls,
+    # usage) and ``response`` is ignored. "custom": ``response`` says where each field is.
+    reply_shape: Literal["custom", "gaugelab"] = "custom"
     cleanup: CleanupConfig | None = None
     verify_tls: bool = True
 
@@ -93,12 +95,16 @@ def render(template: Any, scope: dict[str, Any]) -> Any:
 
 
 def resolve_secret(ref: str) -> str:
-    if ref.startswith("env:"):
-        val = os.environ.get(ref[4:])
-        if not val:
-            raise ValueError(f"Secret {ref} is not set in the server environment")
-        return val
-    raise ValueError("Only env:NAME secret references are supported")
+    from gaugelab.secrets import SecretError, resolve
+
+    try:
+        val = resolve(ref)
+    except SecretError as exc:
+        raise ValueError("Secret references are env:NAME or keyring:NAME") from exc
+    if not val:
+        where = "the server environment" if ref.startswith("env:") else "the OS credential store"
+        raise ValueError(f"Secret {ref} is not set in {where}")
+    return val
 
 
 # --------------------------------------------------------------------------------------
@@ -252,6 +258,13 @@ class HttpTargetAdapter(TargetAdapter):
         self._client = client
         self._owns_client = client is None
 
+    def mapping(self) -> dict[str, Any]:
+        if self.config.reply_shape == "gaugelab":
+            from gaugelab.adapters.connect import STANDARD_MAPPING
+
+            return STANDARD_MAPPING
+        return self.config.response
+
     def _get_client(self) -> httpx.AsyncClient:
         if self._client is None:
             self._client = httpx.AsyncClient(timeout=self.config.timeout_s, verify=self.config.verify_tls)
@@ -300,7 +313,7 @@ class HttpTargetAdapter(TargetAdapter):
                 raw = resp.json()
             except json.JSONDecodeError:
                 raw = {"answer": resp.text}
-        result = normalize(raw, cfg.response)
+        result = normalize(raw, self.mapping())
         result.latency_ms = (ended - started) * 1000
 
         if cfg.cleanup and (cfg.cleanup.only_if is None or get_path(raw, cfg.cleanup.only_if) is not None):

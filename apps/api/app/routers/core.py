@@ -36,8 +36,8 @@ class ProjectIn(BaseModel):
 
 @router.get("/projects")
 def list_projects(s: Session = Depends(get_session)) -> list[dict[str, Any]]:
-    return [{"id": p.id, "name": p.name, "description": p.description, "created_at": ser.iso(p.created_at)}
-            for p in s.scalars(select(m.Project).order_by(m.Project.id))]
+    return [{"id": p.id, "name": p.name, "description": p.description, "color": p.color, "icon": p.icon,
+             "created_at": ser.iso(p.created_at)} for p in s.scalars(select(m.Project).order_by(m.Project.id))]
 
 
 @router.post("/projects", status_code=201)
@@ -180,14 +180,16 @@ class ProviderIn(BaseModel):
     provider: str = Field(pattern="^(openai|ollama|anthropic)$")
     model: str = Field(min_length=1)
     base_url: str | None = None
-    api_key_ref: str | None = Field(default=None, pattern=r"^env:[A-Za-z_][A-Za-z0-9_]*$")
+    api_key_ref: str | None = Field(default=None, pattern=r"^(env|keyring):[A-Za-z_][A-Za-z0-9_]*$")
     temperature: float = 0.0
     max_tokens: int = 600
 
 
 @router.get("/providers")
 def list_providers(s: Session = Depends(get_session)) -> list[dict[str, Any]]:
-    return [ser.provider_cfg(p) for p in s.scalars(select(m.ProviderConfig).order_by(m.ProviderConfig.id))]
+    from gaugelab.store.workspace import provider_public
+
+    return [provider_public(s, p) for p in s.scalars(select(m.ProviderConfig).order_by(m.ProviderConfig.id))]
 
 
 @router.post("/providers", status_code=201)

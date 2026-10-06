@@ -259,12 +259,10 @@ def build_judge(s: Session, judge_cfg: dict[str, Any] | None) -> Judge | None:
 
 
 def provider_public(pc: m.ProviderConfig) -> dict[str, Any]:
-    import os
+    from gaugelab.secrets import describe
 
     ref = pc.api_key_ref
-    key_status = None
-    if ref and ref.startswith("env:"):
-        key_status = "set" if os.environ.get(ref[4:]) else "missing"
+    key_status = describe(ref)["status"] if ref else None
     return {"id": pc.id, "name": pc.name, "provider": pc.provider, "model": pc.model, "base_url": pc.base_url,
             "api_key_ref": ref, "key_status": key_status, "temperature": pc.temperature,
             "max_tokens": pc.max_tokens}
@@ -330,6 +328,10 @@ def create_experiment(s: Session, project_id: int, name: str, target_version_id:
     get(s, m.DatasetVersion, dataset_version_id)
     cfg = {**DEFAULT_RUN_CONFIG, **{k: v for k, v in config.items() if v is not None}, "evaluators": evaluators,
            "judge": judge}
+    if cfg.get("budget_usd") is None:
+        cap = s.get(m.AppSetting, "spend_cap_usd")
+        if cap is not None and cap.value is not None:
+            cfg["budget_usd"] = float(cap.value)  # the workspace default; a run may set its own
     cfg["trials"] = max(1, min(int(cfg["trials"]), 10))
     cfg["concurrency"] = max(1, min(int(cfg["concurrency"]), 16))
     e = m.Experiment(project_id=project_id, name=name, description=description, target_version_id=target_version_id,
@@ -559,8 +561,15 @@ def run_header(s: Session, run: m.Run) -> dict[str, Any]:
     snap = run.snapshot or {}
     summary = run.summary or {}
     gate = s.scalar(select(m.GateResult).where(m.GateResult.run_id == run.id).order_by(m.GateResult.id.desc()))
+    from gaugelab.store.insights import comparability
+
+    exp = s.get(m.Experiment, run.experiment_id)
+    comp = comparability(run)
     return {
         "id": run.id, "experiment_id": run.experiment_id, "experiment": snap.get("experiment", {}).get("name"),
+        "project_id": exp.project_id if exp else None,
+        "target_id": snap.get("target", {}).get("id"), "dataset_id": snap.get("dataset", {}).get("id"),
+        "comparability_key": comp["key"], "case_filter": comp["case_filter"],
         "status": run.status, "source": run.source, "parent_run_id": run.parent_run_id,
         "stop_reason": run.stop_reason, "error": run.error,
         "target": snap.get("target", {}).get("name"), "target_version": snap.get("target", {}).get("version"),
@@ -762,7 +771,8 @@ def annotate(s: Session, trial_id: int, dimension: str, label: str, annotator: s
     return ann
 
 
-def calibration_stats(s: Session, dimension: str, run_id: int | None = None) -> dict[str, Any]:
+def calibration_stats(s: Session, dimension: str, run_id: int | None = None,
+                      judge: str | None = None) -> dict[str, Any]:
     from gaugelab.statistics import binary_agreement
 
     q = (select(m.HumanAnnotation, m.Score, m.Trial)
@@ -773,6 +783,13 @@ def calibration_stats(s: Session, dimension: str, run_id: int | None = None) -> 
     if run_id is not None:
         q = q.where(m.Trial.run_id == run_id)
     rows = s.execute(q).all()
+    all_judges: dict[str, int] = {}
+    for _, sc, _ in rows:
+        name = f"{(sc.metadata_ or {}).get('provider')}/{(sc.metadata_ or {}).get('model')}"
+        all_judges[name] = all_judges.get(name, 0) + 1
+    if judge:  # agreement is specific to one judge model: a new model starts uncalibrated
+        rows = [r for r in rows
+                if f"{(r[1].metadata_ or {}).get('provider')}/{(r[1].metadata_ or {}).get('model')}" == judge]
     human = [a.label for a, _, _ in rows]
     judge = [(sc.label or sc.status).upper() for _, sc, _ in rows]
     agg = binary_agreement(human, judge)
@@ -784,7 +801,8 @@ def calibration_stats(s: Session, dimension: str, run_id: int | None = None) -> 
                      for a, sc, t in rows if a.label != (sc.label or sc.status).upper()]
     n = agg.n
     status = "Uncalibrated" if n == 0 else f"Calibrated on {n} sample{'s' if n != 1 else ''}"
-    return {"dimension": dimension, "status": status, "agreement": agg.as_dict(),
+    return {"dimension": dimension, "status": status, "agreement": agg.as_dict(), "by_judge": all_judges,
+            "judge_filter": judge,
             "judges": [json.loads(j) for j in judges], "disagreements": disagreements,
             "small_sample": 0 < n < 30}
 

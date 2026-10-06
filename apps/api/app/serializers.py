@@ -19,6 +19,7 @@ def target(s: Session, t: m.Target, with_versions: bool = False) -> dict[str, An
     tv = latest_target_version(s, t.id)
     out = {"id": t.id, "project_id": t.project_id, "name": t.name, "description": t.description,
            "adapter": t.adapter, "archived": t.archived, "created_at": iso(t.created_at),
+           "local_judges_only": t.local_judges_only, "last_check": t.last_check,
            "latest_version": version(tv)}
     if with_versions:
         out["versions"] = [version(v) for v in t.versions]
