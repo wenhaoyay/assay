@@ -244,7 +244,7 @@ def compare(base_trials: list[TrialView], cand_trials: list[TrialView], cases: d
             return None
         ci = paired_bootstrap_delta(pairs)
         return {"delta": ci.estimate, "ci_low": ci.low, "ci_high": ci.high, "n": ci.n,
-                "excludes_zero": ci.low is not None and (ci.low > 0 or ci.high < 0)}
+                "excludes_zero": ci.low is not None and ci.high is not None and (ci.low > 0 or ci.high < 0)}
 
     rows = []
     for key, label, unit in HEADLINE:

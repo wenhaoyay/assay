@@ -1,0 +1,12 @@
+# Same suite and gate, against the regressed candidate: the gate must FAIL (exit code 1).
+baseline: variants/candidate.yaml     # the version in production: v3 must not be worse than it
+candidate: variants/candidate_regressed.yaml
+gates:
+  overall_pass_rate: {min: 0.70}
+  tool_accuracy: {min: 0.90}
+  must_mention: {min: 0.70}
+  recall_at_k.mean: {min: 0.90}
+  p95_latency_ms: {max: 3000}
+  regression:
+    overall_pass_rate: {maximum_drop: 0.03}
+    tool_accuracy: {maximum_drop: 0.02}

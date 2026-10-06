@@ -23,7 +23,7 @@ from gaugelab.gates import evaluate_gates
 from gaugelab.pricing import PricingRegistry
 from gaugelab.providers import ProviderSpec, build_provider
 from gaugelab.runner import RunSpec, TrialRecord, evaluate_trial, run_trials, trial_status
-from gaugelab.schemas import NormalizedTargetResult, Span, TestCase, Trace
+from gaugelab.schemas import NormalizedTargetResult, Span, SpanType, TestCase, Trace, Usage
 from gaugelab.store import models as m
 from gaugelab.traces import add_evaluator_spans
 
@@ -307,7 +307,16 @@ def record_evaluator_versions(s: Session, ids: list[str]) -> list[dict[str, Any]
 # --------------------------------------------------------------------------------------
 
 DEFAULT_RUN_CONFIG = {"trials": 1, "concurrency": 4, "seed": 7, "k": 5, "options": {}, "budget_usd": None,
-                      "redact_fields": []}
+                      "redact_fields": [], "case_filter": None}
+
+
+def select_cases(cases: list[TestCase], case_filter: dict[str, Any] | None) -> list[TestCase]:
+    """Enabled cases, optionally reduced to a suite: any listed category, tag or id matches."""
+    enabled = [c for c in cases if c.enabled]
+    if not case_filter:
+        return enabled
+    cats, tags, ids = (set(case_filter.get(k) or []) for k in ("categories", "tags", "ids"))
+    return [c for c in enabled if c.category in cats or c.id in ids or tags & set(c.tags)]
 
 
 def create_experiment(s: Session, project_id: int, name: str, target_version_id: int, dataset_version_id: int,
@@ -334,7 +343,7 @@ def estimate_judge_cost(s: Session, experiment: m.Experiment) -> dict[str, Any]:
     cfg = experiment.config
     judge = build_judge(s, cfg.get("judge"))
     judge_ids = [e for e in cfg["evaluators"] if get_evaluator(e).kind == "llm_judge"]
-    cases = [c for _, c in version_cases(s, experiment.dataset_version_id) if c.enabled]
+    cases = select_cases([c for _, c in version_cases(s, experiment.dataset_version_id)], cfg.get("case_filter"))
     if not judge_ids or judge is None:
         return {"judge_calls": 0, "estimated_cost_usd": 0.0 if judge_ids == [] else None,
                 "note": "No judge evaluators selected." if not judge_ids else "No judge configured."}
@@ -376,7 +385,7 @@ def start_run(s: Session, experiment_id: int, source: str = "live", parent_run_i
     ds = get(s, m.Dataset, dv.dataset_id)
     freeze(s, dv)
     judge = build_judge(s, e.config.get("judge"))
-    cases = [c for _, c in version_cases(s, dv.id) if c.enabled]
+    cases = select_cases([c for _, c in version_cases(s, dv.id)], e.config.get("case_filter"))
     snapshot = {
         "experiment": {"id": e.id, "name": e.name, "config": e.config},
         "target": {"id": target.id, "name": target.name, "adapter": target.adapter, "version": tv.version,
@@ -441,7 +450,9 @@ async def execute_run(run_id: int) -> None:
         run = get(s, m.Run, run_id)
         e = get(s, m.Experiment, run.experiment_id)
         tv = get(s, m.TargetVersion, e.target_version_id)
-        pairs = [(r, c) for r, c in version_cases(s, e.dataset_version_id) if c.enabled]
+        keep = {c.id for c in select_cases([c for _, c in version_cases(s, e.dataset_version_id)],
+                                           e.config.get("case_filter"))}
+        pairs = [(r, c) for r, c in version_cases(s, e.dataset_version_id) if c.id in keep]
         case_rows = {c.id: r.id for r, c in pairs}
         cfg = e.config
         adapter = adapter_for(s, tv)
@@ -569,9 +580,9 @@ def trace_for(s: Session, trial_id: int) -> Trace | None:
     if tr is None:
         return None
     return Trace(trace_id=tr.trace_id, spans=[Span(
-        span_id=sp.span_id, parent_span_id=sp.parent_span_id, type=sp.type, name=sp.name, start_time=sp.start_time,
+        span_id=sp.span_id, parent_span_id=sp.parent_span_id, type=SpanType(sp.type), name=sp.name, start_time=sp.start_time,
         end_time=sp.end_time, duration_ms=sp.duration_ms, status=sp.status, input_summary=sp.input_summary,
-        output_summary=sp.output_summary, metadata=sp.metadata_ or {}, usage=sp.usage, cost_usd=sp.cost_usd,
+        output_summary=sp.output_summary, metadata=sp.metadata_ or {}, usage=Usage(**sp.usage) if sp.usage else None, cost_usd=sp.cost_usd,
         error=sp.error) for sp in tr.spans])
 
 

@@ -1,0 +1,137 @@
+# Connecting a target
+
+Any chatbot or agent can be connected by configuration alone. Pick the route that fits.
+
+| Your system | Use | Telemetry you get |
+|---|---|---|
+| Has an HTTP endpoint returning JSON | `http` adapter + response mapping | whatever the JSON contains |
+| Streams its answer (SSE or NDJSON) | `http` adapter + `stream` reducer | answer + any events you map (sources, steps, tool rounds) |
+| Is Python code you can import | `python` adapter: `module:function(test_input, options, ctx)` | everything you return |
+| Must not (or cannot) be called during evaluation | the importer + `replay` target | whatever its logs contain |
+
+Start with **Targets > New target > Test connection**: it shows the raw response next to the
+normalized one, and lists the telemetry the mapping does not yet capture.
+
+## 1. JSON over HTTP
+
+```json
+{
+  "base_url": "http://localhost:9040",
+  "endpoint": "/chat",
+  "method": "POST",
+  "body": {"message": "{{input.message}}", "session": "eval-{{uuid}}"},
+  "auth": {"header": "Authorization", "secret_ref": "env:MY_BOT_KEY", "prefix": "Bearer "},
+  "response": {
+    "answer": "reply.text",
+    "retrieved_documents": {"path": "retrieval.hits", "each": {"id": "doc", "score": "score", "text": "snippet"}},
+    "tool_calls": {"path": "trace.tools", "each": {"name": "tool", "arguments": "args", "result": "output"}},
+    "usage": {"input_tokens": "usage.prompt", "output_tokens": "usage.completion"},
+    "provider": {"provider": "model.vendor", "model": "model.name"}
+  }
+}
+```
+
+Templates: `{{input.message}}`, `{{input.fields.<name>}}` (per-case fields such as an
+office or a plant code), `{{case}}`, `{{trial}}`, `{{uuid}}`, `{{hex16}}`. Use a fresh
+`{{uuid}}` session per call so cases never share conversation history.
+
+Paths: `a.b.0.c`, `a.b[0].c`, alternatives `id|code`, wildcards `sources.*.id` (over a list
+or a mapping's values), literals `=value`. Inside `each`, a field may translate values:
+`{"path": "ok", "map": {"true": "success", "false": "error"}}`.
+
+## 2. Streamed replies (SSE / NDJSON)
+
+Fold the stream into one object, then map it as above:
+
+```json
+"stream": {
+  "format": "sse",
+  "type_path": "type",
+  "events": {
+    "delta":   {"op": "concat", "path": "text", "into": "answer"},
+    "sources": {"path": ".", "into": "sources"},
+    "step":    {"op": "append", "path": "step", "into": "steps"},
+    "done":    {"path": ".", "into": "done"},
+    "error":   {"path": "message", "into": "error"}
+  }
+},
+"response": {
+  "answer": "answer",
+  "retrieved_documents": {"path": "sources.sources", "each": {"id": "id|code", "title": "title", "text": "text"}},
+  "citations_from_markers": {"pattern": "\\[(\\d+)\\]", "lookup": "sources.sources", "key": "n", "each": {"id": "id|code"}},
+  "steps": {"path": "steps", "each": {"type": {"path": "kind", "map": {"searched": "retrieval", "written": "model_call"}},
+                                       "name": "kind", "duration_ms": "ms"}}
+}
+```
+
+The event name comes from the SSE `event:` line when present, otherwise from `type_path` in
+the data. Ops: `concat`, `set`, `append`, `merge`. Comments and keep-alive pings are ignored.
+Inline citation markers that resolve to nothing become `marker:N` citations, which
+`citation_validity` reports as dangling.
+
+## 3. Systems that save every conversation
+
+If each question creates a stored conversation, add a clean-up request. It runs after the
+answer, with the collected stream available as `raw`:
+
+```json
+"cleanup": {"method": "DELETE", "endpoint": "/api/conversations/{{raw.done.conversation_id}}",
+            "only_if": "done.conversation_id"}
+```
+
+Check what else a question writes (usage tables, shared logs, budgets) before pointing
+GaugeLab at a shared instance. When the side effects are not acceptable, run an isolated
+instance or use the importer.
+
+## 4. Grading logged answers without calling the system
+
+```yaml
+# import.yaml
+case_id: id
+message: question
+category: intent
+latency_s: seconds
+exclude: {cached: true}
+newest_first: true
+limit: 300
+skip_invalid_lines: true
+attach: {path_template: "evidence/{{record.id}}.json", into: evidence}
+join:
+  - {file: spend.jsonl, key: turn, on: id, into: spend}
+response:
+  answer: answer
+  retrieved_documents: {path: "evidence.ev.*", each: {id: "doc_id|citation", text: "context|text"}}
+  citations_from_markers: {pattern: "\\[([^\\]\\[]{3,200})\\]", lookup: "evidence.ev.*", key: citation, each: {id: "doc_id|citation"}}
+  usage: {input_tokens: spend.answer_in, output_tokens: spend.answer_out}
+```
+
+```bash
+gaugelab import logs/journal.jsonl --config import.yaml --name "Production journal" --project "My bot"
+```
+
+This creates a dataset of the logged questions (inputs only, since nobody has written
+expectations for them yet) and a `replay` target. Run black-box evaluators on it (latency,
+citation validity, numbers grounded, relevance or groundedness judges). Add expected
+outcomes to the cases you care about, and the same dataset becomes a golden set.
+
+## 5. Experiment as code
+
+```yaml
+experiment: {name: my-bot-golden}
+project: My bot
+dataset: {path: golden.yaml}
+target:
+  name: My bot (staging)
+  adapter: http
+  config: { ... as above ... }
+trials: 3
+evaluators: [regex, citation_validity, latency, relevance, groundedness]
+judge: {provider: ollama, model: "llama3.1:8b"}
+gates: {overall_pass_rate: {min: 0.85}}
+```
+
+```bash
+gaugelab run my-bot.yaml        # exits 1 if a gate fails
+```
+
+Keep files that name internal systems in `local/`, which is ignored by git.

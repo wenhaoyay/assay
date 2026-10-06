@@ -49,7 +49,8 @@ def _make(rid: str) -> type[JudgeEvaluator]:
         "failure_type": _FAILURE_TYPES.get(rid, "unknown"),
         "description": f"LLM judge: {rubric.question}",
     })
-    return register(cls)
+    register(cls)
+    return cls
 
 
 for _rid in ("correctness", "groundedness", "relevance", "completeness", "instruction_adherence",

@@ -4,6 +4,7 @@ a local Ollama judge config, a release gate - and optionally real baseline/candi
 from __future__ import annotations
 
 import asyncio
+import os
 from pathlib import Path
 from typing import Any
 
@@ -20,7 +21,7 @@ BENCH = ROOT / "benchmarks" / "acme_support"
 PROJECT = "Acme Support Demo"
 
 
-def seed(run: bool = False, trials: int = 3) -> dict[str, Any]:
+def seed(run: bool = False, trials: int = 3, force_runs: bool = False) -> dict[str, Any]:
     db.upgrade()
     out: dict[str, Any] = {}
     with db.session() as s:
@@ -34,7 +35,8 @@ def seed(run: bool = False, trials: int = 3) -> dict[str, Any]:
         resolve_target(s, p.id, {
             "name": "Acme agent - HTTP (demo server)", "adapter": "http", "variant_label": "candidate over HTTP",
             "description": "The candidate agent behind `gaugelab demo-agent` on :9040 - exercises the HTTP adapter.",
-            "config": {"base_url": "http://127.0.0.1:9040", "endpoint": "/chat", "method": "POST",
+            "config": {"base_url": os.environ.get("GAUGELAB_DEMO_AGENT_URL", "http://127.0.0.1:9040"),
+                       "endpoint": "/chat", "method": "POST",
                        "body": {"message": "{{input.message}}", "variant": "candidate", "seed": "{{trial}}"},
                        "timeout_s": 30,
                        "response": {"answer": "reply.text", "citations": {"path": "reply.sources", "each": {"id": "doc"}},
@@ -57,7 +59,11 @@ def seed(run: bool = False, trials: int = 3) -> dict[str, Any]:
             s.flush()
         out["gate_id"] = gate.id
         out["project_id"] = p.id
-    if run:
+    with db.session() as s:
+        has_runs = s.scalar(select(m.Run.id).join(m.Experiment).where(m.Experiment.project_id == out["project_id"]))
+    if run and has_runs and not force_runs:
+        out["runs"] = "skipped: the demo project already has runs (use --force-runs to add more)"
+    elif run:
         ids = {}
         for name in ("baseline", "candidate"):
             cfg = load_yaml(BENCH / "variants" / f"{name}.yaml")

@@ -62,6 +62,7 @@ class OllamaProvider(LLMProvider):
             "model": self.model,
             "messages": [{"role": m.role, "content": m.content} for m in messages],
             "stream": False,
+            "keep_alive": "15m",  # do not unload the model between judge calls
             "options": {"temperature": self.temperature, "num_predict": self.max_tokens, "seed": 7},
         }
         if json_mode:

@@ -65,11 +65,11 @@ def resolve_dataset(s: Session, project_id: int, spec: dict[str, Any], base: str
     if ds is None:
         raise svc.NotFound(f"Dataset {spec['name']!r} not found")
     if "version" in spec:
-        v = s.scalar(select(m.DatasetVersion).where(m.DatasetVersion.dataset_id == ds.id,
-                                                    m.DatasetVersion.version == int(spec["version"])))
-        if v is None:
+        found = s.scalar(select(m.DatasetVersion).where(m.DatasetVersion.dataset_id == ds.id,
+                                                        m.DatasetVersion.version == int(spec["version"])))
+        if found is None:
             raise svc.NotFound(f"Dataset {spec['name']!r} has no version {spec['version']}")
-        return v
+        return found
     return svc.latest_version(s, ds.id)
 
 
@@ -133,6 +133,7 @@ def prepare_run(s: Session, cfg: dict[str, Any]) -> tuple[m.Run, dict[str, Any]]
         s, project.id, exp.get("name", "experiment"), tv.id, dv.id, evaluators, judge, None,
         description=exp.get("description", ""), trials=cfg.get("trials", 1), concurrency=cfg.get("concurrency", 4),
         seed=cfg.get("seed", 7), k=cfg.get("k", 5), options=cfg.get("options") or {},
-        budget_usd=cfg.get("budget_usd"), redact_fields=cfg.get("redact_fields") or [])
+        budget_usd=cfg.get("budget_usd"), redact_fields=cfg.get("redact_fields") or [],
+        case_filter=cfg.get("case_filter"))
     run = svc.start_run(s, e.id)
     return run, cfg.get("gates") or {}

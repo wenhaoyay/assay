@@ -175,7 +175,7 @@ def normalize(raw: Any, mapping: dict[str, Any]) -> NormalizedTargetResult:
 
     dropped: dict[str, int] = {}
 
-    def objects(key: str, model: type) -> list[Any] | None:
+    def objects(key: str, model: type[BaseModel]) -> list[Any] | None:
         if key not in mapping:
             return None
         val = map_field(raw, mapping[key])

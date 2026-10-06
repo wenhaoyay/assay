@@ -1,0 +1,18 @@
+# Variant C - a "prompt v3" that dropped the tool rules: no retries, no failure admission, order-as-serial slip is back.
+# Exists to show a regression gate catching a real regression (make ci-regression).
+experiment:
+  name: acme-candidate-v3
+  description: Candidate with tool-handling rules removed (a plausible accidental regression).
+project: Acme Support Demo
+dataset: {path: ../dataset.yaml}
+target:
+  name: Acme agent - candidate v3
+  adapter: python
+  variant_label: "hybrid + RRF + rerank / prompt v3 (tool rules dropped)"
+  description: Variant C. Candidate retrieval with the tool-handling rules removed from the prompt.
+  config: {callable: "acme_support_agent.app:run", options: {variant: candidate, overrides: {retry_tools: false, admit_failures: false, order_as_serial_rate: 0.3}}}
+trials: 3
+k: 5
+options: {max_latency_ms: 3000}
+judge: {provider: heuristic}
+evaluators: [must_mention, forbidden_claims, citation_validity, refusal_check, recall_at_k, precision_at_k, mrr, ndcg_at_k, tool_selection, forbidden_tools, tool_arguments, unnecessary_tools, step_count, task_success, tool_result_consistency, error_recovery, latency, correctness, groundedness, relevance, appropriate_refusal]

@@ -31,7 +31,7 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
-from gaugelab.schemas import TestCase
+from gaugelab.schemas import CaseInput, TestCase
 
 
 class DatasetError(ValueError):
@@ -169,7 +169,7 @@ def parse_dataset(text: str, filename: str) -> DatasetFile:
 def case_to_dict(case: TestCase) -> dict[str, Any]:
     """Compact export: drop empty/default fields so files stay readable (and re-import identically)."""
     full = case.model_dump(mode="json")
-    default = TestCase(id=case.id, input={"message": case.input.message}).model_dump(mode="json")
+    default = TestCase(id=case.id, input=CaseInput(message=case.input.message)).model_dump(mode="json")
 
     def prune(cur: Any, dflt: Any) -> Any:
         if not isinstance(cur, dict):

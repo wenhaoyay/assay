@@ -90,11 +90,31 @@ async def _execute(run_id: int) -> None:
     await svc.execute_run(run_id)
 
 
-def _run_config(path: str) -> tuple[int, dict[str, Any]]:
+KEY_REFS = {"openai": "env:OPENAI_API_KEY", "anthropic": "env:ANTHROPIC_API_KEY"}
+
+
+def judge_override(spec: str | None) -> dict[str, Any] | None:
+    """"heuristic", "ollama:llama3.1:8b", "openai:<model>", "anthropic:<model>" -> a judge config."""
+    if not spec:
+        return None
+    if spec == "heuristic":
+        return {"provider": "heuristic"}
+    provider, _, model = spec.partition(":")
+    if provider not in ("ollama", "openai", "anthropic") or not model:
+        raise SystemExit(f"--judge must be heuristic or provider:model (ollama|openai|anthropic), got {spec!r}")
+    out: dict[str, Any] = {"provider": provider, "model": model}
+    if provider in KEY_REFS:
+        out["api_key_ref"] = KEY_REFS[provider]
+    return out
+
+
+def _run_config(path: str, judge: str | None = None) -> tuple[int, dict[str, Any]]:
     from gaugelab.config_run import load_yaml, prepare_run
 
     session = _session()
     cfg = load_yaml(path)
+    if judge:
+        cfg["judge"] = judge_override(judge)
     with session() as s:
         run, gates = prepare_run(s, cfg)
         run_id = run.id
@@ -112,7 +132,7 @@ def _header(run_id: int) -> dict[str, Any]:
 
 
 def cmd_run(args) -> int:
-    run_id, gates = _run_config(args.config)
+    run_id, gates = _run_config(args.config, args.judge)
     h = _header(run_id)
     met = h["metrics"]
     print(f"Run #{run_id} {h['status']}: {h['n_cases']} cases, overall pass rate "
@@ -191,8 +211,8 @@ def cmd_ci(args) -> int:
 
     ci = yaml.safe_load(Path(args.config).read_text(encoding="utf-8"))
     base_dir = Path(args.config).resolve().parent
-    b_id, _ = _run_config(str(base_dir / ci["baseline"]))
-    c_id, gates = _run_config(str(base_dir / ci["candidate"]))
+    b_id, _ = _run_config(str(base_dir / ci["baseline"]), args.judge)
+    c_id, gates = _run_config(str(base_dir / ci["candidate"]), args.judge)
     gates = ci.get("gates") or gates
     with _session()() as s:
         gr = svc.apply_gate(s, c_id, gates, b_id)
@@ -235,7 +255,7 @@ def cmd_import(args) -> int:
 def cmd_seed(args) -> int:
     from gaugelab.seed import seed
 
-    res = seed(run=args.run, trials=args.trials)
+    res = seed(run=args.run, trials=args.trials, force_runs=args.force_runs)
     _out(res)
     return 0
 
@@ -261,6 +281,7 @@ def main(argv: list[str] | None = None) -> int:
     sd = sub.add_parser("seed", help="create the Acme demo project")
     sd.add_argument("--run", action="store_true", help="also run baseline and candidate experiments")
     sd.add_argument("--trials", type=int, default=3)
+    sd.add_argument("--force-runs", action="store_true", help="run again even if demo runs exist")
     sd.set_defaults(fn=cmd_seed)
 
     v = sub.add_parser("validate", help="validate a dataset file")
@@ -270,6 +291,7 @@ def main(argv: list[str] | None = None) -> int:
     r = sub.add_parser("run", help="run an experiment YAML")
     r.add_argument("config")
     r.add_argument("--baseline", type=int, help="baseline run id for regression gates")
+    r.add_argument("--judge", help="override the judge: heuristic | ollama:<model> | openai:<model> | anthropic:<model>")
     r.set_defaults(fn=cmd_run)
 
     c = sub.add_parser("compare", help="compare two runs")
@@ -294,6 +316,7 @@ def main(argv: list[str] | None = None) -> int:
     ci = sub.add_parser("ci", help="baseline + candidate + gates; writes summary artifacts")
     ci.add_argument("config")
     ci.add_argument("--out-dir", default="gaugelab-artifacts")
+    ci.add_argument("--judge", help="override the judge for both runs (see run --judge)")
     ci.set_defaults(fn=cmd_ci)
 
     im = sub.add_parser("import", help="import results a system already produced")
@@ -304,6 +327,9 @@ def main(argv: list[str] | None = None) -> int:
     im.set_defaults(fn=cmd_import)
 
     args = p.parse_args(argv)
+    from gaugelab.env import load_dotenv
+
+    load_dotenv()
     return int(args.fn(args) or 0)
 
 

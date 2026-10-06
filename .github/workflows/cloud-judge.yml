@@ -1,0 +1,40 @@
+name: Evaluation with a cloud judge (optional)
+
+# Manual only. Uses YOUR key from repository secrets; skipped when no key is configured,
+# so forks and pull requests never spend money.
+on:
+  workflow_dispatch:
+    inputs:
+      judge:
+        description: "provider:model, e.g. openai:<model id> or anthropic:<model id>"
+        required: true
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - name: Check a key is configured
+        id: key
+        run: |
+          case "${{ inputs.judge }}" in
+            openai:*)    [ -n "$OPENAI_API_KEY" ] && echo "ok=true" >> "$GITHUB_OUTPUT" || echo "ok=false" >> "$GITHUB_OUTPUT" ;;
+            anthropic:*) [ -n "$ANTHROPIC_API_KEY" ] && echo "ok=true" >> "$GITHUB_OUTPUT" || echo "ok=false" >> "$GITHUB_OUTPUT" ;;
+            *) echo "Unsupported judge"; exit 1 ;;
+          esac
+      - if: steps.key.outputs.ok != 'true'
+        run: echo "::notice::No API key secret for this provider - skipping the cloud-judge evaluation."
+      - if: steps.key.outputs.ok == 'true'
+        uses: actions/checkout@v4
+      - if: steps.key.outputs.ok == 'true'
+        uses: actions/setup-python@v5
+        with: {python-version: "3.12", cache: pip}
+      - if: steps.key.outputs.ok == 'true'
+        run: |
+          pip install -e .
+          gaugelab ci benchmarks/acme_support/ci.yaml --judge "${{ inputs.judge }}" --out-dir cloud-judge-artifacts
+      - if: always() && steps.key.outputs.ok == 'true'
+        uses: actions/upload-artifact@v4
+        with: {name: cloud-judge-evaluation, path: cloud-judge-artifacts}

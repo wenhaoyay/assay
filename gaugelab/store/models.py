@@ -25,6 +25,9 @@ def utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+NullableJSON = JSON(none_as_null=True)  # None is SQL NULL, not the JSON value null
+
+
 class Base(DeclarativeBase):
     type_annotation_map = {dict[str, Any]: JSON, list[Any]: JSON}
 
@@ -169,7 +172,7 @@ class Run(Base):
     progress_done: Mapped[int] = mapped_column(Integer, default=0)
     progress_total: Mapped[int] = mapped_column(Integer, default=0)
     snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
-    summary: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    summary: Mapped[dict[str, Any] | None] = mapped_column(NullableJSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -185,14 +188,14 @@ class Trial(Base):
     trial_index: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(String(20))
     answer: Mapped[str] = mapped_column(Text, default="")
-    result: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
-    raw: Mapped[Any] = mapped_column(JSON, nullable=True)
+    result: Mapped[dict[str, Any] | None] = mapped_column(NullableJSON, nullable=True)
+    raw: Mapped[Any] = mapped_column(NullableJSON, nullable=True)
     latency_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
     total_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     target_cost_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
     judge_cost_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
     attempts: Mapped[int] = mapped_column(Integer, default=1)
-    failure_types_override: Mapped[list[Any] | None] = mapped_column(JSON, nullable=True)
+    failure_types_override: Mapped[list[Any] | None] = mapped_column(NullableJSON, nullable=True)
     failure_note: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     scores: Mapped[list[Score]] = relationship(back_populates="trial", cascade="all, delete-orphan")
@@ -222,7 +225,7 @@ class SpanRow(Base):
     input_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     output_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSON, default=dict)
-    usage: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    usage: Mapped[dict[str, Any] | None] = mapped_column(NullableJSON, nullable=True)
     cost_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     trace: Mapped[TraceRow] = relationship(back_populates="spans")

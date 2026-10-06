@@ -13,12 +13,14 @@ from sqlalchemy import select
 
 from gaugelab import __version__
 from gaugelab.datasets import DatasetError
+from gaugelab.env import load_dotenv
 from gaugelab.store import db
 from gaugelab.store import models as m
 from gaugelab.store.service import Conflict, NotFound
 
 from .routers import core, datasets, runs
 
+load_dotenv()
 log = logging.getLogger("gaugelab")
 WEB_DIST = Path(__file__).resolve().parents[2] / "web" / "dist"
 

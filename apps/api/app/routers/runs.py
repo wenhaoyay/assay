@@ -52,6 +52,7 @@ class ExperimentIn(BaseModel):
     options: dict[str, Any] = Field(default_factory=dict)
     budget_usd: float | None = Field(default=None, ge=0)
     redact_fields: list[str] = Field(default_factory=list)
+    case_filter: dict[str, list[str]] | None = None  # reduced suite: {categories, tags, ids}
     gate_id: int | None = None
 
 
