@@ -1,0 +1,52 @@
+import { expect, test } from '@playwright/test'
+
+test('launch an experiment from the UI and see its result', async ({ page }) => {
+  await page.goto('/experiments/new')
+  await page.getByPlaceholder('hybrid-retrieval-v2').fill('e2e-candidate')
+  const target = page.getByLabel('Target')
+  const value = await target.locator('option', { hasText: 'candidate - v1' }).first().getAttribute('value')
+  await target.selectOption(value!)
+  await page.getByLabel('Dataset version').selectOption({ index: 1 })
+  await page.getByLabel('Judge').selectOption('heuristic')
+  await page.getByRole('button', { name: 'Create experiment' }).click()
+  await expect(page.getByText(/Estimated judge cost/)).toBeVisible()
+  await page.getByRole('button', { name: 'Start run' }).click()
+  await expect(page).toHaveURL(/\/runs\/\d+/)
+  await expect(page.getByText('Completed', { exact: true }).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('Overall pass rate')).toBeVisible()
+  await expect(page.getByText(/95% CI .* n=58/)).toBeVisible()
+})
+
+test('compare baseline vs candidate and open a regressed case', async ({ page }) => {
+  await page.goto('/compare?baseline=1&candidate=2')
+  const overall = page.getByTestId('metric-overall_pass_rate')
+  await expect(overall).toContainText('pp')
+  await expect(page.getByText(/Regressed: passed more often on the baseline/)).toBeVisible()
+  await page.locator('a[href*="tab=cases&case="]').first().click()
+  await expect(page).toHaveURL(/tab=cases/)
+  await page.locator('a[href^="/trials/"]').first().click()
+  await expect(page.getByText('Why it passed or failed')).toBeVisible()
+  await expect(page.getByText('Expected (written or approved by a person)')).toBeVisible()
+})
+
+test('inspect the trace of a failed trial', async ({ page }) => {
+  await page.goto('/runs/1?tab=failures')
+  await expect(page.getByText(/failed trial\(s\) by type/)).toBeVisible()
+  await page.locator('a[href^="/trials/"]').first().click()
+  await expect(page.getByText('Execution trace')).toBeVisible()
+  const request = page.getByRole('button', { name: /request/ }).first()
+  await expect(request).toBeVisible()
+  await page.getByRole('button', { name: /retrieval/ }).first().click()
+  await expect(page.getByText(/Fail/).first()).toBeVisible()
+})
+
+test('label a calibration sample blind, then see agreement', async ({ page }) => {
+  await page.goto('/calibration')
+  await expect(page.getByText('Uncalibrated')).toBeVisible()
+  await page.getByLabel('Your name').fill('e2e-reviewer')
+  await expect(page.getByText(/verdict is hidden until you label/)).toBeVisible()
+  await page.getByRole('button', { name: 'FAIL', exact: true }).click()
+  await expect(page.getByText('Calibrated on 1 sample')).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByTestId('cell-FAIL-FAIL')).toBeVisible()
+  await expect(page.getByText(/Disagreements|Accuracy/).first()).toBeVisible()
+})

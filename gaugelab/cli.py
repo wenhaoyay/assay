@@ -1,8 +1,8 @@
 """The ``gaugelab`` command.
 
     gaugelab db upgrade                     apply migrations
-    gaugelab serve [--port 8000]            API + built web app
-    gaugelab demo-agent [--port 9000]       the fictional Acme agent over HTTP
+    gaugelab serve [--port 8040]            API + built web app
+    gaugelab demo-agent [--port 9040]       the fictional Acme agent over HTTP
     gaugelab seed [--run]                   demo project, dataset, targets, gate (and runs)
     gaugelab validate dataset.yaml          check a dataset file
     gaugelab run experiment.yaml            run an experiment from config
@@ -250,12 +250,12 @@ def main(argv: list[str] | None = None) -> int:
 
     sv = sub.add_parser("serve", help="run the API and web app")
     sv.add_argument("--host", default="127.0.0.1")
-    sv.add_argument("--port", type=int, default=8000)
+    sv.add_argument("--port", type=int, default=8040)
     sv.set_defaults(fn=cmd_serve)
 
     da = sub.add_parser("demo-agent", help="run the fictional Acme agent over HTTP")
     da.add_argument("--host", default="127.0.0.1")
-    da.add_argument("--port", type=int, default=9000)
+    da.add_argument("--port", type=int, default=9040)
     da.set_defaults(fn=cmd_demo_agent)
 
     sd = sub.add_parser("seed", help="create the Acme demo project")

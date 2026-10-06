@@ -173,6 +173,8 @@ def normalize(raw: Any, mapping: dict[str, Any]) -> NormalizedTargetResult:
     answer = map_field(raw, mapping.get("answer", "answer"))
     answer = "" if answer is None else (answer if isinstance(answer, str) else json.dumps(answer))
 
+    dropped: dict[str, int] = {}
+
     def objects(key: str, model: type) -> list[Any] | None:
         if key not in mapping:
             return None
@@ -181,9 +183,13 @@ def normalize(raw: Any, mapping: dict[str, Any]) -> NormalizedTargetResult:
             return []
         items = val if isinstance(val, list) else [val]
         out = []
+        required = "name" if model is ToolCall else "id"
         for item in items:
             if isinstance(item, str) and model in (Citation, RetrievedDocument):
                 item = {"id": item}
+            if isinstance(item, dict) and item.get(required) in (None, "") and model is not TargetStep:
+                dropped[key] = dropped.get(key, 0) + 1  # nothing to identify it by: skip, but count it
+                continue
             if isinstance(item, dict):
                 if "id" in item:
                     item = {**item, "id": str(item["id"])}
@@ -220,11 +226,15 @@ def normalize(raw: Any, mapping: dict[str, Any]) -> NormalizedTargetResult:
         if val is not None:
             metadata[key] = val
 
+    retrieved = objects("retrieved_documents", RetrievedDocument)
+    tool_calls = objects("tool_calls", ToolCall)
+    if dropped:
+        metadata["dropped_unidentified_items"] = dropped
     return NormalizedTargetResult(
         answer=answer,
         citations=citations,
-        retrieved_documents=objects("retrieved_documents", RetrievedDocument),
-        tool_calls=objects("tool_calls", ToolCall),
+        retrieved_documents=retrieved,
+        tool_calls=tool_calls,
         usage=usage,
         provider=provider,
         structured_output=map_field(raw, mapping["structured_output"]) if "structured_output" in mapping else None,

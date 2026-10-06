@@ -79,16 +79,22 @@ class RegexCheck(Evaluator):
     name = "Regex"
     kind = "deterministic"
     failure_type = "malformed_output"
-    description = "The answer matches every configured regular expression."
+    description = "The answer matches every configured regex and none of the forbidden ones."
 
     async def evaluate(self, case, result, trace, ctx):
         patterns = case.expected.answer.regex
-        if not patterns:
+        forbidden = case.expected.answer.forbidden_regex
+        if not patterns and not forbidden:
             return self.na("No patterns configured.")
         failed = [p for p in patterns if re.search(p, result.answer or "") is None]
-        return self.passed(not failed, score=1 - len(failed) / len(patterns),
-                           explanation="All patterns match." if not failed else f"No match for: {', '.join(failed)}",
-                           evidence=failed)
+        matched = [p for p in forbidden if re.search(p, result.answer or "") is not None]
+        problems = [f"no match for {p}" for p in failed] + [f"forbidden match {p}" for p in matched]
+        out = self.passed(not problems, score=1 - len(problems) / (len(patterns) + len(forbidden)),
+                          explanation="All patterns satisfied." if not problems else "; ".join(problems),
+                          evidence=problems)
+        if matched and not failed:
+            out.failure_type = "unsupported_claim"
+        return out
 
 
 @register
@@ -128,9 +134,19 @@ class CitationValidity(Evaluator):
 
     async def evaluate(self, case, result, trace, ctx):
         required = case.expected.required_citations
+        minimum = case.expected.min_citations
         if result.citations is None:
-            return self.missing("citations") if required else self.na("Target does not report citations.")
+            if required or minimum is not None:
+                return self.missing("citations")
+            return self.na("Target does not report citations.")
+        if minimum is not None:
+            n = len(result.citations)
+            if (minimum == 0 and n > 0) or n < minimum:
+                return self.passed(False, score=0.0, evidence=[c.id for c in result.citations],
+                                   explanation=f"{n} citation(s); expected " + ("none." if minimum == 0 else f"at least {minimum}."))
         if not result.citations and not required:
+            if minimum is not None:
+                return self.passed(True, score=1.0, explanation="No citations, as expected.")
             return self.na("No citations claimed and none required.")
         known = {d.id for d in (result.retrieved_documents or [])}
         known |= set(self.config(case).get("available_ids", []))
@@ -220,3 +236,35 @@ class CostBudget(Evaluator):
         if cost is None:
             return self.result(EvalStatus.NOT_EVALUATED, explanation="Cost unknown (no usage or no pricing).")
         return self.passed(cost <= limit, score=cost, threshold=limit, explanation=f"${cost:.5f} vs limit ${limit:.5f}")
+
+
+_NUMBER = re.compile(r"(?<![\w.])\d+(?:[.,]\d+)?(?![\w])")
+
+
+def numbers_in(text: str) -> set[str]:
+    return {n.replace(",", ".") for n in _NUMBER.findall(text or "")}
+
+
+@register
+class NumbersGrounded(Evaluator):
+    id = "numbers_grounded"
+    name = "Numbers grounded"
+    kind = "deterministic"
+    failure_type = "unsupported_claim"
+    description = ("Every number in the answer also appears in the retrieved text or tool results (a cheap, objective "
+                   "hallucination check for specs, prices, dates). The case may allow a few with max_ungrounded_numbers.")
+
+    async def evaluate(self, case, result, trace, ctx):
+        from gaugelab.evaluators.llm_judge.judge import context_text
+
+        evidence = context_text(result, limit=200_000)
+        if not evidence:
+            return self.missing("retrieved text or tool results")
+        allowed = case.expected.max_ungrounded_numbers
+        allowed = 0 if allowed is None else allowed
+        known = numbers_in(evidence) | numbers_in(case.input.message)
+        loose = sorted(numbers_in(result.answer) - known, key=lambda x: (len(x), x))
+        return self.passed(len(loose) <= allowed, score=float(len(loose)), threshold=allowed,
+                           explanation=("All numbers appear in the evidence." if not loose else
+                                        f"{len(loose)} number(s) not in the evidence: {', '.join(loose[:8])}"
+                                        + f" (allowed {allowed})."), evidence=loose[:20])

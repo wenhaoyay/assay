@@ -20,7 +20,8 @@ from gaugelab.store import service as svc
 
 def create_import(s: Session, project_id: int, name: str, filename: str, text: str, cfg: ImportConfig,
                   base_dir: Path | None = None) -> dict[str, Any]:
-    records = import_records(text, filename, cfg, base_dir)
+    skipped: list[int] = []
+    records = import_records(text, filename, cfg, base_dir, skipped)
     if not records:
         raise ValueError("No records matched the import configuration")
     batch = m.ImportBatch(project_id=project_id, name=name, source_filename=filename,
@@ -42,5 +43,5 @@ def create_import(s: Session, project_id: int, name: str, filename: str, text: s
                            change_summary=f"Imported {len(cases)} records")
     tv = svc.create_target(s, project_id, f"{name} (imported results)", "replay", {"import_batch_id": batch.id},
                            f"Replays results imported from {filename}; the system is not called.", "imported")
-    return {"batch_id": batch.id, "records": len(cases), "dataset_id": v.dataset_id, "dataset_version_id": v.id,
+    return {"batch_id": batch.id, "records": len(cases), "skipped_invalid_lines": skipped[:50], "dataset_id": v.dataset_id, "dataset_version_id": v.id,
             "target_id": tv.target_id, "target_version_id": tv.id}

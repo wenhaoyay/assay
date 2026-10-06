@@ -30,6 +30,13 @@ class AttachConfig(BaseModel):
     into: str = "attached"
 
 
+class JoinConfig(BaseModel):
+    file: str  # a JSON Lines file next to the import file, e.g. "spend.jsonl"
+    key: str  # field in the joined file, e.g. "turn"
+    on: str = "id"  # field in the record it must equal
+    into: str = "joined"
+
+
 class ImportConfig(BaseModel):
     case_id: str = "id"
     message: str = "question|input|message"
@@ -37,8 +44,12 @@ class ImportConfig(BaseModel):
     latency_ms: str | None = None
     latency_s: str | None = None
     attach: AttachConfig | None = None
+    join: list[JoinConfig] = Field(default_factory=list)
     category: str | None = None
     where: dict[str, Any] = Field(default_factory=dict)  # keep only records matching these values
+    exclude: dict[str, Any] = Field(default_factory=dict)  # drop records where a field equals this value
+    newest_first: bool = False  # read the file from the end (logs append newest last)
+    skip_invalid_lines: bool = False  # JSONL logs: skip (and count) malformed lines instead of failing
     limit: int | None = None
 
 
@@ -53,7 +64,8 @@ class ImportError_(ValueError):
     pass
 
 
-def read_records(text: str, filename: str) -> list[dict[str, Any]]:
+def read_records(text: str, filename: str, skip_invalid: bool = False,
+                 skipped: list[int] | None = None) -> list[dict[str, Any]]:
     name = filename.lower()
     if name.endswith(".jsonl") or name.endswith(".jsonl.1"):
         out = []
@@ -62,7 +74,11 @@ def read_records(text: str, filename: str) -> list[dict[str, Any]]:
                 try:
                     out.append(json.loads(line))
                 except json.JSONDecodeError as exc:
-                    raise ImportError_(f"line {i}: not valid JSON ({exc.msg})") from exc
+                    if not skip_invalid:
+                        raise ImportError_(f"line {i}: not valid JSON ({exc.msg}); set skip_invalid_lines "
+                                           "to skip such lines") from exc
+                    if skipped is not None:
+                        skipped.append(i)
         return out
     if name.endswith(".csv"):
         return list(csv.DictReader(io.StringIO(text)))
@@ -75,11 +91,26 @@ def read_records(text: str, filename: str) -> list[dict[str, Any]]:
     return data
 
 
-def import_records(text: str, filename: str, cfg: ImportConfig, base_dir: Path | None = None) -> list[ImportedRecord]:
-    records = read_records(text, filename)
+def import_records(text: str, filename: str, cfg: ImportConfig, base_dir: Path | None = None,
+                   skipped: list[int] | None = None) -> list[ImportedRecord]:
+    records = read_records(text, filename, cfg.skip_invalid_lines, skipped)
+    tables: list[tuple[JoinConfig, dict[str, Any]]] = []
+    for j in cfg.join:
+        if base_dir is None or not (base_dir / j.file).is_file():
+            continue
+        index: dict[str, Any] = {}
+        for row in read_records((base_dir / j.file).read_text(encoding="utf-8"), j.file, True):
+            if (k := get_path(row, j.key)) is not None:
+                index[str(k)] = row
+        tables.append((j, index))
     out: list[ImportedRecord] = []
-    for i, rec in enumerate(records, start=1):
+    numbered = list(enumerate(records, start=1))
+    if cfg.newest_first:
+        numbered.reverse()
+    for i, rec in numbered:
         if any(get_path(rec, k) != v for k, v in cfg.where.items()):
+            continue
+        if any(get_path(rec, k) == v for k, v in cfg.exclude.items()):
             continue
         case_id = get_path(rec, cfg.case_id)
         message = get_path(rec, cfg.message)
@@ -89,6 +120,10 @@ def import_records(text: str, filename: str, cfg: ImportConfig, base_dir: Path |
             path = base_dir / render(cfg.attach.path_template, {"record": rec})
             if path.is_file():
                 rec = {**rec, cfg.attach.into: json.loads(path.read_text(encoding="utf-8"))}
+        for j, index in tables:
+            hit = index.get(str(get_path(rec, j.on)))
+            if hit is not None:
+                rec = {**rec, j.into: hit}
         result = normalize(rec, cfg.response)
         if cfg.latency_ms and (v := get_path(rec, cfg.latency_ms)) is not None:
             result.latency_ms = float(v)

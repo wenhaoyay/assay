@@ -146,6 +146,7 @@ class ExpectedAnswer(BaseModel):
     must_mention: list[str] = Field(default_factory=list)
     must_not_claim: list[str] = Field(default_factory=list)
     regex: list[str] = Field(default_factory=list)
+    forbidden_regex: list[str] = Field(default_factory=list)  # none of these may match
     json_schema: dict[str, Any] | None = None
 
 
@@ -155,6 +156,8 @@ class Expected(BaseModel):
     answer: ExpectedAnswer = Field(default_factory=ExpectedAnswer)
     relevant_documents: list[str] = Field(default_factory=list)
     required_citations: list[str] = Field(default_factory=list)
+    min_citations: int | None = None
+    max_ungrounded_numbers: int | None = None  # numbers in the answer that no evidence contains  # e.g. 1 = "the answer must cite something"; 0 = "must not cite"
     required_tools: list[str] = Field(default_factory=list)
     tool_calls: list[ExpectedToolCall] = Field(default_factory=list)
     forbidden_tools: list[str] = Field(default_factory=list)

@@ -33,8 +33,8 @@ def seed(run: bool = False, trials: int = 3) -> dict[str, Any]:
             out[f"{name}_target_version_id"] = tv.id
         resolve_target(s, p.id, {
             "name": "Acme agent - HTTP (demo server)", "adapter": "http", "variant_label": "candidate over HTTP",
-            "description": "The candidate agent behind `gaugelab demo-agent` on :9000 - exercises the HTTP adapter.",
-            "config": {"base_url": "http://127.0.0.1:9000", "endpoint": "/chat", "method": "POST",
+            "description": "The candidate agent behind `gaugelab demo-agent` on :9040 - exercises the HTTP adapter.",
+            "config": {"base_url": "http://127.0.0.1:9040", "endpoint": "/chat", "method": "POST",
                        "body": {"message": "{{input.message}}", "variant": "candidate", "seed": "{{trial}}"},
                        "timeout_s": 30,
                        "response": {"answer": "reply.text", "citations": {"path": "reply.sources", "each": {"id": "doc"}},

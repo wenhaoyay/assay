@@ -64,6 +64,8 @@ def build_trace(test_input: dict[str, Any], call: TargetCall, pricing: Any = Non
         for step in r.steps:
             stype = _STEP_TYPES.get(step.type, SpanType.POST_PROCESSING)
             meta = dict(step.metadata)
+            if stype == SpanType.RETRIEVAL and r.retrieved_documents is not None and "documents" not in meta:
+                meta["documents"] = [d.model_dump(exclude={"text"}) for d in r.retrieved_documents]
             if stype == SpanType.TOOL_CALL:
                 tc = next(tool_iter, None)
                 if tc is not None:

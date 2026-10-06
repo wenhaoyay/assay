@@ -1,8 +1,12 @@
 """Map arbitrary JSON into GaugeLab's normalized result.
 
 A path is dot-separated: ``data.answer``, ``sources.0.id``, ``choices[0].message.content``.
-``a|b`` tries ``a`` then ``b``. ``*`` maps over a list: ``sources.*.id``.
+``a|b`` tries ``a`` then ``b``. ``*`` maps over a list (or a mapping's values): ``sources.*.id``.
 A literal is written ``=value`` (``provider: "=acme"``).
+
+Inside ``each``, a field may also be ``{path: ok, map: {"true": success, "false": error}}``
+to translate values. Nested lists produced by ``*`` are flattened one level, and items that
+are not objects are skipped.
 
 A field mapping is either a path string, or for lists of objects::
 
@@ -43,6 +47,8 @@ def _get_one(data: Any, path: str) -> Any:
     tokens = _tokens(path)
     for i, tok in enumerate(tokens):
         if tok == "*":
+            if isinstance(cur, dict):
+                cur = list(cur.values())
             if not isinstance(cur, list):
                 return _MISSING
             rest = ".".join(tokens[i + 1 :])
@@ -79,12 +85,28 @@ def set_path(data: dict[str, Any], path: str, value: Any) -> None:
     cur[tokens[-1]] = value
 
 
-def _map_object(item: Any, each: dict[str, str]) -> dict[str, Any]:
+def _value(item: Any, spec: Any) -> Any:
+    if isinstance(spec, dict):
+        val = get_path(item, spec["path"])
+        table = spec.get("map") or {}
+        key = str(val).lower() if isinstance(val, bool) else str(val)
+        return table.get(key, val) if val is not None else None
+    return get_path(item, spec)
+
+
+def _map_object(item: Any, each: dict[str, Any]) -> dict[str, Any]:
     out: dict[str, Any] = {}
     for key, sub in each.items():
-        val = get_path(item, sub)
+        val = _value(item, sub)
         if val is not None:
             out[key] = val
+    return out
+
+
+def _flatten(items: list[Any]) -> list[Any]:
+    out: list[Any] = []
+    for i in items:
+        out.extend(i if isinstance(i, list) else [i])
     return out
 
 
@@ -104,14 +126,17 @@ def map_field(data: Any, spec: Any) -> Any:
         if val is None:
             return None
         if isinstance(val, list) and "each" in spec:
-            return [_map_object(i, spec["each"]) for i in val if _matches(i, spec.get("where"))]
+            return [_map_object(i, spec["each"]) for i in _flatten(val)
+                    if isinstance(i, dict) and _matches(i, spec.get("where"))]
+        if "map" in spec:
+            return _value(data, spec)
         return val
     raise ValueError(f"Unsupported mapping spec: {spec!r}")
 
 
 def citations_from_markers(answer: str, data: Any, spec: dict[str, Any]) -> list[dict[str, Any]]:
     pattern = re.compile(spec.get("pattern", r"\[(\d+)\]"))
-    pool = get_path(data, spec["lookup"]) or []
+    pool = [i for i in _flatten(get_path(data, spec["lookup"]) or []) if isinstance(i, dict)]
     key = spec.get("key", "n")
     each = spec.get("each", {"id": "id"})
     seen: list[str] = []

@@ -35,7 +35,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="GaugeLab API", version=__version__, lifespan=lifespan,
               description="Evaluation and regression testing for RAG chatbots and tool-using agents.")
-app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5240", "http://127.0.0.1:5240"],
                    allow_methods=["*"], allow_headers=["*"])
 
 
@@ -71,7 +71,7 @@ def spa(path: str):
     if path.startswith("api/"):
         return JSONResponse({"detail": "Not found"}, status_code=404)
     if not WEB_DIST.is_dir():
-        return JSONResponse({"detail": "Web app not built. Run `make web` (or use the Vite dev server on :5173)."},
+        return JSONResponse({"detail": "Web app not built. Run `make web` (or use the Vite dev server on :5240)."},
                             status_code=404)
     target = (WEB_DIST / path).resolve()
     if path and target.is_file() and WEB_DIST.resolve() in target.parents:
