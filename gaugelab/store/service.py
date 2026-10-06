@@ -815,8 +815,8 @@ def calibration_stats(s: Session, dimension: str, run_id: int | None = None,
         rows = [r for r in rows
                 if f"{(r[1].metadata_ or {}).get('provider')}/{(r[1].metadata_ or {}).get('model')}" == judge]
     human = [a.label for a, _, _ in rows]
-    judge = [(sc.label or sc.status).upper() for _, sc, _ in rows]
-    agg = binary_agreement(human, judge)
+    verdicts = [(sc.label or sc.status).upper() for _, sc, _ in rows]
+    agg = binary_agreement(human, verdicts)
     judges = sorted({json.dumps({k: (sc.metadata_ or {}).get(k) for k in ("provider", "model", "prompt_hash")})
                      for _, sc, _ in rows})
     disagreements = [{"trial_id": t.id, "run_id": t.run_id, "case_id": t.case_key, "human": a.label,

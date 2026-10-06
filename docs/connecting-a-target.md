@@ -1,5 +1,49 @@
 # Connecting a target
 
+## The quick way: Targets > Connect a chatbot
+
+1. **How to reach it.** Paste a curl command (DevTools > Network > right-click > Copy as cURL),
+   type an HTTP request, pick streaming, OpenAI-compatible or Python, upload logs, or start
+   from a template (OpenAI-compatible, Anthropic, LangServe, Flowise, Dify, n8n, SSE, and any
+   connection you saved as a template).
+2. **The request.** A pasted curl fills in the URL, method, headers and body. The field that
+   carries the question is replaced by `{{input.message}}`; a session or conversation id gets
+   a fresh `eval-{{uuid}}` per question; an `Authorization`-like header is offered for the OS
+   credential store and replaced by a `keyring:NAME` reference.
+3. **Test and map.** Send a question. GaugeLab shows the reply as a tree and guesses where the
+   answer, sources (id, title, text, score), citations, tool calls, tokens and model are,
+   with a reason for each guess. Fix any guess by clicking *Change* and then the right node.
+   *Check the mapping* runs the whole connection and lists **what you'll get**: each piece of
+   telemetry, whether it came back, and the checks it unlocks.
+4. **Safety and save.** Set up a clean-up request if each question saves a conversation, ask
+   three real questions for a time and cost estimate of a full run, name it, save. Nothing is
+   saved until a test question came back with an answer.
+
+*Advanced (JSON)* shows the configuration the wizard is writing, and editing it updates the
+steps: the configuration below is still the record of a connection.
+
+## The GaugeLab reply shape (bots you build)
+
+If your bot can answer like this, there is nothing to map - leave *My bot replies in the
+GaugeLab shape* on in the wizard (`"reply_shape": "gaugelab"` in a config):
+
+```json
+{
+  "answer": "Device Alpha has a 24-month warranty [warranty].",
+  "sources": [{"id": "warranty", "title": "Warranty policy", "text": "...", "score": 0.82}],
+  "citations": ["warranty"],
+  "tool_calls": [{"name": "lookup_order", "arguments": {"order_id": "18372"}, "result": {}, "status": "success"}],
+  "usage": {"input_tokens": 900, "output_tokens": 40},
+  "model": {"provider": "openai", "model": "gpt-x"}
+}
+```
+
+Only `answer` is required; every other field unlocks more checks. Settings > *Reply shape* has
+copy-paste FastAPI, Flask and Express endpoints. Bots you did not build keep working through
+the mapping.
+
+## By configuration
+
 Any chatbot or agent can be connected by configuration alone. Pick the route that fits.
 
 | Your system | Use | Telemetry you get |
@@ -20,7 +64,7 @@ normalized one, and lists the telemetry the mapping does not yet capture.
   "endpoint": "/chat",
   "method": "POST",
   "body": {"message": "{{input.message}}", "session": "eval-{{uuid}}"},
-  "auth": {"header": "Authorization", "secret_ref": "env:MY_BOT_KEY", "prefix": "Bearer "},
+  "auth": {"header": "Authorization", "secret_ref": "keyring:MY_BOT_KEY", "prefix": "Bearer "},
   "response": {
     "answer": "reply.text",
     "retrieved_documents": {"path": "retrieval.hits", "each": {"id": "doc", "score": "score", "text": "snippet"}},

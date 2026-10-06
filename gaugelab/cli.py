@@ -3,7 +3,7 @@
     gaugelab db upgrade                     apply migrations
     gaugelab serve [--port 8040]            API + built web app
     gaugelab demo-agent [--port 9040]       the fictional Acme agent over HTTP
-    gaugelab seed [--run]                   demo project, dataset, targets, gate (and runs)
+    gaugelab seed [--run] [--fresh]         demo project, dataset, targets, gate (and runs)
     gaugelab validate dataset.yaml          check a dataset file
     gaugelab run experiment.yaml            run an experiment from config
     gaugelab compare <baseline> <candidate> paired comparison of two runs
@@ -252,9 +252,32 @@ def cmd_import(args) -> int:
     return 0
 
 
+def _fresh_sqlite() -> None:
+    """Delete the SQLite database file (a clean demo). Refuses anything that is not SQLite."""
+    from pathlib import Path
+
+    from gaugelab.store import db
+
+    url = db.database_url()
+    if not url.startswith("sqlite:///"):
+        raise SystemExit("--fresh only deletes a SQLite database; drop other databases yourself.")
+    path = Path(url.split("///", 1)[1])
+    if db._engine is not None:
+        db._engine.dispose()
+    for suffix in ("", "-wal", "-shm"):
+        f = Path(str(path) + suffix)
+        try:
+            f.unlink(missing_ok=True)
+        except PermissionError as exc:
+            raise SystemExit(f"{f} is in use: stop `gaugelab serve` first, then run this again.") from exc
+    print(f"Deleted {path}")
+
+
 def cmd_seed(args) -> int:
     from gaugelab.seed import seed
 
+    if args.fresh:
+        _fresh_sqlite()
     res = seed(run=args.run, trials=args.trials, force_runs=args.force_runs)
     _out(res)
     return 0
@@ -282,6 +305,8 @@ def main(argv: list[str] | None = None) -> int:
     sd.add_argument("--run", action="store_true", help="also run baseline and candidate experiments")
     sd.add_argument("--trials", type=int, default=3)
     sd.add_argument("--force-runs", action="store_true", help="run again even if demo runs exist")
+    sd.add_argument("--fresh", action="store_true",
+                    help="start from an empty SQLite database (deletes it first) - a clean demo in one command")
     sd.set_defaults(fn=cmd_seed)
 
     v = sub.add_parser("validate", help="validate a dataset file")

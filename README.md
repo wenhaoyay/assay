@@ -13,13 +13,22 @@ regressed, why they failed, and the execution trace behind each one. Release dec
 explicit gates that also run in CI, at zero API cost.
 
 It is framework-agnostic. Anything that answers over HTTP (JSON or a streamed reply), any
-Python function, or a log of past answers can be evaluated, by configuration alone.
+Python function, or a log of past answers can be evaluated, by configuration alone - or by
+pasting a curl command into the connect wizard and clicking the reply.
 
 ## What it does
 
-- **Connect any target.** An HTTP adapter with field mapping and SSE/NDJSON stream reducers, a
-  Python adapter, and an importer that re-grades logged answers without calling the system.
-  *Test connection* shows the raw and normalized response and which telemetry is missing.
+- **Connect any chatbot without writing config.** Paste a curl command; secrets are moved to
+  the OS credential store; send a test question and click the reply to say where the answer,
+  sources, tool calls and tokens are (GaugeLab suggests, you confirm); see which checks that
+  unlocks; dry-run three questions for time and cost. Bots that reply in the **GaugeLab reply
+  shape** (`answer, sources, citations, tool_calls, usage`) need no mapping at all. Underneath:
+  an HTTP adapter with field mapping and SSE/NDJSON stream reducers, a Python adapter, and an
+  importer that re-grades logged answers without calling the system.
+- **Verdict first, evidence underneath.** Each chatbot gets a home page that says in one
+  sentence whether the latest version is better, worse or within noise, with a gauge, the
+  trend of comparable runs and where in the pipeline failures start. Runs that are not
+  comparable (different cases, checks or judge) are kept apart and flagged.
 - **Versioned golden datasets.** YAML/JSON/CSV import with row- and field-level errors. A
   version freezes the first time a run uses it, and later edits branch into a new version.
 - **AI-assisted test cases, human-approved.** Generate candidates from your documents, each with
@@ -32,9 +41,14 @@ Python function, or a log of past answers can be evaluated, by configuration alo
   LLM-judge rubrics.
 - **LLM judges done carefully.** PASS/FAIL/UNKNOWN rubrics, strict JSON output, versioned
   prompts with hashes, injection-resistant fencing of untrusted content, cost estimated before
-  the run. Bring your own key (OpenAI-compatible, Anthropic) or run locally with Ollama.
-- **Human calibration.** Blind labelling, then accuracy, F1, Cohen's kappa, a confusion matrix
-  and the disagreements. A judge is shown as *Uncalibrated* until labels exist.
+  the run. Settings > *Models & keys* connects OpenAI, Anthropic, Azure, Gemini, OpenRouter,
+  any OpenAI-compatible gateway, or a local model (Ollama, LM Studio); the model list comes
+  from the provider, and a 5-call check reports speed, JSON reliability and cost per 100
+  grading calls. A target can be restricted to local judges only.
+- **Human calibration.** Blind labelling as flashcards (P / F / U), then accuracy, F1,
+  Cohen's kappa, a confusion matrix and the disagreements - per judge model, so a new model
+  starts *Uncalibrated*. A **judge bake-off** runs several grading models over your labels and
+  ranks them by agreement with you, speed and cost.
 - **Repeated trials.** pass@k vs pass^k shows flakiness that an average hides.
 - **Honest statistics.** Case-level bootstrap intervals, paired deltas, McNemar's exact test,
   and plain readings: *within noise* when the interval includes zero.
@@ -47,10 +61,16 @@ Python function, or a log of past answers can be evaluated, by configuration alo
 
 | | |
 |---|---|
-| ![Run summary: gate, repeated trials](docs/screenshots/run-summary.png) | ![Why a trial failed](docs/screenshots/trial.png) |
-| **Run summary.** Rates with intervals and N, the regression gate, pass@k vs pass^k. | **A failed trial.** Every check with its reason, expected vs retrieved documents. |
-| ![Execution trace](docs/screenshots/trace.png) | ![Blind calibration](docs/screenshots/calibration.png) |
-| **Trace.** Retrieval, model and tool calls with arguments and results, then each evaluator. | **Calibration.** Label blind; the judge stays *Uncalibrated* until you do. |
+| ![A chatbot's home](docs/screenshots/chatbot.png) | ![Run summary with the gate stamp](docs/screenshots/run-summary.png) |
+| **A chatbot's home.** The verdict in one sentence, the trend of comparable runs, where failures start. | **Run summary.** Rates with intervals and N, the release gate, consistency over repeated tries (plain-English layer on). |
+| ![Failures grouped by case](docs/screenshots/failures.png) | ![Why a trial failed](docs/screenshots/trial.png) |
+| **Failures.** By kind of failure and by case, consistent vs flaky; J/K and Enter to triage. | **A failed trial.** The failing checks first, required phrases and citations marked in the answer, the reference beside it. |
+| ![Execution trace](docs/screenshots/trace.png) | ![Every case in every run](docs/screenshots/dataset-history.png) |
+| **Trace.** Request, retrieval, model and tool calls with timings; the slowest step called out; the checks that graded it. | **Results across runs.** A case red in every run is often a wrong golden answer, not a bad bot. |
+| ![Connect wizard](docs/screenshots/connect.png) | ![Models and keys](docs/screenshots/models.png) |
+| **Connect a chatbot.** Paste curl, send a question, click the reply; GaugeLab guesses, you confirm. | **Models & keys.** Bring a better grading model; keys live in the OS credential store. |
+| ![Calibration flashcards](docs/screenshots/calibration.png) | ![Compare in dark mode](docs/screenshots/compare-dark.png) |
+| **Calibration.** Label blind with P / F / U; agreement with the judge fills in as you go. | **Dark mode**, designed rather than inverted. |
 
 ## Architecture
 
@@ -81,6 +101,10 @@ make web                        # build the web app
 make demo                       # migrate, seed the Acme demo, run baseline + candidate (~10 s)
 make serve                      # http://localhost:8040
 ```
+
+Open it and press **Take the tour** on the home page (or Ctrl+K > "Take the tour"): eight
+steps from a chatbot's verdict to connecting your own bot. `gaugelab seed --run --fresh`
+(`make demo-fresh`) starts again from an empty database - stop the server first.
 
 Without `make` (for example on Windows):
 
@@ -179,9 +203,16 @@ that cannot be computed shows as *not applicable* or *not evaluated*, never as a
 
 ## BYOK and local judges
 
-- **Local:** add an Ollama provider (`llama3.1:8b` is enough to start). Nothing leaves the machine.
-- **Cloud:** put your key in `.env` (`OPENAI_API_KEY=...`), then add a provider that references
-  it as `env:OPENAI_API_KEY`. The key stays server-side and is never returned, stored or logged.
+- **Local:** connect Ollama or LM Studio in Settings > Models & keys. Nothing leaves the machine.
+- **Cloud:** in Settings > Models & keys, pick OpenAI (or another provider), paste the key once:
+  it is stored in the operating system's credential store (Windows Credential Manager, macOS
+  Keychain, Secret Service) and referenced as `keyring:OPENAI_API_KEY`. Or keep it in `.env`
+  and reference it as `env:OPENAI_API_KEY`. Either way the key stays server-side and is never
+  returned to the browser, stored in the database or logged; the UI shows the last four
+  characters.
+- **Defaults:** pick a default grading model and a spend cap per run. Changing the default
+  never re-grades old runs, and a failing judge marks answers *not evaluated* rather than
+  silently switching to another model.
 - **CI:** the default pipeline uses the heuristic judge, which is free and offline. An optional
   workflow runs the suite with a cloud judge when you add a key as a repository secret.
 
@@ -189,16 +220,20 @@ There are no demo credentials: GaugeLab has no login. It is a local, single-user
 
 ## Connecting your own chatbot
 
-Write a target config (HTTP with mapping and stream reducers, a Python callable, or an import
-mapping for logs). No code changes are needed. Configuration that names internal systems
-belongs in `local/`, which git ignores. See [docs/connecting-a-target.md](docs/connecting-a-target.md).
+Targets > *Connect a chatbot*: paste a curl command (or pick a template: OpenAI-compatible,
+Anthropic, LangServe, Flowise, Dify, n8n, SSE), send a test question, map the reply by
+clicking it, check what you get, dry-run, save. For bots you build, return the GaugeLab reply
+shape and skip the mapping (Settings > *Reply shape* has FastAPI, Flask and Express snippets).
+The wizard writes an ordinary target config, which you can also write by hand: configuration
+that names internal systems belongs in `local/`, which git ignores. See
+[docs/connecting-a-target.md](docs/connecting-a-target.md).
 
 ## Repository layout
 
 ```text
 gaugelab/                    core package: adapters, evaluators, judge, runner, statistics, gates, store, CLI
 apps/api/                    FastAPI app, Alembic migrations, API tests
-apps/web/                    React + TypeScript + Vite + Tailwind + Recharts; Vitest and Playwright tests
+apps/web/                    React + TypeScript + Vite + Tailwind + Motion + Recharts; Vitest and Playwright tests
 examples/acme_support_agent/ fictional system under test (docs, mock tools, two variants, HTTP server)
 benchmarks/acme_support/     golden dataset (58 cases), experiment configs, gates, CI suites, case study
 docs/                        architecture, methodology, calibration, traces, security, demo script
@@ -210,7 +245,7 @@ local/                       your private connectors (ignored by git)
 
 ```bash
 make test        # pytest (core + API end-to-end) and Vitest
-make e2e         # Playwright: launch, compare, trace, calibration flows on a fresh seeded server
+make e2e         # Playwright: home, run + gate, compare, failures + trace, keyboard, calibration, connect wizard, gates
 make lint typecheck
 make ci          # the CI gate locally (exit 0)
 make ci-regression   # the same gate on a deliberately regressed candidate (exit 1)

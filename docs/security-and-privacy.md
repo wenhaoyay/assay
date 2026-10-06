@@ -9,8 +9,10 @@
   trace, and every evaluator verdict, including judge reasons.
 - Imported logs, when you import them.
 - Human calibration labels and the annotator name you type.
-- Provider configurations: provider, model, base URL and the **name** of the environment
-  variable that holds the key. Never the key.
+- Provider configurations: provider, model, base URL and a **reference** to the key
+  (`env:NAME` or `keyring:NAME`). Never the key.
+- Workspace settings (default judge, default generator, spend cap) and connection templates
+  (which hold key references, never keys).
 
 The default database is `data/gaugelab.db` (SQLite), which is ignored by git. Treat it as
 sensitive as the data you put into it.
@@ -28,20 +30,31 @@ sensitive as the data you put into it.
 A cloud judge receives the question, the reference answer, the retrieved context, tool
 results and the answer being graded. Do not send confidential material to a provider unless
 your organisation allows that data path. A local model avoids external transmission
-entirely: configure an `ollama` provider (default `http://localhost:11434`).
+entirely: connect Ollama or LM Studio in Settings > Models & keys.
+
+**Local judges only.** A target can be marked *local grading models only* (on its page). Runs
+and re-grades of that target are then refused with any judge whose address is not on this
+machine, so a confidential bot's answers cannot reach a cloud API by a wrong click.
 
 ## Bring your own key
 
-1. Put the key in the API server's environment (for example in `.env`, which git ignores):
-   `OPENAI_API_KEY=...`.
-2. In GaugeLab, reference it as `env:OPENAI_API_KEY` when adding a provider (or a target's
-   `auth.secret_ref`).
-3. The key is read at call time, server-side only. It is never returned by the API (the UI
-   shows only whether it is set), never written to the database, and never logged.
-   Provider error messages are truncated and never include request headers.
+Two places a key can live; configurations only ever hold a reference to it:
 
-The browser never sees a key. Nothing secret is kept in `localStorage`; it holds only the
-theme and the reviewer name you typed.
+- **The OS credential store** (`keyring:NAME`): paste the key in Settings > Models & keys, or
+  click *Store securely* when the connect wizard finds an `Authorization` header in a pasted
+  curl command. The key is sent once to the local GaugeLab server, which writes it to Windows
+  Credential Manager / macOS Keychain / Secret Service under the service name `gaugelab`.
+- **The server environment** (`env:NAME`): set it in `.env` (ignored by git) or the
+  deployment, for Docker and CI.
+
+Either way the key is read at call time, server-side only. It is never returned by the API
+(the UI shows whether it is set and its last four characters), never written to the
+database, and never logged. Provider error messages are truncated and never include request
+headers. The curl parser hands a found secret back to the page that pasted it, so the page
+can offer to store it; it is not kept anywhere else.
+
+Nothing secret is kept in `localStorage`; it holds only viewer preferences (theme, density,
+motion, the Explain switch) and the reviewer name you typed.
 
 ## Redaction
 

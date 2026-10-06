@@ -341,7 +341,7 @@ def suggest_mapping(raw: Any) -> dict[str, Any]:
         out["mapping"]["answer"] = best[0]
     # sources: lists of objects with an id-like field; prefer ones that also carry text and a score.
     # A list that only names documents (no text) and is called sources/citations reads as citations.
-    cands = []
+    lists: list[tuple[int, str, dict[str, Any], str, str | None, str | None]] = []
     for p, v in nodes:
         if not (isinstance(v, list) and v and all(isinstance(x, dict) for x in v[:5])):
             continue
@@ -354,10 +354,10 @@ def suggest_mapping(raw: Any) -> dict[str, Any]:
             continue
         sk = _first_key(sample, _SCORE_KEYS)
         rank = 3 * bool(textk and textk != idk) + (last in _SOURCE_KEYS) + bool(sk) + ("retriev" in p.lower())
-        cands.append((rank, p, sample, idk, textk, sk))
-    cands.sort(key=lambda c: -c[0])
-    if cands:
-        rank, p, sample, idk, textk, sk = cands[0]
+        lists.append((rank, p, sample, idk, textk, sk))
+    lists.sort(key=lambda c: -c[0])
+    if lists:
+        rank, p, sample, idk, textk, sk = lists[0]
         each = {"id": idk}
         if (tk := _first_key(sample, ("title", "name", "heading"))) and tk != idk:
             each["title"] = tk
@@ -368,7 +368,7 @@ def suggest_mapping(raw: Any) -> dict[str, Any]:
         out["mapping"]["retrieved_documents"] = {"path": p.replace(".0.", ".*.") if p else ".", "each": each}
         out["reasons"]["retrieved_documents"] = (f"'{p}' is a list of objects with '{idk}'"
                                                  + (f" and text in '{textk}'." if textk and textk != idk else "."))
-        for _, p2, _s2, id2, text2, _ in cands[1:]:
+        for _, p2, _s2, id2, text2, _ in lists[1:]:
             last2 = p2.split(".")[-1].lower()
             if not text2 and last2 in ("sources", "citations", "references", "cited"):
                 out["mapping"]["citations"] = {"path": p2, "each": {"id": id2}}
@@ -416,7 +416,10 @@ def suggest_mapping(raw: Any) -> dict[str, Any]:
         out["reasons"]["usage"] = "Token counts found: " + ", ".join(usage.values()) + "."
     # model
     for p, v in nodes:
-        if p and p.split(".")[-1].lower() in ("model", "model_name") and isinstance(v, str):
+        parts = p.lower().split(".") if p else []
+        named = parts and (parts[-1] in ("model", "model_name", "model_id")
+                           or (parts[-1] in ("name", "id") and len(parts) > 1 and parts[-2] == "model"))
+        if named and isinstance(v, str):
             out["mapping"]["provider"] = {"model": p}
             out["reasons"]["provider"] = f"'{p}' names the model."
             break

@@ -1,65 +1,73 @@
-# Demo script (4 minutes)
+# Demo script (5 minutes)
 
-Setup, before the demo:
+Setup, before the demo (stop any running server first):
 
 ```bash
-gaugelab seed --run      # dataset, two variants, gate, and both runs (about 10 seconds)
-gaugelab serve           # http://localhost:8040
+gaugelab seed --run --fresh   # an empty database, then the dataset, two variants, gate and both runs (~10 s)
+gaugelab demo-agent           # optional: the Acme bot over HTTP on :9040, for the connect wizard
+gaugelab serve                # http://localhost:8040
 ```
 
-## 1. The question (20 s)
+Short on time? Press **Take the tour** on the home page: it walks through the same story in
+eight steps. The script below is the longer version, with what to say.
 
-"I changed my retriever and my prompt. Is the support agent actually better, or just
-different? GaugeLab answers that with a versioned golden dataset, objective checks first,
-and a comparison that says *within noise* when that is the truth."
+## 1. The question (20 s) - Home
 
-## 2. The dataset (40 s) - Datasets > acme-support
+"I changed my retriever and my prompt. Is the support bot actually better, or just
+different?" The home page has one card per chatbot: latest pass rate, the change since the
+last *comparable* run, a trend line, the release gate. Nothing here is specific to one bot.
 
-- 58 cases: factual, multi-document, unanswerable, retrieval traps, tool use, error recovery,
-  adversarial.
-- Point at the blue box: **people define correctness**. Generated cases wait in a review
-  queue (show the *Generate & review* tab).
-- Version badge: **v1 is frozen**, used by 2 runs. Edit any case: the change lands in a new
-  draft v2 and the notice says so. Old runs keep pointing at v1.
+## 2. The verdict (40 s) - open the Acme card
 
-## 3. The baseline (30 s) - Experiments > run #1
+- One sentence at the top, written from the statistics: **Better: pass rate up +23.6pp,
+  beyond noise. 4 cases regressed, 20 improved. Also: tokens up 140%, cost up 98%.**
+- The needle shows the change; the grey arc is its 95% interval. It stays clear of the middle,
+  so the improvement is unlikely to be chance - and the cost of it is in the same sentence.
+- *Where failures start*: the pipeline stages, with the failure kinds behind them.
+- The trend only joins runs with the same cases, checks and judge. A run graded by a
+  different judge becomes a separate line, never a misleading dip.
 
-- 58 cases × 3 trials. Overall pass rate 49.4%, with its interval and N.
-- **Repeated trials**: pass@3 51.7% vs pass^3 44.8%. The gap is flakiness, and the flaky cases
-  are listed.
+## 3. Compare (60 s) - "Every metric, every case" (or Runs, tick #1 and #2, Compare)
 
-## 4. The candidate and the comparison (60 s) - Compare #1 vs #2
-
-- Hybrid retrieval + reranking + prompt v2: overall **+23.6pp, 95% CI [+10.3, +36.8]**, tool
-  accuracy +26.2pp, McNemar p = 0.003.
-- But the same table shows answer correctness, must-mention and refusal rows as
-  **within noise**: GaugeLab does not overclaim.
-- Costs are visible: **+140% tokens, +98% estimated cost, p95 +8%**. It is a trade-off,
+- McNemar p = 0.003: of the questions where the versions disagree, the split is lopsided.
+- The forest plot: each metric's interval against zero. Answer correctness, must-mention and
+  refusal cross zero: GaugeLab does not overclaim. Hatched rows come from the heuristic judge.
+- Measured once: tokens +140%, cost +98%, p95 +8% - arrow up, coloured worse. A trade-off,
   not a free win.
-- Category chart: tool use improved a lot, retrieval traps did not move.
+- Open `multi_08` under *Regressed*: both answers side by side. The candidate now calls
+  `get_return_policy`, answers "30 days", and drops the holiday rule.
 
-## 5. A regression (40 s) - click `multi_08` in "Regressed"
+## 4. Why it failed (40 s) - Run #1 > Failures
 
-- "I bought something in Northvale on 20 December. Until when can I return it?"
-- The candidate now calls `get_return_policy`, answers "30 days", and drops the holiday rule
-  (returnable until 31 January). `must_mention` fails: the new tool rule made a correct
-  answer worse.
-- A second regression, `fact_11`: the new refusal rule refuses "How quickly are refunds paid
-  back?" because "quickly" and "paid" never occur in the docs.
+- Failures by kind (click *Retrieval miss* to filter) and by case: three red dots = fails every
+  try, consistently.
+- J/K to move, Enter to open. The trial page starts with the reason: *recall_at_k - Expected
+  installation, but it was not retrieved in the top 5*. The answer is not tinted red: the
+  answer was fine, retrieval failed.
+- Required phrases are marked in the answer; the reference sits beside it. Shift+J jumps to
+  the next failing case.
 
-## 6. The trace (30 s) - open the trial, Execution trace
+## 5. The dataset (30 s) - Datasets > acme-support > Results across runs
 
-- Request, retrieval with the documents and scores, the plan call, each tool call with
-  arguments and result, the answer call, and the evaluators, each with its timing and
-  tokens. Only observable data; no hidden reasoning needed.
-- Show `fact_03` on the baseline: *"Expected installation, but it was not retrieved in the
-  top 5"*, with the missing document listed in red.
+- Every case in every run. Cases that fail in every run whatever the version (marked *always
+  fails*) are often a sign the golden answer is wrong, not the bot. People define correctness; GaugeLab
+  shows where to look.
 
-## 7. Calibration (30 s) - Calibration
+## 6. Can you trust the judge? (40 s) - Calibration
 
-- The judge's verdict is hidden while you label. Label two or three answers. The panel
-  switches from **Uncalibrated** to **Calibrated on N samples**, with accuracy, kappa, the
-  confusion matrix and the disagreements.
+- Flashcards: label with P / F / U; the judge's verdict stays hidden until you have labelled.
+- Progress toward 30 labels and an agreement meter (Cohen's kappa) fill in as you go.
+- *Judge bake-off*: run the heuristic judge and the local Ollama model (or OpenAI) over your
+  labels; GaugeLab ranks them by agreement with you, speed and cost.
+
+## 7. Bring your own model and your own bot (40 s)
+
+- Settings > **Models & keys**: connect OpenAI by pasting a key - it goes to the OS credential
+  store, never the database; the model list comes from OpenAI; *Check* reports speed, JSON
+  reliability and the cost of 100 grading calls. A new model starts uncalibrated.
+- Targets > **Connect a chatbot**: paste a curl command for `http://127.0.0.1:9040/chat`, send
+  a question, and the reply's answer, sources, tool calls and tokens are already mapped -
+  confirm with a click and see what checks that unlocks.
 
 ## 8. The CI gate (30 s) - terminal
 
@@ -68,6 +76,6 @@ gaugelab ci benchmarks/acme_support/ci.yaml             # PASS, exit 0
 gaugelab ci benchmarks/acme_support/ci-regression.yaml  # prompt v3 dropped the tool rules
 ```
 
-The second run prints *REGRESSION DETECTED*: 6 cases regressed, tool accuracy dropped 14.3pp
-against production, **Gate: FAIL**, and the exit code is 1. In GitHub Actions that fails the
-build at zero API cost, and the Markdown summary is posted to the job summary.
+The second run prints *REGRESSION DETECTED*: tool accuracy dropped 14.3pp against
+production, **Gate: FAIL**, and the exit code is 1. In GitHub Actions that fails the build at
+zero API cost, and the Markdown summary is posted to the job summary.

@@ -107,7 +107,10 @@ async def check_provider(s: Session, pc: m.ProviderConfig, tries: int = 5) -> di
     provider = build_provider(ProviderSpec(provider=pc.provider, model=pc.model, base_url=pc.base_url,
                                            api_key_ref=pc.api_key_ref, max_tokens=120, temperature=0.0))
     provider.max_retries = 0
-    latencies, valid, errors, verdicts = [], 0, [], []
+    latencies: list[float] = []
+    errors: list[str] = []
+    verdicts: list[str] = []
+    valid = 0
     tin = tout = 0
     for _ in range(tries):
         t0 = time.perf_counter()
@@ -201,11 +204,8 @@ async def run_bakeoff(bakeoff_id: int) -> None:
         dimension, judge_cfgs = b.dimension, list(b.judges)
         items = [(t.id, TestCase.model_validate(s.get(m.TestCaseRow, t.test_case_id).content),
                   NormalizedTargetResult.model_validate(t.result), label) for t, label in labelled_items(s, dimension)]
-        judges = [(cfg, svc.build_judge(s, cfg)) for cfg in judge_cfgs]
-        names = []
-        for _cfg, j in judges:
-            d = j.describe()
-            names.append(f"{d['provider']}/{d['model']}")
+        judges = [(cfg, j) for cfg in judge_cfgs if (j := svc.build_judge(s, cfg)) is not None]
+        names = [f"{j.describe()['provider']}/{j.describe()['model']}" for _cfg, j in judges]
         pricing = svc.pricing(s)
     ev = get_evaluator(dimension)
     results: list[dict[str, Any]] = []
@@ -276,7 +276,7 @@ def dry_run_summary(calls: list[dict[str, Any]], dataset_cases: int, trials: int
                     pricing: Any) -> dict[str, Any]:
     ok = [c for c in calls if c.get("ok")]
     lat = [c["elapsed_ms"] for c in ok if c.get("elapsed_ms")]
-    costs = [c.get("cost_usd") for c in ok if c.get("cost_usd") is not None]
+    costs = [float(c["cost_usd"]) for c in ok if c.get("cost_usd") is not None]
     per = statistics.median(lat) if lat else None
     total_calls = dataset_cases * trials
     return {"calls": calls, "ok": len(ok), "median_ms": round(per) if per else None,

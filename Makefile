@@ -5,7 +5,7 @@ PY = .venv/Scripts/python
 endif
 GL = $(PY) -m gaugelab.cli
 
-.PHONY: setup web seed demo serve dev agent test test-py test-web e2e lint typecheck ci ci-regression docker clean
+.PHONY: setup web seed demo demo-fresh serve dev agent test test-py test-web e2e lint typecheck ci ci-regression docker clean
 
 setup:            ## virtualenv + Python deps + web deps
 	python -m venv .venv
@@ -20,6 +20,9 @@ seed:             ## migrate and load the Acme demo (dataset, targets, gate)
 
 demo:             ## seed + run baseline and candidate (zero API cost)
 	$(GL) seed --run
+
+demo-fresh:       ## the same on an empty database (stop the server first): a clean slate for a live demo
+	$(GL) seed --run --fresh
 
 serve:            ## API + built web app on http://localhost:8040
 	$(GL) serve --port 8040

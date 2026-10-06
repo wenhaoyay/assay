@@ -231,7 +231,8 @@ def case_matrix(s: Session, dataset_id: int, project_id: int | None = None, limi
             c["passed"] += t.status == "passed"
             c["errors"] += t.status == "error"
     latest = svc.latest_version(s, dataset_id)
-    cases = [{"id": c.id, "title": c.title, "category": c.category} for _, c in svc.version_cases(s, latest.id)]
+    cases: list[dict[str, Any]] = [{"id": c.id, "title": c.title, "category": c.category}
+                                   for _, c in svc.version_cases(s, latest.id)]
     known = {c["id"] for c in cases}
     cases += [{"id": k, "title": "", "category": None} for k in sorted(cells) if k not in known]
     always_fail = [k for k, row in cells.items() if len(row) >= 2 and all(v["passed"] == 0 for v in row.values())]
