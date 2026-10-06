@@ -6,6 +6,7 @@ import { Fragment, useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { TraceViewer } from '../components/TraceViewer'
 import { Badge, Button, Card, Consistency, ErrorState, Explain, Field, Input, Json, Kbd, PageSkeleton, Segmented, StatusBadge, Table, Term } from '../components/ui'
+import { AddFailureToDataset } from '../components/Golden'
 import { api } from '../lib/api'
 import { useCrumbs } from '../lib/crumbs'
 import { FAILURE_LABELS, ms, num, usd } from '../lib/format'
@@ -113,6 +114,9 @@ export function TrialPage() {
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {(tr.status === 'failed' || tr.status === 'error') && tr.question && (
+            <AddFailureToDataset projectId={run.data?.project_id} question={tr.question} answer={tr.answer ?? ''} runId={tr.run_id} trialId={tr.id} reference={c?.expected.answer.reference} />
+          )}
           <Consistency statuses={siblings.map((s) => s.status)} />
           {siblings.length > 1 && (
             <div className="inline-flex rounded-lg border border-line bg-surface-2 p-0.5" aria-label="Tries of this case">

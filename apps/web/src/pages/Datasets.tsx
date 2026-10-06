@@ -1,15 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { Archive, ArchiveRestore, Download, Lock, Plus, Sparkles, Trash2 } from 'lucide-react'
+import { Archive, ArchiveRestore, Download, Hammer, Lock, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { DatasetAdd } from '../components/DatasetAdd'
+import { AddVariations, BuildPanel, ProvenanceBadge, TermChips } from '../components/Golden'
 import { CaseMatrixView, MatrixLegend } from '../components/viz'
 import { Badge, Button, Card, Empty, ErrorState, Explain, Field, Input, Json, Loading, Notice, PageHeader, Segmented, Select, StatusBadge, Table, Tabs, Textarea } from '../components/ui'
 import { api } from '../lib/api'
 import { useCrumbs } from '../lib/crumbs'
 import { when } from '../lib/format'
 import { usePrefs } from '../lib/prefs'
+import { plainPattern } from '../lib/trials'
 import { projectOption, useProjects } from '../lib/projects'
 import type { Candidate, CaseMatrix, Dataset, DatasetVersion, EditResult, Project, ProviderConfig, Settings, TestCase } from '../lib/types'
 
@@ -136,7 +138,7 @@ function DatasetRow({ d, projects }: { d: Dataset; projects: Project[] }) {
   )
 }
 
-type DTab = 'cases' | 'history' | 'generate' | 'versions'
+type DTab = 'cases' | 'build' | 'history' | 'generate' | 'versions'
 
 export function DatasetPage() {
   const { id } = useParams()
@@ -178,6 +180,7 @@ export function DatasetPage() {
       <Tabs
         tabs={[
           { id: 'cases', label: `Cases${version.data ? ` (${version.data.case_count})` : ''}` },
+          { id: 'build', label: <span className="inline-flex items-center gap-1.5"><Hammer className="size-3.5" /> Build</span> },
           { id: 'history', label: 'Results across runs' },
           { id: 'generate', label: <span className="inline-flex items-center gap-1.5"><Sparkles className="size-3.5" /> Generate &amp; review{d.unreviewed_candidates ? <Badge tone="warn">{d.unreviewed_candidates}</Badge> : null}</span> },
           { id: 'versions', label: `Versions (${d.versions.length})` },
@@ -196,6 +199,7 @@ export function DatasetPage() {
             }}
           />
         ))}
+        {tab === 'build' && version.data && <BuildPanel dataset={d} version={version.data} project={project} onEdited={(r) => { if (r.branched) { setNotice(r.notice ?? null); switchTo(r.id) } }} />}
         {tab === 'history' && <HistoryPanel matrix={matrix.data} loading={matrix.isLoading} focus={params.get('case')} />}
         {tab === 'generate' && versionId && <GeneratePanel datasetId={d.id} versionId={versionId} onPromoted={(r) => { if (r.branched) setNotice(r.notice ?? null); switchTo(r.id); setTab('cases') }} />}
         {tab === 'versions' && (
@@ -269,6 +273,7 @@ function HistoryPanel({ matrix, loading, focus }: { matrix?: CaseMatrix; loading
 
 function CasesPanel({ version, onEdited, matrix, focus }: { version: DatasetVersion; onEdited: (r: EditResult) => void; matrix?: CaseMatrix; focus?: string | null }) {
   const cases = useMemo(() => version.cases ?? [], [version.cases])
+  const lint = useQuery({ queryKey: ['lint', version.id], queryFn: () => api.get<{ issues: { case_id: string }[] }>(`/api/dataset-versions/${version.id}/lint`) })
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
   const [editing, setEditing] = useState<TestCase | 'new' | null>(null)
@@ -282,6 +287,9 @@ function CasesPanel({ version, onEdited, matrix, focus }: { version: DatasetVers
     <div className="space-y-4">
       {version.status === 'frozen' && (
         <Notice tone="info" title="This version is frozen">A run used it, so it stays exactly as it was. Editing a case saves your change to a new draft version.</Notice>
+      )}
+      {(lint.data?.issues.length ?? 0) > 0 && (
+        <p className="text-xs text-warn-ink">{lint.data!.issues.length} possible problem{lint.data!.issues.length === 1 ? '' : 's'} in this set (duplicates, phrases too generic to test anything, cases that always fail). <Link className="underline" to="?tab=build">See them on Build</Link>.</p>
       )}
       {editing && <CaseEditor versionId={version.id} initial={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={(r) => { setEditing(null); onEdited(r) }} />}
       <div className="flex flex-wrap items-center gap-2">
@@ -302,12 +310,12 @@ function CasesPanel({ version, onEdited, matrix, focus }: { version: DatasetVers
             <tbody>
               {shown.map((c) => (
                 <tr key={c.id} className={clsx('align-top hover:bg-surface-2/60', focus === c.id && 'bg-accent-wash')}>
-                  <td className="whitespace-nowrap font-mono text-xs">{c.id}{c.metadata?.generated ? <Badge tone="info" className="ml-1">generated</Badge> : null}</td>
+                  <td className="whitespace-nowrap font-mono text-xs">{c.id}<div className="mt-0.5"><ProvenanceBadge c={c} origin={(c as TestCase & { _origin?: string })._origin} /></div></td>
                   <td className="max-w-xl"><div className="font-medium">{c.title}</div><div className="text-ink-2">{c.input.message}</div></td>
                   <td><Badge>{c.category}</Badge><div className="mt-0.5 text-[11px] text-ink-3">{c.difficulty}</div></td>
                   <td><div className="flex flex-wrap gap-1">{expectedSummary(c).map((s) => <Badge key={s}>{s}</Badge>)}</div></td>
                   <td><CaseHistory matrix={matrix} caseId={c.id} /></td>
-                  <td><Button size="sm" variant="ghost" onClick={() => setEditing(c)}>{version.status === 'frozen' ? 'Edit (new version)' : 'Edit'}</Button></td>
+                  <td className="whitespace-nowrap"><Button size="sm" variant="ghost" onClick={() => setEditing(c)}>{version.status === 'frozen' ? 'Edit (new version)' : 'Edit'}</Button><AddVariations versionId={version.id} caseId={c.id} /></td>
                 </tr>
               ))}
             </tbody>
@@ -318,7 +326,8 @@ function CasesPanel({ version, onEdited, matrix, focus }: { version: DatasetVers
   )
 }
 
-const lines = (s: string) => s.split('\n').map((x) => x.trim()).filter(Boolean)
+const NL = '\n'
+const lines = (s: string) => s.split(NL).map((x) => x.trim()).filter(Boolean)
 
 export function CaseEditor({ versionId, initial, onClose, onSaved }: {
   versionId: number
@@ -335,6 +344,7 @@ export function CaseEditor({ versionId, initial, onClose, onSaved }: {
   const [mention, setMention] = useState((initial?.expected.answer.must_mention ?? []).join('\n'))
   const [forbid, setForbid] = useState((initial?.expected.answer.must_not_claim ?? []).join('\n'))
   const [refusal, setRefusal] = useState(initial?.expected.refusal_expected == null ? '' : String(initial.expected.refusal_expected))
+  const [patterns, setPatterns] = useState<string[]>(initial?.expected.answer.regex ?? [])
   const [advanced, setAdvanced] = useState(false)
   const rest = initial ? { ...initial.expected } : {}
   const [advancedText, setAdvancedText] = useState(JSON.stringify({ expected: rest, evaluator_config: initial?.evaluator_config ?? {}, tags: initial?.tags ?? [] }, null, 2))
@@ -347,7 +357,7 @@ export function CaseEditor({ versionId, initial, onClose, onSaved }: {
         try { adv = JSON.parse(advancedText) } catch (e) { setJsonError((e as Error).message); throw e }
       }
       const baseExpected = (advanced ? adv.expected : initial?.expected) ?? {}
-      const answer = { ...((baseExpected as { answer?: object }).answer ?? {}), reference: reference || null, must_mention: lines(mention), must_not_claim: lines(forbid) }
+      const answer = { ...((baseExpected as { answer?: object }).answer ?? {}), reference: reference || null, must_mention: lines(mention), must_not_claim: lines(forbid), regex: patterns }
       const body = {
         id, title, category, difficulty,
         description: initial?.description ?? '',
@@ -383,6 +393,10 @@ export function CaseEditor({ versionId, initial, onClose, onSaved }: {
         </div>
         <div className="space-y-3">
           <Field label="Must mention (one per line, a|b for alternatives)"><Textarea rows={3} value={mention} onChange={(e) => setMention(e.target.value)} /></Field>
+          <TermChips text={reference} picked={lines(mention)} exclude={[]}
+            onToggle={(t) => setMention((m) => (lines(m).includes(t) ? lines(m).filter((x) => x !== t) : [...lines(m), t]).join(NL))} />
+          <PlainMatchers onAdd={(p) => setPatterns((x) => [...x, p])} />
+          {patterns.length > 0 && <div className="flex flex-wrap gap-1">{patterns.map((p) => <Badge key={p} className="font-mono">{p}<button type="button" aria-label="Remove pattern" className="ml-1" onClick={() => setPatterns((x) => x.filter((y) => y !== p))}>×</button></Badge>)}</div>}
           <Field label="Must not claim (one per line)"><Textarea rows={2} value={forbid} onChange={(e) => setForbid(e.target.value)} /></Field>
           <Field label="Should the assistant decline?">
             <Select value={refusal} onChange={(e) => setRefusal(e.target.value)}>
@@ -538,6 +552,31 @@ function GeneratePanel({ datasetId, versionId, onPromoted }: { datasetId: number
           </ul>
         )}
       </Card>
+    </div>
+  )
+}
+
+/** Plain-word rules turned into patterns: "contains any of", "the whole word", "the exact number". */
+function PlainMatchers({ onAdd }: { onAdd: (pattern: string) => void }) {
+  const [kind, setKind] = useState<'any' | 'number' | 'word'>('any')
+  const [text, setText] = useState('')
+  const make = () => {
+    const parts = text.split(/,\s*|\|/).map((x) => x.trim()).filter(Boolean)
+    if (!parts.length) return
+    onAdd(plainPattern(kind, parts))
+    setText('')
+  }
+  return (
+    <div className="rounded-lg border border-line p-2">
+      <div className="mb-1 text-xs font-medium text-ink-2">Or a rule in plain words</div>
+      <div className="flex flex-wrap gap-2">
+        <Select className="w-48" value={kind} onChange={(e) => setKind(e.target.value as typeof kind)} aria-label="Rule kind">
+          <option value="any">contains any of</option><option value="word">contains the whole word</option><option value="number">contains the exact number</option>
+        </Select>
+        <Input className="w-56" value={text} onChange={(e) => setText(e.target.value)} placeholder={kind === 'any' ? 'EOL, end of life' : kind === 'number' ? '91' : 'backflush'} aria-label="Rule text" onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); make() } }} />
+        <Button size="sm" disabled={!text.trim()} onClick={make}>Add rule</Button>
+      </div>
+      <p className="mt-1 text-[11px] text-ink-3">GaugeLab writes the pattern (shown below) so "91" does not match "910", and capitals do not matter.</p>
     </div>
   )
 }

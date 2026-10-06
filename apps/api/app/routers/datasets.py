@@ -18,6 +18,7 @@ from gaugelab.providers import ProviderSpec, build_provider
 from gaugelab.schemas import TestCase
 from gaugelab.store import models as m
 from gaugelab.store import service as svc
+from gaugelab.store import workspace
 
 from .. import serializers as ser
 from ..deps import get_session
@@ -368,10 +369,168 @@ def promote(version_id: int, body: PromoteIn, s: Session = Depends(get_session))
         case = _case(c.case)
         if case.id in existing:
             case = case.model_copy(update={"id": f"{case.id}_{c.id}"})
-        case.metadata = {**case.metadata, "generated": True, "reviewed_by": c.reviewer, "candidate_id": c.id}
+        prov = {**(case.metadata.get("provenance") or {"source": (c.generator or {}).get("source", "generated"),
+                                                        "drafted_by": "AI"}),
+                "approved_by": c.reviewer, "approved_at": ser.iso(c.reviewed_at)}
+        case.metadata = {**case.metadata, "generated": True, "reviewed_by": c.reviewer, "candidate_id": c.id,
+                         "provenance": prov}
         svc.upsert_case(s, target.id, case, origin="generated-approved")
         c.approved_in_version_id = target.id
     return _edit_result(s, version_id, target)
+
+
+# --------------------------------------------------------------------------------------
+# Building golden sets faster: the machine types, a person vouches
+# --------------------------------------------------------------------------------------
+
+
+def _project_documents(s: Session, project_id: int) -> list[m.DocumentSource]:
+    return list(s.scalars(select(m.DocumentSource).where(m.DocumentSource.project_id == project_id)))
+
+
+@router.get("/dataset-versions/{version_id}/lint")
+def lint_version(version_id: int, s: Session = Depends(get_session)) -> dict[str, Any]:
+    """Weak cases: duplicates, phrases too generic to test anything, patterns that cannot fail,
+    expectations in none of the chatbot's documents, cases that fail in every run."""
+    from gaugelab.datasets.golden import lint
+    from gaugelab.store.insights import case_matrix
+
+    v = svc.get(s, m.DatasetVersion, version_id)
+    ds = svc.get(s, m.Dataset, v.dataset_id)
+    cases = [c for _, c in svc.version_cases(s, v.id)]
+    docs = [d.text for d in _project_documents(s, ds.project_id)]
+    always = case_matrix(s, ds.id)["always_fail"]
+    issues = lint(cases, docs or None, [c for c in always if any(x.id == c for x in cases)])
+    return {"issues": issues, "n_cases": len(cases), "documents_checked": len(docs)}
+
+
+@router.get("/dataset-versions/{version_id}/coverage")
+def coverage_version(version_id: int, s: Session = Depends(get_session)) -> dict[str, Any]:
+    from gaugelab.datasets.golden import coverage
+
+    v = svc.get(s, m.DatasetVersion, version_id)
+    ds = svc.get(s, m.Dataset, v.dataset_id)
+    cases = [c for _, c in svc.version_cases(s, v.id)]
+    docs = _project_documents(s, ds.project_id)
+    cited = {d for c in cases for d in c.expected.relevant_documents}
+    # A document "has cases" when a case names it, or an approved candidate came from it.
+    from_docs = {d.filename for d in docs if s.scalar(select(m.GeneratedTestCandidate.id).where(
+        m.GeneratedTestCandidate.document_source_id == d.id, m.GeneratedTestCandidate.status == "approved"))}
+    return coverage(cases, [d.filename for d in docs] if docs else None, cited | from_docs)
+
+
+@router.post("/questions/group")
+async def group_real_questions(file: UploadFile = File(...)) -> dict[str, Any]:
+    """Questions from chat history, near-duplicates grouped, most asked first."""
+    from gaugelab.datasets.golden import group_questions, read_questions
+
+    text = (await _read(file)).decode("utf-8", errors="replace")
+    try:
+        qs = read_questions(file.filename or "history.txt", text)
+    except (json.JSONDecodeError, ValueError) as exc:
+        raise HTTPException(422, f"Could not read questions from {file.filename}: {exc}") from exc
+    if not qs:
+        raise HTTPException(422, "No questions found. Use JSONL/JSON with a question field, a CSV with a "
+                                 "'question' column, or one question per line.")
+    groups = group_questions(qs)
+    return {"n_questions": len(qs), "n_groups": len(groups), "groups": groups[:300]}
+
+
+@router.post("/suggest-terms")
+def suggest(body: dict[str, Any]) -> dict[str, Any]:
+    from gaugelab.datasets.golden import suggest_terms
+
+    return {"terms": suggest_terms(str(body.get("text") or ""), int(body.get("limit") or 8))}
+
+
+@router.post("/datasets/{dataset_id}/candidates/import", status_code=201)
+async def import_candidates(dataset_id: int, file: UploadFile = File(...), source: str = Form("prompt-kit"),
+                            s: Session = Depends(get_session)) -> dict[str, Any]:
+    """Cases drafted outside GaugeLab (e.g. by your own ChatGPT/Claude with the prompt kit) enter
+    the review queue as UNREVIEWED candidates, never straight into the dataset."""
+    svc.get(s, m.Dataset, dataset_id)
+    text = (await _read(file)).decode("utf-8", errors="replace")
+    try:
+        parsed = parse_dataset(text, file.filename or "drafts.yaml")
+    except DatasetError as exc:
+        raise _dataset_error(exc) from exc
+    ids = []
+    for c in parsed.cases:
+        meta = dict(c.metadata)
+        where = f"{meta.get('source', '')} {meta.get('source_page', '')}".strip() or (file.filename or "draft file")
+        quote = str(meta.pop("evidence_quote", "") or "")
+        evidence = [{"document": where, "quote": quote, "found": None,
+                     "warnings": [] if quote else ["No quoted passage: check the answer against the source yourself."]}]
+        case = c.model_copy(update={"metadata": {**meta, "provenance": {"source": source, "drafted_by": "AI (outside GaugeLab)",
+                                                                       "file": file.filename}}})
+        row = m.GeneratedTestCandidate(dataset_id=dataset_id, kind=c.category or "factual",
+                                       case=case.model_dump(mode="json"), evidence=evidence,
+                                       generator={"source": source, "file": file.filename})
+        s.add(row)
+        s.flush()
+        ids.append(row.id)
+    return {"created": len(ids), "candidate_ids": ids,
+            "notice": "Added to the review queue as UNREVIEWED. Approve, edit or reject each one before it counts."}
+
+
+class VariationsIn(BaseModel):
+    kinds: list[str] = Field(default_factory=lambda: ["typo"])  # typo | paraphrase | zh | ja
+    provider_config_id: int | None = None
+
+
+LANGS = {"zh": "Simplified Chinese", "ja": "Japanese"}
+
+
+@router.post("/dataset-versions/{version_id}/cases/{case_key}/variations", status_code=201)
+async def variations(version_id: int, case_key: str, body: VariationsIn, s: Session = Depends(get_session)) -> dict[str, Any]:
+    """Copies of a case asked differently (a typo, other words, another language) that keep its
+    expectations. They go to the review queue: a translation can change what must be mentioned."""
+    from gaugelab.datasets.golden import typo_variant
+
+    v = svc.get(s, m.DatasetVersion, version_id)
+    case = next((c for _, c in svc.version_cases(s, v.id) if c.id == case_key), None)
+    if case is None:
+        raise HTTPException(404, f"No case {case_key!r} in this version")
+    texts: list[tuple[str, str]] = []
+    if "typo" in body.kinds:
+        texts.append(("typo", typo_variant(case.input.message)))
+    llm_kinds = [k for k in body.kinds if k in ("paraphrase", *LANGS)]
+    errors: list[str] = []
+    if llm_kinds:
+        pid = body.provider_config_id or (workspace.get_settings(s).get("default_generator") or {}).get("provider_config_id")
+        if not pid:
+            raise HTTPException(422, "Paraphrases and translations need a drafting model: pick one in Settings > Defaults.")
+        pc = svc.get(s, m.ProviderConfig, int(pid))
+        provider = build_provider(ProviderSpec(provider=pc.provider, model=pc.model, base_url=pc.base_url,
+                                               api_key_ref=pc.api_key_ref, temperature=0.4, max_tokens=400))
+        from gaugelab.providers import ChatMessage
+
+        for k in llm_kinds:
+            ask = ("Rewrite this question the way a different user might ask it: same meaning, different words. "
+                   if k == "paraphrase" else f"Translate this question into {LANGS[k]}. Keep codes, numbers and names as they are. ")
+            try:
+                out = await provider.complete([ChatMessage(role="user", content=ask + "Reply with the question only.\n\n" + case.input.message)],
+                                             json_mode=False)
+                texts.append((k, (out.text or "").strip().strip('"')))
+            except Exception as exc:
+                errors.append(f"{k}: {str(exc)[:200]}")
+    ids = []
+    for kind, q in texts:
+        if not q or q == case.input.message:
+            continue
+        new = case.model_copy(deep=True, update={"id": f"{case.id}__{kind}", "title": f"{case.title or case.id} ({kind})"})
+        new.input.message = q
+        new.metadata = {**case.metadata, "variation_of": case.id, "variation": kind,
+                        "provenance": {"source": f"variation:{kind}", "drafted_by": "GaugeLab" if kind == "typo" else "AI"}}
+        row = m.GeneratedTestCandidate(dataset_id=v.dataset_id, kind="variation", case=new.model_dump(mode="json"),
+                                       evidence=[{"document": f"variation ({kind}) of {case.id}", "quote": case.input.message,
+                                                  "found": None, "warnings": [] if kind == "typo" else
+                                                  ["Check that the expectations still fit the new wording."]}],
+                                       generator={"source": f"variation:{kind}"})
+        s.add(row)
+        s.flush()
+        ids.append(row.id)
+    return {"created": len(ids), "candidate_ids": ids, "errors": errors}
 
 
 # --------------------------------------------------------------------------------------

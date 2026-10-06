@@ -38,3 +38,15 @@ export function groupByCase(rows: TrialRow[]): CaseGroup[] {
     }
   })
 }
+
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/**
+ * A plain-word rule as a pattern for the regex check (Python syntax, case-insensitive):
+ * "any" of several phrases, a whole "word", or an exact "number" (91 must not match 910).
+ */
+export function plainPattern(kind: 'any' | 'word' | 'number', parts: string[]): string {
+  if (kind === 'number') return String.raw`(?<![\d.])` + escapeRegex(parts[0]) + String.raw`(?!\d)`
+  if (kind === 'word') return String.raw`(?i)\b` + escapeRegex(parts[0]) + String.raw`\b`
+  return `(?i)(${parts.map(escapeRegex).join('|')})`
+}

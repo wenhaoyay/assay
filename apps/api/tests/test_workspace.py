@@ -353,3 +353,37 @@ def test_local_models_notice_gates_downloads(client, monkeypatch):
     r = c.post("/api/local-models/pull", json={"model": "llama3.2:3b"})
     assert r.status_code == 409 and "not answering" in r.json()["detail"]
     assert c.post("/api/local-models/pull", json={"model": "bad name;rm"}).status_code == 422
+
+
+def test_golden_set_helpers(client):
+    c, s = client, client.seeded
+    vid = s["dataset_version_id"]
+    # Checks on the set and its coverage.
+    lint = c.get(f"/api/dataset-versions/{vid}/lint").json()
+    assert lint["n_cases"] == 58 and isinstance(lint["issues"], list)
+    cov = c.get(f"/api/dataset-versions/{vid}/coverage").json()
+    assert cov["total"] == 58 and {k["id"] for k in cov["kinds"]} >= {"lookup", "refusal"}
+    # Weak cases are named.
+    ds = c.post("/api/datasets", json={"project_id": s["project_id"], "name": "weak", "cases": [
+        {"id": "a", "input": {"message": "What is ZP17?"}, "expected": {"answer": {"must_mention": ["the"], "regex": [".*"]}}},
+        {"id": "b", "input": {"message": "what is ZP17"}},
+    ]}).json()
+    kinds = {i["kind"] for i in c.get(f"/api/dataset-versions/{ds['latest']['id']}/lint").json()["issues"]}
+    assert {"too_generic", "match_all", "duplicate", "no_expectations"} <= kinds
+    # Suggested must-mention phrases come from the answer.
+    terms = c.post("/api/suggest-terms", json={"text": "SCRS uses REM profile ZP17 with a 60-day period."}).json()["terms"]
+    assert "ZP17" in terms and "60-day" in terms
+    # Real questions are grouped by how often they were asked.
+    hist = b'{"question": "What is ZP17?"}\n{"question": "what is zp17"}\n{"question": "How long is the warranty?"}\n'
+    g = c.post("/api/questions/group", files={"file": ("history.jsonl", hist, "application/json")}).json()
+    assert g["n_questions"] == 3 and g["groups"][0]["count"] == 2
+    # Drafts from the prompt kit land in the review queue, unreviewed.
+    drafts = b"Question,Must mention (comma-separated)\nWhich profile does SCRS use?,ZP17\n"
+    r = c.post(f"/api/datasets/{ds['id']}/candidates/import", files={"file": ("drafts.csv", drafts, "text/csv")}).json()
+    assert r["created"] == 1
+    cand = c.get(f"/api/datasets/{ds['id']}/candidates?status=unreviewed").json()
+    assert cand[0]["case"]["metadata"]["provenance"]["source"] == "prompt-kit"
+    # A typo variation keeps the expectations and also goes to the queue.
+    v = c.post(f"/api/dataset-versions/{ds['latest']['id']}/cases/a/variations", json={"kinds": ["typo"]}).json()
+    assert v["created"] == 1
+    assert c.post(f"/api/dataset-versions/{ds['latest']['id']}/cases/a/variations", json={"kinds": ["zh"]}).status_code == 422
