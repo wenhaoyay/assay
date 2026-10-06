@@ -5,11 +5,10 @@ Kept as plain functions over a SQLAlchemy session so both front doors behave the
 
 from __future__ import annotations
 
-import re
-
 import asyncio
 import hashlib
 import json
+import re
 from datetime import UTC, datetime
 from typing import Any
 
