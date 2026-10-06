@@ -55,6 +55,20 @@ With labels from a person (H) and the judge (J) on the same trials:
 
 For numeric scores, `gaugelab.statistics` also provides MAE and Spearman's rank correlation.
 
+## What this looks like in practice
+
+In the Acme case study ([benchmarks/acme_support/README.md](../benchmarks/acme_support/README.md),
+section 3), `llama3.1:8b` with correctness rubric v1.0.0 disagreed with the phrase check on 18 of
+60 answers. Against the source documents it was right in 3 and wrong in 15, in two systematic
+ways: it failed correct answers that added true detail (although the rubric said not to), and
+it passed refusals of questions the reference answers (the rubric did not say that was a
+failure). The response followed the intended workflow: make both rules explicit in the rubric
+(v1.1.0, new prompt hash), re-grade the stored answers without calling the target, and compare.
+The re-grade fixed three verdicts and broke two others: a clearer rubric moved a weak judge's
+errors around without removing them. Only measured agreement with people settles whether a judge
+can be trusted.
+Uncalibrated, neither the judge nor the phrase check would have been safe to gate a release on.
+
 ## Limitations
 
 - Agreement is specific to **one judge model and one rubric version**. Change either and

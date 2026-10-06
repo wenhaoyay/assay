@@ -43,6 +43,15 @@ Python function, or a log of past answers can be evaluated, by configuration alo
 - **Regression gates and CI.** Thresholds and maximum drops against a baseline, PASS / FAIL /
   NOT_EVALUATED. The CLI exits 1 when a gate fails and writes JSON and Markdown summaries.
 
+## Screenshots
+
+| | |
+|---|---|
+| ![Run summary: gate, repeated trials](docs/screenshots/run-summary.png) | ![Why a trial failed](docs/screenshots/trial.png) |
+| **Run summary.** Rates with intervals and N, the regression gate, pass@k vs pass^k. | **A failed trial.** Every check with its reason, expected vs retrieved documents. |
+| ![Execution trace](docs/screenshots/trace.png) | ![Blind calibration](docs/screenshots/calibration.png) |
+| **Trace.** Retrieval, model and tool calls with arguments and results, then each evaluator. | **Calibration.** Label blind; the judge stays *Uncalibrated* until you do. |
+
 ## Architecture
 
 ```mermaid
@@ -140,6 +149,16 @@ real LLM.
 and passes the release gate, but it pays for that in tokens and latency, and two of its new
 rules caused regressions. The full case study, with failure examples traced end to end and a
 local-LLM-judge run, is in [benchmarks/acme_support/README.md](benchmarks/acme_support/README.md).
+
+**The most useful finding was about the evaluators themselves.** On 30 knowledge questions, a
+local 8B judge (Ollama `llama3.1:8b`) and the phrase check disagreed on 18 of 60 answers.
+Checked against the source documents, the judge was right in 3 (wrong-product answers the
+phrase check let through) and wrong in 15: it failed correct answers that added true detail,
+and passed refusals of answerable questions. That is how the candidate came out 13 points ahead on
+judged correctness while the phrase check had it 7 points behind. A clearer rubric (v1.1.0),
+re-graded on the stored answers without calling the agent, brought the delta back within noise
+but moved the judge's errors around rather than removing them. The lesson is the one the
+calibration page exists for: measure a judge against people before letting it gate a release.
 
 ## Golden datasets: who decides what is correct
 

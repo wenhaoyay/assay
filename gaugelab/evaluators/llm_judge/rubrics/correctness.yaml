@@ -1,9 +1,10 @@
 id: correctness
 name: Answer correctness
-version: "1.0.0"
+version: "1.1.0"
 needs: [reference]
-question: Do the answer's material factual claims agree with the reference?
+question: Does the answer give the reference's answer to the question, with no material claim that contradicts it?
 labels:
-  PASS: All material factual claims in the answer agree with the reference answer or reference evidence, and the task outcome (e.g. a status, a yes/no) is the same.
-  FAIL: At least one material factual claim contradicts the reference, or the answer gives a different task outcome. Extra correct detail is not a failure; wrong detail is.
+  PASS: The answer states the outcome the reference gives (e.g. the duration, status, yes/no) and none of its material claims contradicts the reference. Extra statements that do not contradict the reference are allowed and are NOT a reason to fail.
+  FAIL: A material claim contradicts the reference, or the answer gives a different outcome, or it does not give the reference's answer at all - including declining or saying the information is unavailable when the reference contains the answer.
   UNKNOWN: The reference is insufficient to decide whether the answer is correct.
+notes: "v1.1.0 (2026-10-06): under v1.0.0 a local 8B judge passed refusals of answerable questions (a refusal makes no false claim) and failed correct answers that added true detail. Both rules are now explicit."

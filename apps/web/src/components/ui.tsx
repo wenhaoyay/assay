@@ -122,7 +122,7 @@ export function StatusBadge({ status, className }: { status: string; className?:
 
 export function Field({ label, hint, children, error }: { label: string; hint?: ReactNode; children: ReactNode; error?: string }) {
   return (
-    <label className="block space-y-1">
+    <label className="flex flex-col items-stretch gap-1">
       <span className="text-xs font-medium text-ink-2">{label}</span>
       {children}
       {hint && !error && <span className="block text-xs text-ink-3">{hint}</span>}
@@ -134,7 +134,7 @@ export function Field({ label, hint, children, error }: { label: string; hint?: 
 const control =
   'rounded-md border border-line-strong bg-surface px-2.5 text-[13px] text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none'
 // Full width unless the caller sets a width (Tailwind cannot order two width utilities by class order).
-const width = (className?: string) => (/(^|\s)(max-)?w-/.test(className ?? '') ? '' : 'w-full')
+const width = (className?: string) => (/(^|\s)w-/.test(className ?? '') ? '' : 'w-full')
 
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={clsx(control, width(props.className), 'h-8', props.className)} />

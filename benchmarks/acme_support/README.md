@@ -125,7 +125,80 @@ pass@3 counts it as solved; pass^3 does not.
 
 ## 3. Local LLM judge on the knowledge questions
 
-<!-- LLM_JUDGE_SECTION -->
+Configs: `case-study/baseline-llm-judge.yaml`, `case-study/candidate-llm-judge.yaml`. A fixed
+reduced suite (`case_filter`: the 30 factual, multi-document and retrieval-trap questions), one
+trial each, graded for **answer correctness by a local LLM judge** (Ollama `llama3.1:8b`,
+temperature 0; nothing leaves the machine), next to every deterministic check. On this laptop's
+CPU a judge call takes about 30 seconds, which is why the suite is reduced. Judge cost: $0
+(local model, compute not priced).
+
+### Rubric v1.0.0: runs #3 (baseline) and #4 (candidate)
+
+| Metric (30 cases) | A | B | Delta | 95% CI (paired) |
+|---|---|---|---|---|
+| Correctness (LLM judge, v1.0.0) | 46.7% | 60.0% | +13.3pp | 0.0 to +30.0pp |
+| Must-mention check | 73.3% | 66.7% | -6.7pp | -20.0 to +6.7pp |
+| Refusal behaviour | 100.0% | 90.0% | -10.0pp | -20.0 to 0.0pp |
+| Overall pass rate (gating checks) | 40.0% | 43.3% | +3.3pp | -13.3 to +16.7pp |
+
+Two checks of the same answers point in opposite directions, so at least one of them is wrong.
+Both disagree on 18 of the 60 judged trials. Checked by hand against the fictional source
+documents, which are the ground truth by construction:
+
+- **The judge was right 3 times**, catching two answers that the phrase check passed wrongly.
+  `multi_01` on A is the generic warranty table, which contains "12 months" but never says 36.
+  `fact_02` (both variants) states Beta Pro's "24 hours" alongside Beta's 18.
+- **The judge was wrong 15 times**, in two systematic ways:
+  - **It failed correct answers that added true detail** (`fact_01`, `multi_02`, `multi_03`,
+    `multi_04`, `multi_06`, `trap_05`). For example: *"Device Beta Pro comes with a 24-month
+    standard warranty ... 12 months for Device Beta"*, judged FAIL because "the reference states
+    a 12-month warranty". The reference says *"24 months (Device Beta: 12)"*. The rubric already
+    said extra correct detail is not a failure; the 8B model did not follow it.
+  - **It passed refusals of answerable questions** (B: `fact_11`, `multi_01`, `trap_03`) and a
+    non-answer (`trap_07`). A refusal makes no false claim, and rubric v1.0.0 only failed
+    contradictions.
+
+So the candidate's "+13.3pp correctness" is mostly the judge's leniency towards the
+candidate's new refusals. **An uncalibrated small judge cannot be trusted on its own, and
+neither can a phrase check.** This is what the calibration page is for. A person labels a
+sample blind, and GaugeLab reports agreement (accuracy, kappa, the confusion matrix, the
+disagreements) before the judge's numbers are used for a decision. The labels above were not
+entered as calibration labels, because a person still needs to make them.
+
+### Rubric v1.1.0: re-graded without calling the agent
+
+Rubric v1.1.0 makes both rules explicit: extra statements that do not contradict the reference
+are not a failure, and declining a question that the reference answers is. The stored answers
+of runs #3 and #4 were then graded again (`POST /api/runs/{id}/reevaluate`). That created runs #5
+and #6 without calling the agent. The new prompt hash is recorded on every verdict, so v1.0.0
+and v1.1.0 grades are never mixed.
+
+| Metric (30 cases) | A (#5) | B (#6) | Delta | 95% CI (paired) |
+|---|---|---|---|---|
+| Correctness (LLM judge, v1.1.0) | 46.7% | 50.0% | +3.3pp | -13.3 to +16.7pp |
+| Must-mention check | 73.3% | 66.7% | -6.7pp | -20.0 to +6.7pp |
+
+The headline changed from "+13.3pp" to **within noise**, which agrees with the phrase check. But
+the judge did not become trustworthy. Checked against the documents again:
+
+- **3 verdicts fixed:** the `multi_01` refusal and the `trap_07` non-answer now FAIL, and
+  `fact_01` (correct, with true extra detail) now PASSES.
+- **2 verdicts broken:** `multi_07` and `trap_08`, both correct answers with a true extra
+  sentence, now FAIL for "adding an extra claim".
+- **Still wrong:** two refusals of answerable questions still PASS (`fact_11`, `trap_03`), and
+  four correct answers with extra detail still FAIL (`multi_02`, `multi_04`, `multi_06`, `trap_05`).
+
+Against the phrase check, the judge now disagrees on 17 of 60 answers, and is right in 3 of
+them, as before. **Conclusion:** with this rubric, an 8B local judge is a noisy signal, not
+evidence. A rubric wording change moved its errors around without removing them. The next steps
+are the ones GaugeLab is built for:
+
+1. label a sample in Calibration (blind) to measure the judge instead of guessing;
+2. try a stronger judge with the same rubric (`--judge openai:<model>` or a larger local model);
+3. keep the release gate on deterministic checks until a judge has a measured kappa.
+
+The rubric file records this history in its `notes` field.
+
 
 ## 4. The gate catching a regression
 
