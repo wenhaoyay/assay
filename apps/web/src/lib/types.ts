@@ -283,8 +283,8 @@ export interface Span {
 
 export interface TargetResult {
   answer: string
-  citations: { id: string; title?: string }[] | null
-  retrieved_documents: { id: string; title?: string; score?: number; text?: string }[] | null
+  citations: { id: string; title?: string; quote?: string; n?: number | string; label?: string }[] | null
+  retrieved_documents: { id: string; title?: string; score?: number; text?: string; n?: number | string; label?: string; page?: number | string; date?: string }[] | null
   tool_calls: { name: string; arguments: Record<string, unknown>; result: unknown; status: string }[] | null
   usage: { input_tokens?: number | null; output_tokens?: number | null; total_tokens?: number | null } | null
   provider: { provider?: string; model?: string } | null
@@ -301,6 +301,44 @@ export interface TrialDetail extends TrialRow {
   trace: { trace_id: string; spans: Span[] } | null
   sibling_trials: { id: number; trial_index: number; status: string }[]
   annotations: { dimension: string; label: string; annotator: string; note: string }[]
+  cause: Verdict | null
+  cause_ai: { cause: string; reason: string; confidence: string; model: string; cost_usd: number | null; at: string } | null
+}
+
+/** Why a failed answer failed (gaugelab/diagnosis.py). */
+export interface Verdict {
+  cause: string
+  label: string
+  kind: 'bot' | 'content' | 'test' | 'run' | 'unknown'
+  fix: string
+  evidence: string[]
+  source: 'rule' | 'you' | 'ai'
+  rule?: string
+  model?: string
+  confidence?: string
+  maybe?: string
+  needs_sources?: boolean
+}
+
+export interface CauseCount {
+  cause: string
+  label: string
+  kind: Verdict['kind']
+  fix: string
+  cases: number
+  examples: { trial_id: number; case_id: string; title: string; question?: string | null }[]
+}
+
+export interface RunCauses {
+  run_id: number
+  causes: CauseCount[]
+  by_trial: Record<string, Verdict>
+  by_case: Record<string, string>
+  sources_reported: boolean
+  documents: number
+  off_topic: string | null
+  kinds: Record<string, string>
+  unplaced: number[]
 }
 
 export interface ComparisonRow {
@@ -337,6 +375,7 @@ export interface Comparison {
   baseline_run: RunHeader
   candidate_run: RunHeader
   same_dataset_content: boolean
+  causes?: { fixed: CauseCount[]; broke: CauseCount[] }
   baseline_summary: Pick<RunSummary, 'metrics' | 'failures' | 'reliability' | 'n_cases' | 'trials_per_case'>
   candidate_summary: Pick<RunSummary, 'metrics' | 'failures' | 'reliability' | 'n_cases' | 'trials_per_case'>
 }

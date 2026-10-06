@@ -7,11 +7,12 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { TraceViewer } from '../components/TraceViewer'
 import { Badge, Button, Card, Consistency, ErrorState, Explain, Field, Input, Json, Kbd, PageSkeleton, Segmented, StatusBadge, Table, Term } from '../components/ui'
 import { AddFailureToDataset } from '../components/Golden'
+import { CauseBadge, CauseCard } from '../components/Causes'
 import { api } from '../lib/api'
 import { useCrumbs } from '../lib/crumbs'
 import { FAILURE_LABELS, ms, num, usd } from '../lib/format'
 import { useHotkey } from '../lib/hotkeys'
-import { groupByCase } from '../lib/trials'
+import { describePattern, groupByCase } from '../lib/trials'
 import type { Score, TrialDetail, TrialRow } from '../lib/types'
 
 const ORDER: Record<string, number> = { fail: 0, error: 1, unknown: 2, pass: 3, not_evaluated: 4, not_applicable: 5 }
@@ -98,6 +99,8 @@ export function TrialPage() {
   const other = scores.filter((s) => !['fail', 'error', 'pass'].includes(s.status) && (showNA || s.status !== 'not_applicable'))
   const relevant = new Set((c?.expected.relevant_documents ?? []).flatMap((d) => d.split('|')))
   const cited = new Set((r?.citations ?? []).map((x) => x.id))
+  const citedN = new Set((r?.citations ?? []).filter((x) => x.n != null).map((x) => String(x.n)))
+  const graded = tr.scores.some((sc) => sc.kind === 'llm_judge' && !['not_applicable', 'not_evaluated'].includes(sc.status))
   const answerFailed = tr.failure_types.some((f) => ANSWER_FAILURES.has(f))
   const mustMention = c?.expected.answer.must_mention ?? []
   const mustNot = c?.expected.answer.must_not_claim ?? []
@@ -192,23 +195,17 @@ export function TrialPage() {
               <dt className="text-ink-3">Latency</dt><dd className="num text-right">{ms(tr.latency_ms)}</dd>
               <dt className="text-ink-3">Tokens</dt><dd className="num text-right">{num(tr.total_tokens)}</dd>
               <dt className="text-ink-3">Bot cost (est.)</dt><dd className="num text-right">{usd(tr.target_cost_usd)}</dd>
-              <dt className="text-ink-3">Grading cost (est.)</dt><dd className="num text-right">{usd(tr.judge_cost_usd)}</dd>
+              <dt className="text-ink-3">Grading cost (est.)</dt><dd className="num text-right">{graded || tr.judge_cost_usd != null ? usd(tr.judge_cost_usd) : <span title="No grading model was asked about this answer">$0, no grading model</span>}</dd>
               <dt className="text-ink-3">Attempts</dt><dd className="num text-right">{tr.attempts}</dd>
             </dl>
           </Card>
           <Card title={`Retrieved documents${r?.retrieved_documents ? ` (${r.retrieved_documents.length})` : ''}`} padded={!r?.retrieved_documents?.length}>
             {r?.retrieved_documents == null ? <p className="text-[13px] text-ink-3">Not reported by the bot.</p> : r.retrieved_documents.length === 0 ? <p className="text-[13px] text-ink-3">None.</p> : (
               <Table>
-                <thead><tr><th>#</th><th>Document</th><th className="text-right">Score</th><th></th></tr></thead>
+                <thead><tr><th>#</th><th>Source</th><th className="text-right">Score</th><th></th></tr></thead>
                 <tbody>
-                  {r.retrieved_documents.map((d, i) => (
-                    <tr key={`${d.id}-${i}`}>
-                      <td className="num text-ink-3">{i + 1}</td>
-                      <td className="font-mono text-xs" title={d.text}>{d.id}</td>
-                      <td className="num text-right text-xs">{d.score != null ? d.score.toFixed(3) : '-'}</td>
-                      <td className="space-x-1 whitespace-nowrap">{relevant.has(d.id) && <Badge tone="good">expected</Badge>}{cited.has(d.id) && <Badge tone="accent">cited</Badge>}</td>
-                    </tr>
-                  ))}
+                  {r.retrieved_documents.map((d, i) => <SourceRow key={`${d.id}-${i}`} d={d} i={i} expected={relevant.has(d.id)}
+                    cited={d.n != null && citedN.size ? citedN.has(String(d.n)) : cited.has(d.id)} />)}
                   {[...relevant].filter((d) => !r.retrieved_documents!.some((x) => x.id === d)).map((d) => (
                     <tr key={`missing-${d}`}><td className="text-ink-3">-</td><td className="font-mono text-xs text-bad-ink">{d}</td><td></td><td><Badge tone="bad">expected, not retrieved</Badge></td></tr>
                   ))}
@@ -229,6 +226,7 @@ export function TrialPage() {
               </ol>
             )}
           </Card>
+          {tr.cause && <CauseCard t={tr} />}
           <FailureAnnotation t={tr} />
           <Card title="Response" actions={<Segmented size="sm" value={rawTab} onChange={setRawTab} options={[{ id: 'normalized', label: 'As GaugeLab read it' }, { id: 'raw', label: 'Raw' }]} />}>
             <Json value={rawTab === 'raw' ? tr.raw : r} maxHeight={320} />
@@ -261,6 +259,12 @@ function Verdict({ t, failing }: { t: TrialDetail; failing: Score[] }) {
             </div>
           ))}
           {t.result?.error && <div className="text-[13px]">{t.result.error}</div>}
+          {t.cause && (
+            <div className="flex flex-wrap items-center gap-1.5 pt-0.5 text-[13px]">
+              <span className="text-ink-2">Likely cause:</span><CauseBadge v={t.cause} />
+              {t.cause.evidence[0] && <span className="text-ink-2">{t.cause.evidence[0]}</span>}
+            </div>
+          )}
         </div>
       </div>
     </motion.div>
@@ -273,6 +277,10 @@ function Expectations({ c }: { c: NonNullable<TrialDetail['case']> }) {
   if (e.answer.reference) rows.push(['Reference answer', e.answer.reference])
   if (e.answer.must_mention.length) rows.push(['Must mention', e.answer.must_mention.map((m) => <code key={m} className="mr-1 rounded bg-good-wash px-1 text-good-ink">{m}</code>)])
   if (e.answer.must_not_claim.length) rows.push(['Must not claim', e.answer.must_not_claim.map((m) => <code key={m} className="mr-1 rounded bg-bad-wash px-1 text-bad-ink">{m}</code>)])
+  if (e.answer.regex.length) rows.push(['Must match', <PatternList key="re" patterns={e.answer.regex} tone="good" />])
+  if (e.answer.forbidden_regex?.length) rows.push(['Must not match', <PatternList key="fre" patterns={e.answer.forbidden_regex} tone="bad" />])
+  if (e.answer.exact) rows.push(['Exact answer', e.answer.exact])
+  if (Number(e.min_citations ?? 0) > 0) rows.push(['Citations', `at least ${Number(e.min_citations)}`])
   if (e.relevant_documents.length) rows.push(['Documents needed', e.relevant_documents.join(', ')])
   if (e.required_tools.length) rows.push(['Required tools', e.required_tools.join(', ')])
   if (e.tool_calls.length) rows.push(['Expected calls', e.tool_calls.map((t) => `${t.name}(${JSON.stringify(t.arguments)})`).join('; ')])
@@ -288,6 +296,48 @@ function Expectations({ c }: { c: NonNullable<TrialDetail['case']> }) {
         </dl>
       )}
     </div>
+  )
+}
+
+function PatternList({ patterns, tone }: { patterns: string[]; tone: 'good' | 'bad' }) {
+  return (
+    <ul className="space-y-0.5">
+      {patterns.map((p) => {
+        const plain = describePattern(p)
+        return (
+          <li key={p}>
+            {plain ? <span>{plain}</span> : null}
+            <code className={clsx('block break-all rounded px-1 font-mono text-[11px]', plain ? 'text-ink-3' : tone === 'good' ? 'bg-good-wash text-good-ink' : 'bg-bad-wash text-bad-ink')}>{p}</code>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+type Source = NonNullable<NonNullable<TrialDetail['result']>['retrieved_documents']>[number]
+
+function SourceRow({ d, i, expected, cited }: { d: Source; i: number; expected: boolean; cited: boolean }) {
+  const [open, setOpen] = useState(false)
+  const where = d.label ?? (d.page != null ? `p. ${d.page}` : null)
+  return (
+    <>
+      <tr className={clsx(d.text && 'cursor-pointer hover:bg-surface-2/60')} onClick={() => d.text && setOpen((v) => !v)}>
+        <td className="num align-top text-ink-3">{d.n ?? i + 1}</td>
+        <td className="align-top">
+          <div className="flex items-start gap-1">
+            {d.text && <ChevronRight className={clsx('mt-0.5 size-3.5 shrink-0 text-ink-3 transition-transform', open && 'rotate-90')} />}
+            <span className="min-w-0">
+              <span className="block text-xs font-medium">{d.title ?? d.id}</span>
+              <span className="block font-mono text-[11px] text-ink-3">{where ? `${where} - ` : ''}{d.id}{d.date ? ` - ${d.date}` : ''}</span>
+            </span>
+          </div>
+        </td>
+        <td className="num text-right align-top text-xs">{d.score != null ? (Math.abs(d.score) >= 10 ? d.score.toFixed(1) : d.score.toFixed(3)) : '-'}</td>
+        <td className="space-x-1 whitespace-nowrap align-top">{expected && <Badge tone="good">expected</Badge>}{cited && <Badge tone="accent">cited</Badge>}</td>
+      </tr>
+      {open && d.text && <tr><td /><td colSpan={3}><div className="max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-surface-2/60 p-2 text-xs text-ink-2">{d.text}</div></td></tr>}
+    </>
   )
 }
 

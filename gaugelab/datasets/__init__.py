@@ -106,6 +106,16 @@ CSV_COLUMNS = {"id", "question", "message", "reference_answer", "expected_answer
                "must_mention", "must_not_claim", "relevant_documents", "required_tools", "refusal_expected"}
 
 
+def short_title(text: str, limit: int = 80) -> str:
+    """A title from longer text: its first sentence if that fits, else cut at a word with an ellipsis."""
+    text = " ".join((text or "").split())
+    first = re.split(r"(?<=[.!?])\s", text, maxsplit=1)[0]
+    if len(first) <= limit:
+        return first
+    cut = first[: limit - 1].rsplit(" ", 1)[0].rstrip(" ,;:")
+    return cut + "…"
+
+
 # Plain column names (the spreadsheet template for colleagues) and their technical names.
 BOM = "\ufeff"  # Excel writes one at the start of a UTF-8 CSV
 

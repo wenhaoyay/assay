@@ -4,6 +4,7 @@ import { ChevronRight, GitCompareArrows, RotateCcw, Search, Square } from 'lucid
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { CauseBadge, FixFirst, useRunCauses } from '../components/Causes'
 import { CountBars, IntervalBar, PairedBars } from '../components/charts'
 import { ShareMenu } from '../components/Share'
 import { TraceViewer } from '../components/TraceViewer'
@@ -18,7 +19,7 @@ import { useCrumbs } from '../lib/crumbs'
 import { duration, FAILURE_LABELS, ms, num, pct, score, usd, when } from '../lib/format'
 import { useHotkey, useListNav } from '../lib/hotkeys'
 import { groupByCase, type CaseGroup } from '../lib/trials'
-import type { EvaluatorInfo, Gate, GateResult, ProviderConfig, Reliability, RunDetail, RunHeader, RunSummary, Stage, TrialDetail, TrialRow } from '../lib/types'
+import type { EvaluatorInfo, Gate, GateResult, ProviderConfig, Reliability, RunDetail, RunHeader, RunSummary, Stage, TrialDetail, TrialRow, Verdict } from '../lib/types'
 
 type RTab = 'summary' | 'cases' | 'failures' | 'metrics' | 'traces' | 'config'
 const TABS: RTab[] = ['summary', 'cases', 'failures', 'metrics', 'traces', 'config']
@@ -109,7 +110,7 @@ export function RunPage() {
             <motion.div key={tab} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
               {tab === 'summary' && <SummaryTab r={r} s={s} prev={prev} />}
               {tab === 'cases' && <CasesTab runId={r.id} />}
-              {tab === 'failures' && <FailuresTab runId={r.id} s={s} />}
+              {tab === 'failures' && <FailuresTab runId={r.id} s={s} targetId={r.target_id} />}
               {tab === 'metrics' && <MetricsTab s={s} heuristic={heur} />}
               {tab === 'traces' && <TracesTab runId={r.id} />}
               {tab === 'config' && <ConfigTab r={r} />}
@@ -237,6 +238,7 @@ function SummaryTab({ r, s, prev }: { r: RunDetail; s: RunSummary; prev: RunHead
         <Stat label="Bot cost / question" value={usd(s.metrics.average_cost_usd)} sub={tel.target_cost_n ? 'from the price table' : 'unknown: no usage or price'} />
         <Stat label="Grading cost" value={usd(s.metrics.total_judge_cost_usd)} sub={r.judge ? (r.judge.provider === 'heuristic' ? 'heuristic: free' : `${r.judge.model}`) : 'no judge'} hatched={r.judge?.provider === 'heuristic'} />
       </div>
+      {s.failed_trials > 0 && <FixFirst runId={r.id} targetId={r.target_id} compact onPick={(c) => nav(`?tab=failures&cause=${c ?? ''}`)} />}
       <div className="grid gap-5 lg:grid-cols-2">
         <GateCard r={r} />
         <Card title="Consistency over repeated tries">
@@ -280,7 +282,9 @@ function useTrials(runId: number, filters: Record<string, string | undefined>) {
 }
 
 /** Cases, one row each, with a dot per try. Enter opens the first failing try (or the first). */
-export function CaseTable({ groups, showChecks = true, keyboard = true, highlight }: { groups: CaseGroup[]; showChecks?: boolean; keyboard?: boolean; highlight?: string | null }) {
+export function CaseTable({ groups, showChecks = true, keyboard = true, highlight, causes }: {
+  groups: CaseGroup[]; showChecks?: boolean; keyboard?: boolean; highlight?: string | null; causes?: Record<string, Verdict>
+}) {
   const nav = useNavigate()
   const open = (g: CaseGroup) => nav(`/trials/${(g.firstFailing ?? g.trials[0]).id}`, { viewTransition: true })
   const [active] = useListNav(groups.length, (i) => open(groups[i]), keyboard)
@@ -302,6 +306,7 @@ export function CaseTable({ groups, showChecks = true, keyboard = true, highligh
             <td>
               {showChecks && (
                 <div className="flex flex-wrap gap-1">
+                  {causes && g.firstFailing && causes[g.firstFailing.id] && <CauseBadge v={causes[g.firstFailing.id]} />}
                   {g.failure_types.map((f) => <Badge key={f} tone="bad">{FAILURE_LABELS[f] ?? f}</Badge>)}
                   {g.failed_evaluators.slice(0, 4).map((e) => <Badge key={e}>{e}</Badge>)}
                 </div>
@@ -322,6 +327,7 @@ function CasesTab({ runId }: { runId: number }) {
   const caseId = params.get('case') ?? ''
   const [search, setSearch] = useState('')
   const q = useTrials(runId, {})
+  const causes = useRunCauses(runId)
   const groups = useMemo(() => groupByCase(q.data ?? []), [q.data])
   const cats = useMemo(() => [...new Set(groups.map((g) => g.category).filter(Boolean))] as string[], [groups])
   const rows = groups.filter((g) => (!state || g.state === state) && (!category || g.category === category) && (!caseId || g.case_id === caseId)
@@ -341,7 +347,7 @@ function CasesTab({ runId }: { runId: number }) {
         {caseId && <Button size="sm" variant="ghost" onClick={() => set('case', '')}>Case {caseId} ×</Button>}
         <span className="ml-auto text-xs text-ink-3">{rows.length} cases, {q.data?.length ?? 0} tries</span>
       </div>
-      <Card padded={false}>{q.isLoading ? <Loading /> : q.isError ? <ErrorState error={q.error} /> : rows.length === 0 ? <p className="p-4 text-[13px] text-ink-3">No case matches.</p> : <CaseTable groups={rows} highlight={caseId || null} />}</Card>
+      <Card padded={false}>{q.isLoading ? <Loading /> : q.isError ? <ErrorState error={q.error} /> : rows.length === 0 ? <p className="p-4 text-[13px] text-ink-3">No case matches.</p> : <CaseTable groups={rows} highlight={caseId || null} causes={causes.data?.by_trial} />}</Card>
     </div>
   )
 }
@@ -352,30 +358,38 @@ const STAGE_TYPES: Record<string, string[]> = {
   performance: ['latency_regression', 'cost_regression'], execution: ['execution_error', 'unknown', 'judge_disagreement'],
 }
 
-function FailuresTab({ runId, s }: { runId: number; s: RunSummary }) {
+function FailuresTab({ runId, s, targetId }: { runId: number; s: RunSummary; targetId?: number | null }) {
   const [params, setParams] = useSearchParams()
   const selected = params.get('failure')
   const stage = params.get('stage')
+  const cause = params.get('cause') || null
+  const causes = useRunCauses(runId)
   const q = useTrials(runId, {})
   const failing = useMemo(() => groupByCase((q.data ?? []).filter((t) => t.status === 'failed' || t.status === 'error')), [q.data])
   const all = useMemo(() => groupByCase(q.data ?? []), [q.data])
   const statusOf = useMemo(() => Object.fromEntries(all.map((g) => [g.case_id, g.statuses])), [all])
-  const rows = failing.filter((g) => (!selected || g.failure_types.includes(selected)) && (!stage || g.failure_types.some((f) => STAGE_TYPES[stage]?.includes(f))))
+  const causeOf = (g: CaseGroup) => (g.firstFailing ? causes.data?.by_trial?.[g.firstFailing.id]?.cause : undefined)
+  const rows = failing.filter((g) => (!selected || g.failure_types.includes(selected)) && (!stage || g.failure_types.some((f) => STAGE_TYPES[stage]?.includes(f)))
+    && (!cause || causeOf(g) === cause))
     .map((g) => ({ ...g, statuses: statusOf[g.case_id] ?? g.statuses }))
     .sort((a, b) => a.passed - b.passed)
   const data = Object.entries(s.failures).map(([key, value]) => ({ key, label: FAILURE_LABELS[key] ?? key, value })).sort((a, b) => b.value - a.value)
   if (data.length === 0) return <Empty title="No failures">Every scored try passed its gating checks. The Metrics tab shows checks that did not apply or could not run.</Empty>
-  const toggle = (k: string) => setParams((p) => { if (selected === k) p.delete('failure'); else { p.set('failure', k); p.delete('stage') } return p })
+  const toggle = (k: string) => setParams((p) => { if (selected === k) p.delete('failure'); else { p.set('failure', k); p.delete('stage'); p.delete('cause') } return p })
+  const pickCause = (c: string | null) => setParams((p) => { if (c) { p.set('cause', c); p.delete('failure'); p.delete('stage') } else p.delete('cause'); return p })
   return (
-    <div className="grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)]" data-tour="failures">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-5 xl:grid-cols-[400px_minmax(0,1fr)]" data-tour="failures">
+      <div className="min-w-0 space-y-5">
+      <FixFirst runId={runId} targetId={targetId} selected={cause} onPick={pickCause} />
       <Card title="By kind of failure" subtitle={`${s.failed_trials} failed tries in ${failing.length} cases`}>
         <CountBars data={data} selected={selected} onSelect={toggle} />
         <Explain className="mt-2">A try counts once for each kind of failure it shows, so these add up to more than the failed tries.</Explain>
-        {(selected || stage) && <Button size="sm" variant="ghost" className="mt-2" onClick={() => setParams((p) => { p.delete('failure'); p.delete('stage'); return p })}>Clear filter</Button>}
+        {(selected || stage || cause) && <Button size="sm" variant="ghost" className="mt-2" onClick={() => setParams((p) => { p.delete('failure'); p.delete('stage'); p.delete('cause'); return p })}>Clear filter</Button>}
       </Card>
-      <Card padded={false} title={selected ? FAILURE_LABELS[selected] ?? selected : stage ? `Stage: ${stage}` : 'Failing cases'}
+      </div>
+      <Card padded={false} title={cause ? causes.data?.causes?.find((c) => c.cause === cause)?.label ?? cause : selected ? FAILURE_LABELS[selected] ?? selected : stage ? `Stage: ${stage}` : 'Failing cases'}
         subtitle={`${rows.length} case(s) - most consistent failures first - J/K, Enter`}>
-        {q.isLoading ? <Loading /> : <CaseTable groups={rows} />}
+        {q.isLoading ? <Loading /> : <CaseTable groups={rows} causes={causes.data?.by_trial} />}
       </Card>
     </div>
   )

@@ -151,3 +151,31 @@ class NDCGAtK(_RetrievalEvaluator):
 
     def compute(self, retrieved, relevant, k):
         return ndcg_at_k(retrieved, relevant, k)
+
+
+@register
+class SearchFoundIt(Evaluator):
+    """Search tested on its own, with no document labels: what a correct answer must mention should
+    already be in the passages the bot read. Runs against a search-only endpoint cost no answers."""
+
+    id = "search_found_it"
+    name = "Search found it"
+    kind = "retrieval"
+    failure_type = "retrieval_miss"
+    description = ("Every must-mention phrase is in the passages the bot read (no document labels needed). "
+                   "With a search-only connection it tests search without paying for answers.")
+
+    async def evaluate(self, case: TestCase, result: NormalizedTargetResult, trace: Trace | None,
+                       ctx: EvalContext) -> EvaluationResult:
+        phrases = case.expected.answer.must_mention
+        if not phrases:
+            return self.na("No must-mention phrases to look for.")
+        if result.retrieved_documents is None:
+            return self.missing("retrieved passages")
+        text = "\n".join(f"{d.title or ''}\n{d.text or ''}" for d in result.retrieved_documents).lower()
+        missing = [p for p in phrases if not any(a.strip().lower() in text for a in p.split("|") if a.strip())]
+        n = len(result.retrieved_documents)
+        return self.passed(not missing, score=1 - len(missing) / len(phrases),
+                           explanation=(f"All {len(phrases)} phrase(s) are in the {n} passages read." if not missing
+                                        else f"Not in the {n} passages read: {', '.join(missing)}."),
+                           evidence=missing)

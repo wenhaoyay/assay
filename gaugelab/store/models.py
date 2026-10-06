@@ -209,6 +209,10 @@ class Trial(Base):
     attempts: Mapped[int] = mapped_column(Integer, default=1)
     failure_types_override: Mapped[list[Any] | None] = mapped_column(NullableJSON, nullable=True)
     failure_note: Mapped[str] = mapped_column(Text, default="")
+    # Why it failed: a person's choice beats the rule-based diagnosis; the model's explanation is
+    # kept for failures the rules could not place.
+    cause_override: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    cause_ai: Mapped[dict[str, Any] | None] = mapped_column(NullableJSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     scores: Mapped[list[Score]] = relationship(back_populates="trial", cascade="all, delete-orphan")
 

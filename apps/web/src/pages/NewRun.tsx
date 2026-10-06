@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { ChevronDown, Clock, Coins, Gauge, Play, Rocket, ShieldCheck, Sparkles, Zap } from 'lucide-react'
+import { ChevronDown, Clock, Coins, Gauge, Play, Rocket, ScanSearch, ShieldCheck, Sparkles, Zap } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
@@ -25,11 +25,12 @@ const KIND_LABEL: Record<string, string> = {
 // Used in default run names (month-day); fixed at load so a render never reads the clock.
 const TODAY = new Date().toISOString().slice(5, 10)
 
-type Preset = 'smoke' | 'release' | 'full' | 'custom'
+type Preset = 'smoke' | 'release' | 'full' | 'search' | 'custom'
 const PRESETS: { id: Preset; title: string; body: string; icon: typeof Zap }[] = [
   { id: 'smoke', title: 'Quick smoke', body: 'Objective checks only, 1 try per question. Free and fast.', icon: Zap },
   { id: 'release', title: 'Release gate', body: 'Default checks, 3 tries (shows flakiness), the release gate.', icon: ShieldCheck },
   { id: 'full', title: 'Full + grading model', body: 'Everything, including meaning checks by the default judge.', icon: Sparkles },
+  { id: 'search', title: 'Search only', body: 'Did search find what a correct answer needs? With a search-only connection, no answer is paid for.', icon: ScanSearch },
   { id: 'custom', title: 'Custom', body: 'Pick each check yourself.', icon: Gauge },
 ]
 
@@ -93,6 +94,7 @@ export function NewRunPage() {
   const [project, setProject] = useState<number | ''>(Number(params.get('project')) || '')
   const [pickedTarget, setTargetVersionId] = useState<number | ''>('')
   const [pickedDataset, setDatasetVersionId] = useState<number | ''>('')
+  const [allowOther, setAllowOther] = useState(false)
   const [typedName, setName] = useState<string | null>(null)
   const [preset, setPreset] = useState<Preset>('release')
   const [custom, setCustom] = useState<string[] | null>(null)
@@ -120,24 +122,29 @@ export function NewRunPage() {
     preset === 'smoke' ? evaluators.filter((e) => ['deterministic', 'retrieval', 'agent', 'performance'].includes(e.kind) && e.gating).map((e) => e.id)
     : preset === 'release' ? defaults.filter((e) => !judgeIds.includes(e) || judgeValue)
     : preset === 'full' ? [...evaluators.filter((e) => e.kind !== 'llm_judge').map((e) => e.id), ...judgeIds]
+    : preset === 'search' ? evaluators.filter((e) => e.kind === 'retrieval').map((e) => e.id)
     : custom ?? defaults
   const checks = preset === 'custom' ? (custom ?? presetChecks) : presetChecks
   const choosePreset = (p: Preset) => {
     setPreset(p)
-    if (p === 'smoke') setTrials(1)
+    if (p === 'smoke' || p === 'search') setTrials(1)
     if (p === 'release' || p === 'full') setTrials(3)
   }
 
   const projectTargets = (targets.data ?? []).filter((t) => !project || t.project_id === project)
-  const projectDatasets = (datasets.data ?? []).filter((d) => !project || d.project_id === project)
   // Until you pick, the version used by the most recent run, and the chatbot's first dataset.
   const lastLive = (recent.data ?? []).find((r) => r.source === 'live' && projectTargets.some((t) => t.id === r.target_id))
   const defaultTarget = (projectTargets.find((t) => t.id === lastLive?.target_id) ?? projectTargets[0])?.latest_version.id ?? ''
   const targetVersionId = pickedTarget || defaultTarget
-  const datasetVersionId = pickedDataset || (projectDatasets[0]?.latest?.id ?? '')
   const tv = (targets.data ?? []).find((t) => t.latest_version.id === targetVersionId)
   const name = typedName ?? (tv ? `${tv.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${TODAY}` : '')
   const effectiveProject = project || tv?.project_id || ''
+  // The questions belong to the chatbot of the chosen connection; another chatbot's are off-topic for it.
+  const projectDatasets = (datasets.data ?? []).filter((d) => !effectiveProject || d.project_id === effectiveProject)
+  const otherDatasets = effectiveProject ? (datasets.data ?? []).filter((d) => d.project_id !== effectiveProject) : []
+  const datasetVersionId = pickedDataset || (projectDatasets[0]?.latest?.id ?? '')
+  const otherPicked = otherDatasets.find((d) => d.versions.some((v) => v.id === datasetVersionId))
+  const ownerName = (id: number) => projects.all.find((p) => p.id === id)?.name ?? 'another chatbot'
   const projectGates = (gates.data ?? []).filter((g) => !effectiveProject || g.project_id === effectiveProject)
   const gateValue = gateId === null ? (preset === 'release' ? projectGates[0]?.id ?? '' : '') : gateId
   const gate = projectGates.find((g) => g.id === gateValue)
@@ -171,6 +178,7 @@ export function NewRunPage() {
       max_answers: maxAnswers ? Number(maxAnswers) : null,
       gate_id: gateValue || null,
       options: maxLatency ? { max_latency_ms: Number(maxLatency) } : {},
+      allow_other_chatbot: !!otherPicked && allowOther,
     }),
     onSuccess: (r) => { qc.invalidateQueries({ queryKey: ['runs'] }); qc.invalidateQueries({ queryKey: ['activity'] }); nav(`/runs/${r.id}`, { viewTransition: true }) },
   })
@@ -211,12 +219,32 @@ export function NewRunPage() {
               <Field label="Questions (dataset version)" hint="Running freezes this version; later edits create a new one.">
                 <Select value={datasetVersionId} onChange={(ev) => { if (ev.target.value === '__add') { setAdding(true); return } setDatasetVersionId(ev.target.value ? Number(ev.target.value) : '') }} aria-label="Dataset version">
                   <option value="">{projectDatasets.length ? 'Choose...' : effectiveProject ? 'No questions for this chatbot yet' : 'Choose...'}</option>
-                  {projectDatasets.flatMap((d) => d.versions.map((v) => <option key={v.id} value={v.id}>{d.name} v{v.version} ({v.case_count} cases{v.status === 'draft' ? ', draft' : ''})</option>))}
+                  {otherDatasets.length > 0 ? (
+                    <optgroup label="This chatbot's questions">
+                      {projectDatasets.flatMap((d) => d.versions.map((v) => <option key={v.id} value={v.id}>{d.name} v{v.version} ({v.case_count} cases{v.status === 'draft' ? ', draft' : ''})</option>))}
+                    </optgroup>
+                  ) : projectDatasets.flatMap((d) => d.versions.map((v) => <option key={v.id} value={v.id}>{d.name} v{v.version} ({v.case_count} cases{v.status === 'draft' ? ', draft' : ''})</option>))}
+                  {otherDatasets.length > 0 && (
+                    <optgroup label="Other chatbots' questions (off-topic for this one)">
+                      {otherDatasets.flatMap((d) => d.versions.map((v) => <option key={v.id} value={v.id}>{d.name} v{v.version} - {ownerName(d.project_id)}</option>))}
+                    </optgroup>
+                  )}
                   {effectiveProject && <option value="__add">+ Import or type questions...</option>}
                 </Select>
               </Field>
               <Field label="Run name"><Input value={name} onChange={(ev) => setName(ev.target.value)} aria-label="Run name" /></Field>
             </div>
+            {otherPicked && (
+              <div className="mt-3" data-testid="other-chatbot-warning">
+                <Notice tone="warn" title={`These questions were written for ${ownerName(otherPicked.project_id)}`}>
+                  {tv?.name ?? 'This connection'} belongs to {ownerName(Number(effectiveProject))}: it will answer them off-topic, and each answer may be billed. Their failures say nothing about this bot.
+                  <label className="mt-2 flex items-center gap-2 text-[13px] font-medium text-ink">
+                    <input type="checkbox" className="accent-[var(--accent)]" checked={allowOther} onChange={(ev) => setAllowOther(ev.target.checked)} />
+                    I mean to use them (say, a successor bot or a shared safety set)
+                  </label>
+                </Notice>
+              </div>
+            )}
             {effectiveProject && !projectDatasets.length && !datasets.isLoading && (
               <div className="mt-3"><Notice tone="info" title="This chatbot has no questions yet" action={<Button size="sm" variant="primary" onClick={() => setAdding(true)}>Add questions</Button>}>
                 Import a file (YAML, JSON or a spreadsheet CSV), or type a few questions, without leaving this page.
@@ -229,7 +257,7 @@ export function NewRunPage() {
           </Card>
 
           <Card title="2. How thoroughly">
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4" role="radiogroup" aria-label="Preset">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5" role="radiogroup" aria-label="Preset">
               {PRESETS.map((p) => (
                 <button key={p.id} type="button" role="radio" aria-checked={preset === p.id} onClick={() => { choosePreset(p.id); if (p.id === 'custom') { setCustom(checks); setShowChecks(true) } }}
                   className={clsx('relative rounded-xl border p-3 text-left transition-colors', preset === p.id ? 'border-accent bg-accent-wash/60' : 'border-line hover:border-line-strong')}>
@@ -344,7 +372,7 @@ export function NewRunPage() {
             <Explain className="mt-3">Estimates come from how long earlier runs of this version took. A local grading model on a CPU is slow (tens of seconds per call).</Explain>
             {touched && errors.length > 0 && <div className="mt-3"><Notice tone="warn" title="Before starting"><ul className="list-disc pl-4">{errors.map((x) => <li key={x}>{x}</li>)}</ul></Notice></div>}
             {start.isError && <div className="mt-3"><ErrorState error={start.error} /></div>}
-            <Button variant="primary" size="lg" className="mt-4 w-full" loading={start.isPending} disabled={!!e?.blocked}
+            <Button variant="primary" size="lg" className="mt-4 w-full" loading={start.isPending} disabled={!!e?.blocked || (!!otherPicked && !allowOther)}
               onClick={() => { setTouched(true); if (!errors.length) start.mutate() }}>
               <Play className="size-4" /> Create and run
             </Button>

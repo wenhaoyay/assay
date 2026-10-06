@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from gaugelab.analysis import FAILURE_TYPES
 from gaugelab.evaluators import REGISTRY, get_evaluator
 from gaugelab.report import markdown_summary
+from gaugelab.store import causes as cz
 from gaugelab.store import models as m
 from gaugelab.store import service as svc
 
@@ -55,6 +56,9 @@ class ExperimentIn(BaseModel):
     redact_fields: list[str] = Field(default_factory=list)
     case_filter: dict[str, list[str]] | None = None  # reduced suite: {categories, tags, ids}
     gate_id: int | None = None
+    # Questions written for another chatbot are off-topic for this one, and each answer may be billed:
+    # refused unless asked for on purpose (a successor bot, a shared safety suite).
+    allow_other_chatbot: bool = False
 
 
 @router.get("/experiments")
@@ -84,7 +88,15 @@ def create_experiment(body: ExperimentIn, s: Session = Depends(get_session)) -> 
 
     if reason := judge_allowed(s, tv.target_id, body.judge):
         raise HTTPException(422, reason)
-    data = body.model_dump()
+    target = svc.get(s, m.Target, tv.target_id)
+    ds = svc.get(s, m.Dataset, svc.get(s, m.DatasetVersion, body.dataset_version_id).dataset_id)
+    if ds.project_id != target.project_id and not body.allow_other_chatbot:
+        owner, bot = s.get(m.Project, ds.project_id), s.get(m.Project, target.project_id)
+        raise HTTPException(409, f"'{ds.name}' was written for {owner.name if owner else 'another chatbot'}; "
+                                 f"{target.name} belongs to {bot.name if bot else 'another chatbot'}. Its answers "
+                                 "would be off-topic, and each may be billed. Pick this chatbot's questions, or "
+                                 "confirm that you mean to use another chatbot's.")
+    data = body.model_dump(exclude={"allow_other_chatbot"})
     e = svc.create_experiment(s, data.pop("project_id"), data.pop("name"), data.pop("target_version_id"),
                               data.pop("dataset_version_id"), data.pop("evaluators"), data.pop("judge"),
                               data.pop("gate_id"), description=data.pop("description"), **data)
@@ -135,6 +147,8 @@ def list_runs(experiment_id: int | None = None, limit: int = 100, s: Session = D
 @router.get("/runs/compare")
 def compare(baseline: int, candidate: int, s: Session = Depends(get_session)) -> dict[str, Any]:
     out = svc.compare_runs(s, baseline, candidate)
+    out["causes"] = cz.compare_causes(s, baseline, candidate, [x["case_id"] for x in out["improvements"]],
+                                      [x["case_id"] for x in out["regressions"]])
     # The full per-run summaries are large; the comparison page reads what it needs from the top level.
     for side in ("baseline", "candidate"):
         summary = out.pop(side)
@@ -274,6 +288,7 @@ def get_trial(trial_id: int, s: Session = Depends(get_session)) -> dict[str, Any
             "result": t.result, "raw": t.raw, "scores": [ser.score(sc) for sc in t.scores],
             "trace": trace.model_dump(mode="json") if trace else None,
             "sibling_trials": [{"id": o.id, "trial_index": o.trial_index, "status": o.status} for o in others],
+            "cause": cz.trial_cause(s, t), "cause_ai": t.cause_ai,
             "annotations": [{"dimension": a.dimension, "label": a.label, "annotator": a.annotator, "note": a.note}
                             for a in s.scalars(select(m.HumanAnnotation).where(m.HumanAnnotation.trial_id == t.id))]}
 
@@ -294,6 +309,69 @@ def override_failure(trial_id: int, body: FailureOverride, s: Session = Depends(
     t.failure_note = body.note
     svc.refresh_summary(s, svc.get(s, m.Run, t.run_id))
     return ser.trial_row(t)
+
+
+# --------------------------------------------------------------------------------------
+# Why it failed
+# --------------------------------------------------------------------------------------
+
+
+@router.get("/runs/{run_id}/causes")
+def run_causes(run_id: int, s: Session = Depends(get_session)) -> dict[str, Any]:
+    """Each failure's likely cause, counted largest first, with what to change in the bot."""
+    return cz.run_causes(s, run_id)
+
+
+class CauseIn(BaseModel):
+    cause: str | None  # None: back to the automatic verdict
+
+
+@router.put("/trials/{trial_id}/cause")
+def set_cause(trial_id: int, body: CauseIn, s: Session = Depends(get_session)) -> dict[str, Any]:
+    from gaugelab.diagnosis import CAUSES
+
+    t = svc.get(s, m.Trial, trial_id)
+    if body.cause is not None and body.cause not in CAUSES:
+        raise HTTPException(422, f"Unknown cause: {body.cause}")
+    t.cause_override = body.cause
+    s.flush()
+    return {"cause": cz.trial_cause(s, t)}
+
+
+@router.post("/trials/{trial_id}/explain")
+async def explain_trial(trial_id: int, s: Session = Depends(get_session)) -> dict[str, Any]:
+    """One grading-model call: a cause and one sentence, for a failure the rules could not place."""
+    t = svc.get(s, m.Trial, trial_id)
+    if t.status not in ("failed", "error"):
+        raise HTTPException(409, "Only a failed answer has a cause to explain.")
+    try:
+        ai = await cz.explain(s, t)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(502, f"The grading model did not answer: {type(exc).__name__}") from exc
+    return {"cause_ai": ai, "cause": cz.trial_cause(s, t)}
+
+
+@router.post("/runs/{run_id}/reread", status_code=202)
+async def reread(run_id: int, s: Session = Depends(get_session)) -> dict[str, Any]:
+    """Read this run's stored replies again with the connection's current reading. No bot calls;
+    checks without a grading model run again, the grading model's verdicts are carried over."""
+    run = svc.get(s, m.Run, run_id)
+    if run.status in ("queued", "running"):
+        raise HTTPException(409, "Wait for the run to finish first.")
+    target_id = (run.snapshot or {}).get("target", {}).get("id")
+    t = s.get(m.Target, target_id) if target_id else None
+    if t is None or t.adapter != "http":
+        raise HTTPException(409, "Only replies from a web connection can be read again.")
+    stored = s.scalar(select(m.Trial.id).where(m.Trial.run_id == run_id, m.Trial.raw.is_not(None)).limit(1))
+    if stored is None:
+        raise HTTPException(409, "This run kept no replies to read again.")
+    mapping = (svc.latest_target_version(s, t.id).config or {}).get("response") or {}
+    new = svc.prepare_reevaluation(s, run_id, reread=mapping)
+    s.commit()
+    _spawn(svc.execute_reevaluation(new.id))
+    return svc.run_header(s, new)
 
 
 @router.get("/traces/{trial_id}")

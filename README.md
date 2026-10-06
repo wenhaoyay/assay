@@ -43,9 +43,15 @@ pasting a curl command into the connect wizard and clicking the reply.
   and checks on the set itself (duplicates, phrases too generic to test, patterns that cannot
   fail, expectations in no document, cases that always fail). Every case records where it came
   from and who approved it.
-- **29 evaluators**: deterministic checks (must-mention, forbidden claims, regex, JSON schema,
+- **Why it failed, and what to change.** Every failed answer gets a likely cause with its
+  evidence: not in the documents, search missed it, found but not used, made up, cited the
+  wrong source, a suspect test, questions written for another chatbot. A run's *What to fix
+  first* counts them; Compare shows what a change fixed and broke, by cause. Plain text
+  matching, free; a grading model explains only what the rules cannot place, and you can
+  overrule both. See [docs/finding-the-cause.md](docs/finding-the-cause.md).
+- **30 evaluators**: deterministic checks (must-mention, forbidden claims, regex, JSON schema,
   citation validity, refusal, numbers grounded in evidence), IR metrics (Recall@k, Precision@k,
-  MRR, nDCG), agent checks (tool selection, arguments, forbidden and unnecessary tools, task
+  MRR, nDCG, and *search found it* for search-only runs), agent checks (tool selection, arguments, forbidden and unnecessary tools, task
   outcome, consistency with tool results, error recovery), latency/token/cost budgets, and six
   LLM-judge rubrics.
 - **LLM judges done carefully.** PASS/FAIL/UNKNOWN rubrics, strict JSON output, versioned

@@ -174,6 +174,20 @@ def collect_stream(events: list[tuple[str | None, Any]], cfg: StreamConfig) -> d
 # --------------------------------------------------------------------------------------
 
 
+def _as_text(v: Any) -> str:
+    if isinstance(v, list):
+        return "\n".join(" | ".join(map(str, x)) if isinstance(x, list) else _as_text(x) for x in v)
+    if isinstance(v, dict):
+        return json.dumps(v, ensure_ascii=False)
+    return str(v)
+
+
+def _textual(item: dict[str, Any]) -> dict[str, Any]:
+    """Text fields that came back as something else (a table's rows, say), read as text."""
+    return {**item, **{k: _as_text(item[k]) for k in ("text", "quote", "title")
+                       if item.get(k) is not None and not isinstance(item[k], str)}}
+
+
 def normalize(raw: Any, mapping: dict[str, Any]) -> NormalizedTargetResult:
     """Apply a response mapping. Fields the mapping does not name stay ``None`` (= not reported)."""
     answer = map_field(raw, mapping.get("answer", "answer"))
@@ -199,6 +213,8 @@ def normalize(raw: Any, mapping: dict[str, Any]) -> NormalizedTargetResult:
             if isinstance(item, dict):
                 if "id" in item:
                     item = {**item, "id": str(item["id"])}
+                if model in (Citation, RetrievedDocument):
+                    item = _textual(item)
                 if model is ToolCall and isinstance(item.get("arguments"), str):
                     try:
                         item = {**item, "arguments": json.loads(item["arguments"])}
@@ -210,7 +226,7 @@ def normalize(raw: Any, mapping: dict[str, Any]) -> NormalizedTargetResult:
     citations = objects("citations", Citation)
     if "citations_from_markers" in mapping:
         marked = citations_from_markers(answer, raw, mapping["citations_from_markers"])
-        citations = [Citation.model_validate({**c, "id": str(c.get("id"))}) for c in marked]
+        citations = [Citation.model_validate(_textual({**c, "id": str(c.get("id"))})) for c in marked]
 
     usage = None
     if "usage" in mapping:

@@ -24,7 +24,16 @@ from typing import Any
 
 import httpx
 
-from gaugelab.adapters.http import HttpTargetConfig, parse_ndjson, parse_sse, render, resolve_secret
+from gaugelab.adapters.http import (
+    HttpTargetConfig,
+    StreamConfig,
+    collect_stream,
+    parse_ndjson,
+    parse_sse,
+    render,
+    resolve_secret,
+)
+from gaugelab.adapters.mapping import get_path
 
 # --------------------------------------------------------------------------------------
 # The standard reply shape
@@ -253,6 +262,15 @@ async def probe(config: dict[str, Any], message: str) -> dict[str, Any]:
             entry["count"] += 1
         out["events"] = list(types.values())[:20]
         out["stream_suggestion"] = suggest_stream(events)
+        # Fold the stream as it will be folded, so the reply can be mapped like any JSON reply:
+        # the answer from the text pieces, the sources from the event that carries them.
+        try:
+            rules = cfg.stream if cfg.stream is not None else StreamConfig.model_validate(out["stream_suggestion"])
+            collected = {k: v for k, v in collect_stream(events, rules).items() if k != "_events"}
+            out["collected"] = collected
+            out["suggestion"] = suggest_mapping(collected)
+        except Exception:  # a suggestion is a convenience; the probe result stands without it
+            pass
         return out
     try:
         out["kind"], out["json"] = "json", resp.json()
@@ -348,7 +366,9 @@ def suggest_mapping(raw: Any) -> dict[str, Any]:
         last = p.split(".")[-1].lower() if p else ""
         if last in ("tool_calls", "tools", "steps", "messages", "choices", "events"):
             continue
-        sample = v[0]
+        sample: dict[str, Any] = {}  # items differ (a table record next to a passage): read the first few together
+        for x in v[:8]:
+            sample.update({k: val for k, val in x.items() if k not in sample})
         idk, textk = _first_key(sample, _ID_KEYS), _first_key(sample, _TEXT_KEYS)
         if not idk:
             continue
@@ -358,13 +378,22 @@ def suggest_mapping(raw: Any) -> dict[str, Any]:
     lists.sort(key=lambda c: -c[0])
     if lists:
         rank, p, sample, idk, textk, sk = lists[0]
-        each = {"id": idk}
-        if (tk := _first_key(sample, ("title", "name", "heading"))) and tk != idk:
-            each["title"] = tk
+        # A document id names the document (what a question set expects); a passage id, one piece of it.
+        doc = _first_key(sample, ("doc_id", "document_id", "source_id", "doc"))
+        each: dict[str, str] = {"id": f"{doc}|{idk}" if doc and doc != idk else idk}
+        titles = [k for k in ("doc_title", "document_title", "source_title", "title", "name", "heading")
+                  if (k2 := _first_key(sample, (k,))) and k2 != idk]
+        if titles:
+            each["title"] = "|".join(titles[:2])
         if textk and textk != idk:
             each["text"] = textk
+        if rows := _first_key(sample, ("rows", "table", "records")):
+            each["text"] = f"{each['text']}|{rows}" if "text" in each else rows
         if sk:
             each["score"] = sk
+        for extra in ("label", "page", "date", "n"):
+            if (k := _first_key(sample, (extra,))) and k not in each.values():
+                each[extra] = k
         out["mapping"]["retrieved_documents"] = {"path": p.replace(".0.", ".*.") if p else ".", "each": each}
         out["reasons"]["retrieved_documents"] = (f"'{p}' is a list of objects with '{idk}'"
                                                  + (f" and text in '{textk}'." if textk and textk != idk else "."))
@@ -374,6 +403,19 @@ def suggest_mapping(raw: Any) -> dict[str, Any]:
                 out["mapping"]["citations"] = {"path": p2, "each": {"id": id2}}
                 out["reasons"]["citations"] = f"'{p2}' lists document ids without text: the documents the answer cites."
                 break
+        # Inline markers such as [3] in the answer, numbered like the source list: the citations.
+        answer_text = get_path(raw, out["mapping"].get("answer") or "") if out["mapping"].get("answer") else None
+        num_key = _first_key(sample, ("n", "num", "number", "index", "ref", "marker"))
+        if isinstance(answer_text, str) and num_key and re.search(r"\[\d+\]", answer_text):
+            cite_each = {k: v for k, v in each.items() if k in ("id", "title", "label", "page")}
+            if "text" in each:
+                cite_each["quote"] = each["text"]
+            cite_each["n"] = num_key
+            out["mapping"].pop("citations", None)
+            out["mapping"]["citations_from_markers"] = {"pattern": r"\[(\d+)\]", "lookup": p, "key": num_key,
+                                                        "each": cite_each}
+            out["reasons"]["citations"] = (f"The answer has markers like [1], numbered like '{p}' by '{num_key}': "
+                                           "each marker is a citation of that source.")
     # tool calls: a list of objects with a name and arguments
     for p, v in nodes:
         if isinstance(v, list) and v and isinstance(v[0], dict):

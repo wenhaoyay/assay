@@ -24,7 +24,16 @@ from gaugelab.gates import evaluate_gates
 from gaugelab.pricing import PricingRegistry
 from gaugelab.providers import ProviderSpec, build_provider
 from gaugelab.runner import RunSpec, TrialRecord, evaluate_trial, run_trials, trial_status
-from gaugelab.schemas import NormalizedTargetResult, Span, SpanType, TestCase, Trace, Usage
+from gaugelab.schemas import (
+    EvalStatus,
+    EvaluationResult,
+    NormalizedTargetResult,
+    Span,
+    SpanType,
+    TestCase,
+    Trace,
+    Usage,
+)
 from gaugelab.store import models as m
 from gaugelab.traces import add_evaluator_spans
 
@@ -642,18 +651,27 @@ def trace_for(s: Session, trial_id: int) -> Trace | None:
 
 
 def prepare_reevaluation(s: Session, run_id: int, evaluators: list[str] | None = None,
-                         judge: dict[str, Any] | None = None, name: str | None = None) -> m.Run:
-    """Create the experiment + run that will hold the new grades (no target calls)."""
+                         judge: dict[str, Any] | None = None, name: str | None = None,
+                         reread: dict[str, Any] | None = None) -> m.Run:
+    """Create the experiment + run that will hold the new grades (no target calls).
+
+    ``reread`` is a reply mapping: each stored reply is read again with it (say, now that the
+    connection also reads the bot's sources), the checks that need no grading model run again,
+    and the grading model's verdicts are carried over unchanged, so nothing is paid twice.
+    """
     src = get(s, m.Run, run_id)
     e = get(s, m.Experiment, src.experiment_id)
     cfg = {**e.config}
+    if reread is not None:
+        cfg["reread"] = {"mapping": reread}
     if evaluators is not None:
         cfg["evaluators"] = evaluators
     if judge is not None:
         cfg["judge"] = judge or None
-    e2 = create_experiment(s, e.project_id, name or f"{e.name} (re-evaluated)", e.target_version_id,
+    e2 = create_experiment(s, e.project_id, name or f"{e.name} ({'re-read' if reread is not None else 're-evaluated'})", e.target_version_id,
                            e.dataset_version_id, cfg.pop("evaluators"), cfg.pop("judge"), e.gate_id,
-                           description=f"Re-evaluation of run {run_id}", **cfg)
+                           description=(f"Run {run_id}'s stored replies, read again" if reread is not None
+                                        else f"Re-evaluation of run {run_id}"), **cfg)
     run = start_run(s, e2.id, source="reevaluated", parent_run_id=run_id)
     run.progress_total = len(s.scalars(select(m.Trial.id).where(m.Trial.run_id == run_id,
                                                                  m.Trial.result.is_not(None))).all())
@@ -678,13 +696,18 @@ async def execute_reevaluation(new_run_id: int) -> None:
         run.status, run.started_at = "running", now()
         cases = {c.id: (r, c) for r, c in version_cases(s, e2.dataset_version_id)}
         old = s.scalars(select(m.Trial).where(m.Trial.run_id == run_id).order_by(m.Trial.id)).all()
-        jobs = [(t.case_key, t.trial_index, t.result, t.raw, t.target_cost_usd, t.attempts, trace_for(s, t.id))
+        reread = (e2.config.get("reread") or {}).get("mapping")
+        jobs = [(t.case_key, t.trial_index, _reread(t, reread) if reread is not None else t.result, t.raw,
+                 t.target_cost_usd, t.attempts, trace_for(s, t.id),
+                 [_kept(sc) for sc in t.scores if sc.kind == "llm_judge"] if reread is not None else [])
                 for t in old if t.result is not None]
         j = build_judge(s, e2.config.get("judge"))
         from gaugelab.evaluators.base import EvalContext
 
         ctx = EvalContext(k=e2.config["k"], judge=j, pricing=pricing(s), options=e2.config.get("options") or {})
         new_run_id, evs = run.id, e2.config["evaluators"]
+        if reread is not None:  # the grading model's verdicts are carried over, not asked again
+            evs = [x for x in evs if get_evaluator(x).kind != "llm_judge"]
     flag = ACTIVE.setdefault(new_run_id, {"cancel": False})
     cancelled, failed, error = False, 0, None
     try:
@@ -714,15 +737,40 @@ class _Cancelled(Exception):
     pass
 
 
+def _reread(t: m.Trial, mapping: dict[str, Any]) -> dict[str, Any]:
+    """A stored reply read again with another mapping; timing and errors stay as measured."""
+    from gaugelab.adapters.http import normalize
+
+    old = t.result or {}
+    if t.raw is None or old.get("error"):
+        return old
+    try:
+        fresh = normalize(t.raw, mapping).model_dump(mode="json")
+    except Exception:  # one odd reply keeps its old reading rather than stopping the whole re-read
+        return old
+    for k in ("latency_ms", "error", "usage", "provider"):
+        if old.get(k) is not None and not fresh.get(k):
+            fresh[k] = old[k]
+    return fresh
+
+
+def _kept(sc: m.Score) -> EvaluationResult:
+    return EvaluationResult(evaluator_id=sc.evaluator_id, evaluator_version=sc.evaluator_version, kind=sc.kind,
+                            status=EvalStatus(sc.status), score=sc.score, label=sc.label, threshold=sc.threshold,
+                            explanation=sc.explanation, evidence=list(sc.evidence or []), failure_type=sc.failure_type,
+                            duration_ms=sc.duration_ms, judge_cost_usd=None,
+                            metadata={**(sc.metadata_ or {}), "gating": sc.gating, "carried_over": True})
+
+
 async def _regrade(jobs, cases, evs, ctx, new_run_id, flag, session) -> None:
-    for key, idx, result_json, raw, tcost, attempts, trace in jobs:
+    for key, idx, result_json, raw, tcost, attempts, trace, kept in jobs:
         if flag["cancel"]:
             raise _Cancelled
         if key not in cases:
             continue
         result = NormalizedTargetResult.model_validate(result_json)
         case = cases[key][1]
-        scores = await evaluate_trial(case, result, trace, evs, ctx)
+        scores = await evaluate_trial(case, result, trace, evs, ctx) + kept
         if trace:
             trace.spans = [sp for sp in trace.spans if sp.type != "evaluator"]
             add_evaluator_spans(trace, scores)

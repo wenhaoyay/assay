@@ -45,11 +45,12 @@ flowchart LR
 |---|---|
 | `gaugelab/schemas.py` | The contracts: `NormalizedTargetResult`, `TestCase`, `Trace`/`Span`, `EvaluationResult` |
 | `gaugelab/adapters/` | Get a normalized result for one input: `http` (mapping + SSE/NDJSON reducers + clean-up), `python` (call a function), `replay` (imported results) |
-| `gaugelab/evaluators/` | 29 evaluators behind one interface, registered by id |
+| `gaugelab/evaluators/` | 30 evaluators behind one interface, registered by id |
 | `gaugelab/evaluators/llm_judge/` | Versioned YAML rubrics, prompt construction, strict output parsing, the heuristic stand-in |
 | `gaugelab/providers/` | Thin HTTP clients for OpenAI-compatible, Anthropic and Ollama, with bounded retries |
 | `gaugelab/runner/` | Executes (case, trial) pairs; knows nothing about databases |
 | `gaugelab/analysis.py` | Aggregates, failure taxonomy, baseline-vs-candidate comparison |
+| `gaugelab/diagnosis.py` | Why a failed answer failed: rule-based causes with evidence and the fix (`store/causes.py` applies them to runs, overrides, model explanations and grouped notes) |
 | `gaugelab/statistics/` | Bootstrap, McNemar, pass@k / pass^k, Cohen's kappa, Spearman |
 | `gaugelab/gates/` | Threshold and relative-regression gates |
 | `gaugelab/store/` | SQLAlchemy models, the service layer, imports |

@@ -50,3 +50,22 @@ export function plainPattern(kind: 'any' | 'word' | 'number', parts: string[]): 
   if (kind === 'word') return String.raw`(?i)\b` + escapeRegex(parts[0]) + String.raw`\b`
   return `(?i)(${parts.map(escapeRegex).join('|')})`
 }
+
+const LITERAL = /^(?:\\.|[^.*+?^${}()|[\]\\])+$/
+const unescape = (s: string) => s.replace(/\\(.)/g, '$1')
+
+/** A pattern in plain words when it is a plain-word rule (or plain text), else null. */
+export function describePattern(p: string): string | null {
+  const num = p.match(/^\(\?<!\[\\d\.\]\)(.+)\(\?!\\d\)$/)
+  if (num && LITERAL.test(num[1])) return `the number ${unescape(num[1])}`
+  const word = p.match(/^\(\?i\)\\b(.+)\\b$/)
+  if (word && LITERAL.test(word[1])) return `the word "${unescape(word[1])}"`
+  const any = p.match(/^\(\?i\)\((.+)\)$/)
+  if (any) {
+    const parts = any[1].split(/(?<!\\)\|/)
+    if (parts.every((x) => LITERAL.test(x))) return parts.length === 1 ? `"${unescape(parts[0])}"` : `any of ${parts.map((x) => `"${unescape(x)}"`).join(', ')}`
+  }
+  const bare = p.replace(/^\(\?i\)/, '')
+  if (LITERAL.test(bare)) return `"${unescape(bare)}"`
+  return null
+}

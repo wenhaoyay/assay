@@ -10,6 +10,8 @@ from gaugelab.evaluators.base import EvalContext, Evaluator, register
 from gaugelab.schemas import EvalStatus, EvaluationResult, NormalizedTargetResult, TestCase, Trace
 from gaugelab.text import contains_phrase, looks_like_refusal, normalize
 
+_ANCHORED = re.compile(r"^(?:\(\?[a-z]+\))?\^|(?<!\\)\$$")  # ^ at the start or $ at the end: a pattern about form
+
 
 @register
 class ExactMatch(Evaluator):
@@ -94,6 +96,9 @@ class RegexCheck(Evaluator):
                           evidence=problems)
         if matched and not failed:
             out.failure_type = "unsupported_claim"
+        elif failed and not any(_ANCHORED.search(p) for p in failed):
+            # An unanchored pattern tests what the answer says, not its form.
+            out.failure_type = "incomplete_response"
         return out
 
 
@@ -239,6 +244,7 @@ class CostBudget(Evaluator):
 
 
 _NUMBER = re.compile(r"(?<![\w.])\d+(?:[.,]\d+)?(?![\w])")
+_CITATION = re.compile(r"\[\d+(?:\s*[,;–-]\s*\d+)*\]")
 
 
 def numbers_in(text: str) -> set[str]:
@@ -260,10 +266,14 @@ class NumbersGrounded(Evaluator):
         evidence = context_text(result, limit=200_000)
         if not evidence:
             return self.missing("retrieved text or tool results")
+        # What a source says about itself counts too: its date, page and label ("the 2007 training", "p. 173").
+        about = " ".join(str(v) for d in result.retrieved_documents or [] for k, v in (d.model_extra or {}).items()
+                         if isinstance(v, (str, int, float)) and not isinstance(v, bool) and k != "n")
         allowed = case.expected.max_ungrounded_numbers
         allowed = 0 if allowed is None else allowed
-        known = numbers_in(evidence) | numbers_in(case.input.message)
-        loose = sorted(numbers_in(result.answer) - known, key=lambda x: (len(x), x))
+        known = numbers_in(evidence) | numbers_in(about) | numbers_in(case.input.message)
+        # Citation markers ([8], [7][8], [3, 4]) number the sources; they are not claims.
+        loose = sorted(numbers_in(_CITATION.sub(" ", result.answer or "")) - known, key=lambda x: (len(x), x))
         return self.passed(len(loose) <= allowed, score=float(len(loose)), threshold=allowed,
                            explanation=("All numbers appear in the evidence." if not loose else
                                         f"{len(loose)} number(s) not in the evidence: {', '.join(loose[:8])}"

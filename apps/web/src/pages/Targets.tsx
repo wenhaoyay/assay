@@ -3,6 +3,7 @@ import clsx from 'clsx'
 import { Activity, BookmarkPlus, Check, Pencil, Plug, RefreshCw, Send } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { ReadingCard } from '../components/Causes'
 import { Sparkline } from '../components/viz'
 import { Badge, Button, Card, Empty, ErrorState, Explain, Field, Input, Json, Loading, Notice, PageHeader, PageSkeleton, ProjectMark, Segmented, Table, Toggle, linkButton } from '../components/ui'
 import { api } from '../lib/api'
@@ -182,6 +183,7 @@ export function TargetPage() {
           </Card>
         </div>
         <div className="space-y-5">
+          <ReadingCard targetId={target.id} />
           <Card title="Grading privacy">
             <Toggle checked={!!target.local_judges_only} onChange={(val) => flags.mutate({ local_judges_only: val })} label="Local grading models only"
               hint="This bot's answers may only be graded by a model running on this machine (Ollama, LM Studio). Runs that pick a cloud model are refused." />

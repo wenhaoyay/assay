@@ -181,7 +181,7 @@ def project_home(s: Session, project_id: int) -> dict[str, Any]:
 # RAG pipeline stages, in the order an answer is produced: the failure types that start in each,
 # and the checks that exercise it (a stage no check exercised is left out, not shown as "0").
 STAGES = [
-    ("retrieval", "Retrieval", ["retrieval_miss"], {"recall_at_k", "precision_at_k", "mrr", "ndcg_at_k"}),
+    ("retrieval", "Retrieval", ["retrieval_miss"], {"recall_at_k", "precision_at_k", "mrr", "ndcg_at_k", "search_found_it"}),
     ("tools", "Tools", ["incorrect_tool", "incorrect_tool_arguments", "unnecessary_tool", "tool_result_misused"],
      {"tool_selection", "forbidden_tools", "tool_arguments", "unnecessary_tools", "task_success",
       "tool_result_consistency", "error_recovery", "step_count"}),

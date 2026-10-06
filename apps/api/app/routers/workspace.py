@@ -66,6 +66,30 @@ def project_home(project_id: int, s: Session = Depends(get_session)) -> dict[str
     return insights.project_home(s, project_id)
 
 
+@router.get("/projects/{project_id}/notes")
+def project_notes(project_id: int, s: Session = Depends(get_session)) -> list[dict[str, Any]]:
+    """Your notes on failed answers, across this chatbot's runs."""
+    from gaugelab.store.causes import project_notes as notes
+
+    return notes(s, project_id)
+
+
+class GroupNotesIn(BaseModel):
+    provider_config_id: int | None = None  # None: group by shared words, no model
+
+
+@router.post("/projects/{project_id}/notes/group")
+async def group_project_notes(project_id: int, body: GroupNotesIn, s: Session = Depends(get_session)) -> dict[str, Any]:
+    from gaugelab.store.causes import group_notes
+
+    try:
+        return await group_notes(s, project_id, body.provider_config_id)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(502, f"The model did not answer: {type(exc).__name__}") from exc
+
+
 @router.patch("/projects/{project_id}")
 def patch_project(project_id: int, body: ProjectPatch, s: Session = Depends(get_session)) -> dict[str, Any]:
     p = svc.get(s, m.Project, project_id)
@@ -296,6 +320,8 @@ async def probe(body: ProbeIn) -> dict[str, Any]:
             raw["json"] = redact(raw["json"])
         elif raw.get("kind") == "text":
             raw["suggestion"] = cx.suggest_mapping(raw["text"])
+        if raw.get("collected") is not None:  # a stream, folded into one reply
+            raw["collected"] = redact(raw["collected"])
         return raw
     return await normalize_test(NormalizeIn(adapter=body.adapter, config=body.config, message=body.message))
 
@@ -427,6 +453,72 @@ class TargetFlags(BaseModel):
     shared: bool | None = None
     cost_per_answer_usd: float | None = Field(default=None, ge=0)
     clear_cost_per_answer: bool = False
+
+
+def _latest_reply(s: Session, target_id: int) -> m.Trial | None:
+    versions = [v.id for v in s.scalars(select(m.TargetVersion).where(m.TargetVersion.target_id == target_id))]
+    return s.scalar(select(m.Trial).join(m.Run, m.Run.id == m.Trial.run_id)
+                    .join(m.Experiment, m.Experiment.id == m.Run.experiment_id)
+                    .where(m.Experiment.target_version_id.in_(versions), m.Trial.raw.is_not(None),
+                           m.Trial.status != "error", m.Run.source == "live")
+                    .order_by(m.Trial.id.desc()).limit(1))
+
+
+@router.get("/targets/{target_id}/reading")
+def target_reading(target_id: int, s: Session = Depends(get_session)) -> dict[str, Any]:
+    """What the connection reads from each reply, what a stored reply suggests it could read,
+    and the runs whose replies can be read again. No bot calls."""
+    from gaugelab.adapters.http import normalize
+
+    t = svc.get(s, m.Target, target_id)
+    if t.adapter != "http":
+        return {"supported": False}
+    tv = svc.latest_target_version(s, t.id)
+    current = (tv.config or {}).get("response") or {}
+    trial = _latest_reply(s, t.id)
+    out: dict[str, Any] = {"supported": True, "current": current,
+                           "standard": (tv.config or {}).get("reply_shape") == "gaugelab",
+                           "updated_at": (tv.config or {}).get("reading_updated_at"),
+                           "sample_trial_id": trial.id if trial else None}
+    if trial is None:
+        return {**out, "suggestion": None, "runs": []}
+    raw = trial.raw
+    body = {k: v for k, v in raw.items() if k != "_events"} if isinstance(raw, dict) else raw
+    sug = cx.suggest_mapping(body)
+
+    def caps(mapping: dict[str, Any]) -> list[dict[str, Any]]:
+        try:
+            return cx.capabilities(normalize(raw, mapping).model_dump(mode="json"), mapping)
+        except Exception:
+            return []
+
+    runs = []
+    for r in s.scalars(select(m.Run).where(m.Run.status.in_(insights.DONE)).order_by(m.Run.id.desc()).limit(80)):
+        if (r.snapshot or {}).get("target", {}).get("id") == t.id and r.source in ("live", "reevaluated"):
+            runs.append({"id": r.id, "name": (r.snapshot or {}).get("experiment", {}).get("name"), "source": r.source,
+                         "pass_rate": (r.summary or {}).get("metrics", {}).get("overall_pass_rate"),
+                         "created_at": r.created_at.isoformat() if r.created_at else None})
+    return {**out, "suggestion": sug, "current_caps": caps(current), "suggested_caps": caps(sug["mapping"]),
+            "same": sug["mapping"] == current, "runs": runs[:10]}
+
+
+class ReadingIn(BaseModel):
+    response: dict[str, Any]
+
+
+@router.put("/targets/{target_id}/reading")
+def set_target_reading(target_id: int, body: ReadingIn, s: Session = Depends(get_session)) -> dict[str, Any]:
+    """Change how the connection reads replies. It is how GaugeLab reads, not what is inside the bot,
+    so it applies to the current version rather than making a new one."""
+    t = svc.get(s, m.Target, target_id)
+    if t.adapter != "http":
+        raise HTTPException(409, "Only a web connection has a reply reading.")
+    if not isinstance(body.response.get("answer", "answer"), str):
+        raise HTTPException(422, "The answer must be read from one place (a path).")
+    tv = svc.latest_target_version(s, t.id)
+    tv.config = {**(tv.config or {}), "response": body.response, "reading_updated_at": datetime.now(UTC).isoformat()}
+    s.flush()
+    return {"current": tv.config["response"], "updated_at": tv.config["reading_updated_at"]}
 
 
 @router.patch("/targets/{target_id}/flags")

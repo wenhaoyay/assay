@@ -4,6 +4,7 @@ import { ArrowDownRight, ArrowLeftRight, ArrowUpRight, Check, ChevronDown, Chevr
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { CompareCauses } from '../components/Causes'
 import { PairedBars } from '../components/charts'
 import { ShareMenu } from '../components/Share'
 import { Confetti, DeltaList, ForestPlot, VerdictNeedle } from '../components/viz'
@@ -221,6 +222,7 @@ function CompareView({ c }: { c: Comparison }) {
         ) : <MetricTable rows={c.metrics} />}
       </Card>
 
+      {c.causes && <CompareCauses fixed={c.causes.fixed} broke={c.causes.broke} baseline={c.baseline_run.id} candidate={c.candidate_run.id} />}
       <div className="grid gap-5 lg:grid-cols-2">
         <Card title={<span className="text-bad-ink">Regressed: passed more often before ({c.regressions.length})</span>} padded={false}>
           <CaseList items={c.regressions} c={c} kind="regression" />

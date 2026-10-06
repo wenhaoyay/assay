@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildPrompt } from '../components/Golden'
 import { findChatId, quotedLiterals } from '../pages/Connect'
-import { plainPattern } from '../lib/trials'
+import { describePattern, plainPattern } from '../lib/trials'
 
 describe('plain-word rules', () => {
   it('turns words into patterns that do what they say', () => {
@@ -40,5 +40,15 @@ describe('prompt kit', () => {
     expect(p).toContain('8 x lookup')
     expect(p).toContain('Question,Must mention (comma-separated),Must never say,Should refuse? (yes/no)')
     expect(p).toMatch(/Use ONLY the attached documents/)
+  })
+})
+
+describe('patterns in plain words', () => {
+  it('reads back the plain-word rules, and leaves real patterns as they are', () => {
+    expect(describePattern(plainPattern('any', ['EOL', 'end of life']))).toBe('any of "EOL", "end of life"')
+    expect(describePattern(plainPattern('word', ['ZP17']))).toBe('the word "ZP17"')
+    expect(describePattern(plainPattern('number', ['91']))).toBe('the number 91')
+    expect(describePattern('(?i)SSSC')).toBe('"SSSC"')
+    expect(describePattern('(?i)(which|what)\s+(site|office)')).toBeNull()
   })
 })

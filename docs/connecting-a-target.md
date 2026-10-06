@@ -14,7 +14,10 @@
    answer, sources (id, title, text, score), citations, tool calls, tokens and model are,
    with a reason for each guess. Fix any guess by clicking *Change* and then the right node.
    *Check the mapping* runs the whole connection and lists **what you'll get**: each piece of
-   telemetry, whether it came back, and the checks it unlocks.
+   telemetry, whether it came back, and the checks it unlocks. A streamed reply is folded into
+   one (text pieces joined into the answer, other events kept by name) and mapped the same
+   way: a `sources` event becomes the passages read, and markers like `[3]` in the answer
+   become citations of the source numbered 3.
 4. **Safety and save.** Choose the chatbot first (it decides which question sets are offered).
    If each question saves a conversation, turn on clean-up: GaugeLab reads the chat id where
    the reply actually has it (for a streamed reply, often `done.conversation_id`) and warns
@@ -24,6 +27,12 @@
    table shows, per question set, the billed answers and the time at 1 and 4 in parallel. Name
    the connection (where this copy of the bot runs) and say what is inside this version (model,
    prompt, retriever). Nothing is saved until a test question came back with an answer.
+
+**Reading the reply, later.** A connection's page shows what each reply is read for, what
+the last stored reply also contains, and reads it with one click. Past runs can then be read
+again from their stored replies, with no questions asked again. This changes how GaugeLab
+reads, not what is inside the bot, so it stays the same version. See
+[finding-the-cause.md](finding-the-cause.md).
 
 The three levels: a **chatbot** is the product (it holds question sets, gates and runs); a
 **connection** is one place it runs (local copy, test copy, server); a **version** is what is

@@ -40,6 +40,7 @@ interface Probe {
   text?: string
   events?: { type: string; count: number; sample: unknown }[]
   stream_suggestion?: Record<string, unknown>
+  collected?: unknown // a stream folded into one reply, so it can be mapped like JSON
   elapsed_ms?: number
   error?: string
   explanation?: string | null
@@ -129,6 +130,8 @@ function ConnectWizard({ editing }: { editing: Target | null }) {
       if (adapter === 'http' && p.ok) {
         if (p.kind === 'sse' || p.kind === 'ndjson') {
           if (!cfg.stream && p.stream_suggestion) setCfg((c) => ({ ...c, stream: { ...p.stream_suggestion, format: p.kind } }))
+          // The sources and citations a stream carries, read from the folded reply.
+          if (p.suggestion && !standard && (!cfg.response || Object.keys(cfg.response).length <= 1)) setCfg((c) => ({ ...c, response: p.suggestion!.mapping }))
         } else if (p.suggestion) {
           if (standard && !p.suggestion.standard.matches) { /* keep standard on; the user is told it does not match */ }
           if (!standard && (!cfg.response || Object.keys(cfg.response).length <= 1)) setCfg((c) => ({ ...c, response: p.suggestion!.mapping }))
@@ -450,8 +453,8 @@ function StepMap(props: {
 }) {
   const { adapter, cfg, setCfg, standard, setStandard, message, setMessage, probe, runProbe, probing, test, runTest, testing, picking, setPicking, pickError, setPickError } = props
   const mapping = (cfg.response ?? {}) as Mapping
-  const raw = probe?.kind === 'json' ? probe.json : probe?.kind === 'text' ? probe.text : undefined
   const isStream = probe?.kind === 'sse' || probe?.kind === 'ndjson'
+  const raw = probe?.kind === 'json' ? probe.json : probe?.kind === 'text' ? probe.text : isStream ? probe?.collected : undefined
   const onPick = (path: string, value: unknown) => {
     if (!picking) return
     const r = ROLES.find((x) => x.id === picking)!
@@ -490,9 +493,9 @@ function StepMap(props: {
             </Notice>
       )}
 
-      {probe?.ok && adapter === 'http' && !standard && !isStream && raw !== undefined && (
+      {probe?.ok && adapter === 'http' && !standard && raw !== undefined && (
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-          <Card title="The reply" subtitle={picking ? 'Click the node for the role you picked' : 'Pick a role on the right, then click where it is'}>
+          <Card title={isStream ? 'The reply, with the stream folded into one' : 'The reply'} subtitle={picking ? 'Click the node for the role you picked' : 'Pick a role on the right, then click where it is'}>
             <AnimatePresence>{picking && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="mb-2 flex items-center gap-2 text-xs text-accent-ink"><MousePointerClick className="size-3.5" />Picking: <b>{ROLES.find((r) => r.id === picking)?.label}</b><Button size="sm" variant="ghost" onClick={() => setPicking(null)}>Cancel</Button></motion.div>}</AnimatePresence>
             {pickError && <p className="mb-2 text-xs text-bad-ink">{pickError}</p>}
             <JsonTree data={raw} onPick={onPick} marks={marksFor(mapping)} picking={!!picking} />

@@ -5,6 +5,7 @@ import { motion } from 'motion/react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { FixFirst, NotesCard } from '../components/Causes'
 import { RunsTable } from '../components/RunsTable'
 import { DeltaList, StagePipeline, VerdictNeedle } from '../components/viz'
 import { Badge, Card, Empty, ErrorState, Explain, PageHeader, PageSkeleton, PROJECT_COLORS, ProjectMark, Segmented, Term, linkButton } from '../components/ui'
@@ -17,6 +18,7 @@ import type { Lineage, ProjectHome } from '../lib/types'
 export function ProjectPage() {
   const { id } = useParams()
   const q = useQuery({ queryKey: ['project-home', id], queryFn: () => api.get<ProjectHome>(`/api/projects/${id}/home`) })
+  const nav = useNavigate()
   const name = q.data?.project.name ?? '...'
   useCrumbs([{ label: 'Home', to: '/' }, { label: name }], `project-${id}-${name}`)
   if (q.isLoading) return <PageSkeleton />
@@ -68,6 +70,10 @@ export function ProjectPage() {
               )}
               <Explain className="mt-3">Each failed trial is counted once per kind of failure it shows. The stage is where that kind of failure starts.</Explain>
             </Card>
+          </div>
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+            {latest.failed_trials ? <FixFirst runId={latest.id} targetId={latest.target_id} compact onPick={(c) => nav(`/runs/${latest.id}?tab=failures&cause=${c ?? ''}`)} /> : <div />}
+            <NotesCard projectId={h.project.id} />
           </div>
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
             <Card title="Recent runs" padded={false} actions={<Link to="/runs" className="text-xs text-accent-ink hover:underline">All runs</Link>}>

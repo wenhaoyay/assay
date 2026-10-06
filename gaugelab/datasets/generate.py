@@ -13,6 +13,7 @@ import json
 import re
 from typing import Any
 
+from gaugelab.datasets import short_title
 from gaugelab.providers import ChatMessage, LLMProvider, json_from_text
 from gaugelab.text import normalize
 
@@ -102,7 +103,7 @@ async def generate_candidates(provider: LLMProvider, doc_name: str, doc_text: st
         if kind == "tool_use" and it.get("expected_tool"):
             expected["required_tools"] = [it["expected_tool"]]
             expected["tool_calls"] = [{"name": it["expected_tool"], "arguments": it.get("expected_arguments") or {}}]
-        case = {"id": f"gen_{_slug(doc_name, 20)}_{_slug(it['question'], 30)}_{i}", "title": it["question"][:80],
+        case = {"id": f"gen_{_slug(doc_name, 20)}_{_slug(it['question'], 30)}_{i}", "title": short_title(it["question"]),
                 "category": kind, "difficulty": "medium", "tags": ["generated"],
                 "input": {"message": it["question"]}, "expected": expected,
                 "metadata": {"source_document": doc_name}}
