@@ -164,7 +164,7 @@ export function VerdictNeedle({ delta, low, high, size = 168, label }: { delta: 
   }
   const target = delta === null ? 0 : ang(delta)
   return (
-    <svg width={size} height={size / 2 + 18} viewBox={`0 0 ${size} ${size / 2 + 18}`} role="img" aria-label={label ?? 'verdict gauge'}>
+    <svg width={size} height={size / 2 + 10} viewBox={`0 0 ${size} ${size / 2 + 10}`} role="img" aria-label={label ?? 'verdict gauge'}>
       <path d={arc(-90, 0)} stroke="var(--bad)" strokeOpacity={0.28} strokeWidth={10} fill="none" />
       <path d={arc(0, 90)} stroke="var(--good)" strokeOpacity={0.28} strokeWidth={10} fill="none" />
       {low !== null && low !== undefined && high !== null && high !== undefined && (
@@ -182,8 +182,6 @@ export function VerdictNeedle({ delta, low, high, size = 168, label }: { delta: 
       </motion.g>
       <circle cx={cx} cy={cy} r={5} fill="var(--ink)" />
       <circle cx={cx} cy={cy} r={2} fill="var(--accent)" />
-      <text x={cx - r} y={cy + 13} textAnchor="middle" className="fill-ink-3 text-[9px]">worse</text>
-      <text x={cx + r} y={cy + 13} textAnchor="middle" className="fill-ink-3 text-[9px]">better</text>
     </svg>
   )
 }

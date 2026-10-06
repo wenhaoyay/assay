@@ -177,7 +177,8 @@ function CompareView({ c }: { c: Comparison }) {
         <div className="grid items-center gap-5 p-5 md:grid-cols-[auto_minmax(0,1fr)]">
           <div className="flex flex-col items-center">
             <VerdictNeedle delta={overall?.delta ?? null} low={overall?.ci?.ci_low} high={overall?.ci?.ci_high} label={verdict.text} />
-            <span className="num -mt-1 text-xs text-ink-3">pass rate {pct(overall?.baseline)} → <b className="text-ink">{pct(overall?.candidate)}</b></span>
+            <span className="flex w-[168px] justify-between px-2 text-[10px] text-ink-3"><span>worse</span><span>better</span></span>
+            <span className="num mt-1 text-xs text-ink-3">pass rate {pct(overall?.baseline)} → <b className="text-ink">{pct(overall?.candidate)}</b></span>
           </div>
           <div>
             <div className="text-xs font-medium text-ink-3">{c.n_shared_cases} questions in both runs</div>

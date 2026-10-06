@@ -13,6 +13,7 @@ export default defineConfig({
       '/openapi.json': 'http://127.0.0.1:8040',
     },
   },
+  build: { chunkSizeWarningLimit: 700 },
   test: {
     environment: 'jsdom',
     globals: true,

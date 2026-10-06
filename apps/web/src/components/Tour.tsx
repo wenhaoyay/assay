@@ -21,7 +21,8 @@ export function Tour({ open, onClose }: { open: boolean; onClose: () => void }) 
   const nav = useNavigate()
   const home = useQuery({ queryKey: ['home'], queryFn: () => api.get<HomeData>('/api/home'), enabled: open })
   const [i, setI] = useState(0)
-  const [rect, setRect] = useState<DOMRect | null>(null)
+  const [found, setFound] = useState<{ step: number; rect: DOMRect } | null>(null)
+  const rect = found?.step === i ? found.rect : null
 
   const steps = useMemo<Step[]>(() => {
     const p = home.data?.projects.find((x) => x.latest_run_id) ?? home.data?.projects[0]
@@ -39,10 +40,6 @@ export function Tour({ open, onClose }: { open: boolean; onClose: () => void }) 
     ]
   }, [home.data])
 
-  useEffect(() => {
-    if (open) setI(0)
-  }, [open])
-
   const step = steps[i]
   useEffect(() => {
     if (open && step) nav(step.path, { viewTransition: true })
@@ -50,20 +47,19 @@ export function Tour({ open, onClose }: { open: boolean; onClose: () => void }) 
 
   useLayoutEffect(() => {
     if (!open || !step) return
-    setRect(null)
     let tries = 0
     const find = () => {
       const el = document.querySelector(`[data-tour="${step.target}"]`)
       if (el) {
         el.scrollIntoView({ block: 'center', behavior: 'smooth' })
-        setTimeout(() => setRect(el.getBoundingClientRect()), 350)
+        setTimeout(() => setFound({ step: i, rect: el.getBoundingClientRect() }), 350)
       } else if (tries++ < 20) {
         timer = setTimeout(find, 150)
       }
     }
     let timer = setTimeout(find, 200)
     return () => clearTimeout(timer)
-  }, [open, step])
+  }, [open, step, i])
 
   useEffect(() => {
     if (!open) return

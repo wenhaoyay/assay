@@ -4,7 +4,7 @@
 import clsx from 'clsx'
 import { AlertTriangle, Bot, Check, ChevronRight, Database, Gauge, Search, Sparkles, Wrench, X } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { ms, num, usd } from '../lib/format'
 import type { Span } from '../lib/types'
 import { Badge, Json } from './ui'
@@ -26,12 +26,10 @@ export function TraceViewer({ spans, showEvaluators = true }: { spans: Span[]; s
   const checks = spans.filter((s) => s.type === 'evaluator')
   const root = execution.find((s) => !s.parent_span_id)
   const [open, setOpen] = useState<string | null>(null)
-  const totals = useMemo(() => {
-    const model = spans.filter((s) => s.type === 'model_call')
-    const tokens = root?.usage?.total_tokens ?? model.reduce((a, s) => a + (s.usage?.total_tokens ?? 0), 0)
-    const costs = spans.map((s) => s.cost_usd).filter((c): c is number => c !== null && c !== undefined)
-    return { tokens: tokens || null, cost: costs.length ? costs.reduce((a, b) => a + b, 0) : null }
-  }, [spans, root])
+  const modelSpans = spans.filter((s) => s.type === 'model_call')
+  const tokenSum = root?.usage?.total_tokens ?? modelSpans.reduce((a, s) => a + (s.usage?.total_tokens ?? 0), 0)
+  const costs = spans.map((s) => s.cost_usd).filter((c): c is number => c !== null && c !== undefined)
+  const totals = { tokens: tokenSum || null, cost: costs.length ? costs.reduce((a, b) => a + b, 0) : null }
   if (!root) return <p className="text-[13px] text-ink-3">No spans recorded.</p>
   const t0 = root.start_time
   const total = Math.max(root.duration_ms, ...execution.map((s) => (s.end_time - t0) * 1000), 1)

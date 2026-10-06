@@ -425,21 +425,20 @@ function MetricsTab({ s, heuristic }: { s: RunSummary; heuristic: boolean }) {
 function TracesTab({ runId }: { runId: number }) {
   const q = useTrials(runId, {})
   const rows = (q.data ?? []).filter((t) => t.status !== 'cancelled')
-  const [sel, setSel] = useState<number | null>(null)
   const [onlyFailing, setOnlyFailing] = useState(false)
   const shown = rows.filter((t) => !onlyFailing || t.status === 'failed' || t.status === 'error')
-  const pick = sel ?? (rows.find((t) => t.status === 'failed' || t.status === 'error') ?? rows[0])?.id ?? null
-  const trial = useQuery({ queryKey: ['trial', pick], queryFn: () => api.get<TrialDetail>(`/api/trials/${pick}`), enabled: pick !== null })
   const nav = useNavigate()
-  const [active] = useListNav(shown.length, (i) => setSel(shown[i].id))
-  useEffect(() => { if (active >= 0 && shown[active]) setSel(shown[active].id) }, [active, shown])
+  const [active, setActive] = useListNav(shown.length, (i) => nav(`/trials/${shown[i].id}`, { viewTransition: true }))
+  // Opens on the first failing try; j/k (or a click) moves the pick.
+  const pick = (active >= 0 ? shown[active] : shown.find((t) => t.status === 'failed' || t.status === 'error') ?? shown[0])?.id ?? null
+  const trial = useQuery({ queryKey: ['trial', pick], queryFn: () => api.get<TrialDetail>(`/api/trials/${pick}`), enabled: pick !== null })
   return (
     <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
       <Card title="Tries" padded={false} actions={<label className="flex items-center gap-1.5 text-xs text-ink-2"><input type="checkbox" checked={onlyFailing} onChange={(e) => setOnlyFailing(e.target.checked)} className="accent-[var(--accent)]" />failing only</label>}>
         <ul className="scroll-thin max-h-[680px] overflow-y-auto">
           {shown.map((t, i) => (
             <li key={t.id}>
-              <button type="button" data-kb-index={i} onClick={() => setSel(t.id)} className={clsx('flex w-full items-center gap-2 border-b border-line px-3 py-1.5 text-left text-xs hover:bg-surface-2', pick === t.id && 'kb-active')}>
+              <button type="button" data-kb-index={i} onClick={() => setActive(i)} className={clsx('flex w-full items-center gap-2 border-b border-line px-3 py-1.5 text-left text-xs hover:bg-surface-2', pick === t.id && 'kb-active')}>
                 <span className={clsx('size-2 shrink-0 rounded-full', t.status === 'passed' ? 'bg-good' : t.status === 'error' ? 'bg-error' : 'bg-bad')} />
                 <span className="font-mono">{t.case_id}</span><span className="text-ink-3">try {t.trial_index + 1}</span><span className="num ml-auto text-ink-3">{ms(t.latency_ms)}</span>
               </button>

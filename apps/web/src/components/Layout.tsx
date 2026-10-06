@@ -201,7 +201,7 @@ export function Layout() {
       </main>
       <CommandPalette open={palette} onClose={() => setPalette(false)} onShortcuts={() => setShortcuts(true)} onTour={() => setTour(true)} />
       <ShortcutSheet open={shortcuts} onClose={() => setShortcuts(false)} />
-      <Tour open={tour} onClose={() => setTour(false)} />
+      {tour && <Tour open onClose={() => setTour(false)} />}
     </div>
   )
 }

@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { ChevronDown, Clock, Coins, Gauge, Play, Rocket, ShieldCheck, Sparkles, Zap } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
-import { useEffect, useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Badge, Button, Card, ErrorState, Explain, Field, Input, Notice, PageHeader, PageSkeleton, Select, Term } from '../components/ui'
 import { api } from '../lib/api'
@@ -16,6 +16,9 @@ const KIND_LABEL: Record<string, string> = {
   deterministic: 'Objective checks', retrieval: 'Retrieval (needs labelled documents)', agent: 'Agent / tool use',
   performance: 'Latency and cost', llm_judge: 'Meaning (needs a grading model)',
 }
+
+// Used in default run names (month-day); fixed at load so a render never reads the clock.
+const TODAY = new Date().toISOString().slice(5, 10)
 
 type Preset = 'smoke' | 'release' | 'full' | 'custom'
 const PRESETS: { id: Preset; title: string; body: string; icon: typeof Zap }[] = [
@@ -61,10 +64,9 @@ export function NewRunPage() {
   const recent = useQuery({ queryKey: ['runs'], queryFn: () => api.get<RunHeader[]>('/api/runs?limit=300') })
 
   const [project, setProject] = useState<number | ''>(Number(params.get('project')) || '')
-  const [targetVersionId, setTargetVersionId] = useState<number | ''>('')
-  const [datasetVersionId, setDatasetVersionId] = useState<number | ''>('')
-  const [name, setName] = useState('')
-  const [nameTouched, setNameTouched] = useState(false)
+  const [pickedTarget, setTargetVersionId] = useState<number | ''>('')
+  const [pickedDataset, setDatasetVersionId] = useState<number | ''>('')
+  const [typedName, setName] = useState<string | null>(null)
   const [preset, setPreset] = useState<Preset>('release')
   const [custom, setCustom] = useState<string[] | null>(null)
   const [showChecks, setShowChecks] = useState(false)
@@ -83,43 +85,30 @@ export function NewRunPage() {
   const judgeValue = judge ?? defaultJudge
 
   // Presets set the checks, tries and gate; "custom" keeps whatever is ticked.
-  const presetChecks = useMemo(() => {
-    const defaults = evs.data?.defaults ?? []
-    const nonJudge = evaluators.filter((e) => e.kind !== 'llm_judge').map((e) => e.id)
-    if (preset === 'smoke') return evaluators.filter((e) => ['deterministic', 'retrieval', 'agent', 'performance'].includes(e.kind) && e.gating).map((e) => e.id)
-    if (preset === 'release') return defaults.filter((e) => !judgeIds.includes(e) || judgeValue)
-    if (preset === 'full') return [...nonJudge, ...judgeIds]
-    return custom ?? defaults
-  }, [preset, custom, evaluators, evs.data, judgeIds, judgeValue])
+  const defaults = evs.data?.defaults ?? []
+  const presetChecks =
+    preset === 'smoke' ? evaluators.filter((e) => ['deterministic', 'retrieval', 'agent', 'performance'].includes(e.kind) && e.gating).map((e) => e.id)
+    : preset === 'release' ? defaults.filter((e) => !judgeIds.includes(e) || judgeValue)
+    : preset === 'full' ? [...evaluators.filter((e) => e.kind !== 'llm_judge').map((e) => e.id), ...judgeIds]
+    : custom ?? defaults
   const checks = preset === 'custom' ? (custom ?? presetChecks) : presetChecks
-
-  useEffect(() => {
-    if (preset === 'smoke') setTrials(1)
-    if (preset === 'release' || preset === 'full') setTrials(3)
-  }, [preset])
+  const choosePreset = (p: Preset) => {
+    setPreset(p)
+    if (p === 'smoke') setTrials(1)
+    if (p === 'release' || p === 'full') setTrials(3)
+  }
 
   const projectTargets = (targets.data ?? []).filter((t) => !project || t.project_id === project)
   const projectDatasets = (datasets.data ?? []).filter((d) => !project || d.project_id === project)
+  // Until you pick, the version used by the most recent run, and the chatbot's first dataset.
+  const lastLive = (recent.data ?? []).find((r) => r.source === 'live' && projectTargets.some((t) => t.id === r.target_id))
+  const defaultTarget = (projectTargets.find((t) => t.id === lastLive?.target_id) ?? projectTargets[0])?.latest_version.id ?? ''
+  const targetVersionId = pickedTarget || defaultTarget
+  const datasetVersionId = pickedDataset || (projectDatasets[0]?.latest?.id ?? '')
   const tv = (targets.data ?? []).find((t) => t.latest_version.id === targetVersionId)
+  const name = typedName ?? (tv ? `${tv.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${TODAY}` : '')
   const gateValue = gateId === null ? (preset === 'release' && gates.data?.length ? gates.data.filter((g) => !project || g.project_id === project)[0]?.id ?? '' : '') : gateId
 
-  useEffect(() => {
-    if (!targetVersionId && projectTargets.length) {
-      const lastLive = (recent.data ?? []).find((r) => r.source === 'live' && projectTargets.some((t) => t.id === r.target_id))
-      const pick = projectTargets.find((t) => t.id === lastLive?.target_id) ?? projectTargets[0]
-      setTargetVersionId(pick.latest_version.id)
-    }
-    if (!datasetVersionId && projectDatasets.length) {
-      const d = projectDatasets[0]
-      setDatasetVersionId(d.latest?.id ?? '')
-    }
-  }, [projectTargets, projectDatasets, targetVersionId, datasetVersionId, recent.data])
-
-  useEffect(() => {
-    if (nameTouched || !tv) return
-    const d = new Date()
-    setName(`${tv.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${d.toISOString().slice(5, 10)}`)
-  }, [tv, nameTouched])
 
   const judgeBody = judgeValue === '' ? null : judgeValue === 'heuristic' ? { provider: 'heuristic' } : { provider_config_id: Number(judgeValue) }
   const needsJudge = checks.filter((c) => judgeIds.includes(c))
@@ -176,7 +165,7 @@ export function NewRunPage() {
                   {projectDatasets.flatMap((d) => d.versions.map((v) => <option key={v.id} value={v.id}>{d.name} v{v.version} ({v.case_count} cases{v.status === 'draft' ? ', draft' : ''})</option>))}
                 </Select>
               </Field>
-              <Field label="Run name"><Input value={name} onChange={(ev) => { setName(ev.target.value); setNameTouched(true) }} aria-label="Run name" /></Field>
+              <Field label="Run name"><Input value={name} onChange={(ev) => setName(ev.target.value)} aria-label="Run name" /></Field>
             </div>
             {tv?.local_judges_only && <p className="mt-2 text-xs text-accent-ink">This target is set to local grading models only.</p>}
           </Card>
@@ -184,7 +173,7 @@ export function NewRunPage() {
           <Card title="2. How thoroughly">
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4" role="radiogroup" aria-label="Preset">
               {PRESETS.map((p) => (
-                <button key={p.id} type="button" role="radio" aria-checked={preset === p.id} onClick={() => { setPreset(p.id); if (p.id === 'custom') { setCustom(checks); setShowChecks(true) } }}
+                <button key={p.id} type="button" role="radio" aria-checked={preset === p.id} onClick={() => { choosePreset(p.id); if (p.id === 'custom') { setCustom(checks); setShowChecks(true) } }}
                   className={clsx('relative rounded-xl border p-3 text-left transition-colors', preset === p.id ? 'border-accent bg-accent-wash/60' : 'border-line hover:border-line-strong')}>
                   {preset === p.id && <motion.span layoutId="preset-ring" className="absolute inset-0 rounded-xl ring-2 ring-accent" transition={{ type: 'spring', stiffness: 500, damping: 40 }} />}
                   <p.icon className={clsx('size-4', preset === p.id ? 'text-accent-ink' : 'text-ink-3')} />

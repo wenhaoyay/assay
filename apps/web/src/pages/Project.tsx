@@ -128,7 +128,8 @@ function VerdictCard({ h }: { h: ProjectHome }) {
       <div className="grid items-center gap-5 p-5 md:grid-cols-[auto_minmax(0,1fr)]">
         <div className="flex flex-col items-center">
           <VerdictNeedle delta={o?.delta ?? null} low={o?.ci?.ci_low} high={o?.ci?.ci_high} label={s.text} />
-          <span className="num -mt-1 text-xs text-ink-3">pass rate {pct(o?.baseline)} → <b className="text-ink">{pct(o?.candidate)}</b></span>
+          <span className="flex w-[168px] justify-between px-2 text-[10px] text-ink-3"><span>worse</span><span>better</span></span>
+            <span className="num mt-1 text-xs text-ink-3">pass rate {pct(o?.baseline)} → <b className="text-ink">{pct(o?.candidate)}</b></span>
         </div>
         <div className="min-w-0">
           <div className="text-xs font-medium text-ink-3">Latest run <Link className="font-mono text-accent-ink hover:underline" to={`/runs/${v.candidate_run_id}`}>#{v.candidate_run_id}</Link> vs the previous comparable run <Link className="font-mono text-accent-ink hover:underline" to={`/runs/${v.baseline_run_id}`}>#{v.baseline_run_id}</Link>, {v.n_shared_cases} shared cases</div>

@@ -7,10 +7,10 @@ import {
   ArrowLeft, ArrowRight, Check, CircleAlert, Code2, FileUp, KeyRound, Lock, MousePointerClick, Plug, Radio, Send, Sparkles, Terminal, Wand2, X,
 } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { JsonTree } from '../components/JsonTree'
-import { Badge, Button, Card, ErrorState, Explain, Field, Input, Json, Notice, PageHeader, Segmented, Select, Textarea, Toggle } from '../components/ui'
+import { Badge, Button, Card, ErrorState, Explain, Field, Input, Json, Notice, PageHeader, PageSkeleton, Segmented, Select, Textarea, Toggle } from '../components/ui'
 import { api } from '../lib/api'
 import { useCrumbs } from '../lib/crumbs'
 import { ms, usd } from '../lib/format'
@@ -60,18 +60,34 @@ const blankHttp = (): Cfg => ({ base_url: 'http://localhost:8000', endpoint: '/c
 export function ConnectPage() {
   const [params] = useSearchParams()
   const fromId = params.get('from')
+  const editing = useQuery({ queryKey: ['target', fromId], queryFn: () => api.get<Target>(`/api/targets/${fromId}`), enabled: !!fromId })
+  if (fromId && !editing.data) return editing.isError ? <ErrorState error={editing.error} /> : <PageSkeleton />
+  return <ConnectWizard key={fromId ?? 'new'} editing={editing.data ?? null} />
+}
+
+function ConnectWizard({ editing }: { editing: Target | null }) {
+  const fromId = editing ? String(editing.id) : null
   useCrumbs([{ label: 'Targets', to: '/targets' }, { label: fromId ? 'Edit connection' : 'Connect a chatbot' }], `connect-${fromId}`)
   const nav = useNavigate()
   const qc = useQueryClient()
   const projects = useQuery({ queryKey: ['projects'], queryFn: () => api.get<Project[]>('/api/projects') })
   const templates = useQuery({ queryKey: ['connector-templates'], queryFn: () => api.get<ConnectorTemplate[]>('/api/connector-templates') })
-  const editing = useQuery({ queryKey: ['target', fromId], queryFn: () => api.get<Target>(`/api/targets/${fromId}`), enabled: !!fromId })
-
-  const [step, setStep] = useState(0)
-  const [route, setRoute] = useState<Route>('curl')
-  const [adapter, setAdapter] = useState<'http' | 'python'>('http')
-  const [cfg, setCfg] = useState<Cfg>(blankHttp)
-  const [standard, setStandard] = useState(true)
+  const editCfg = editing?.latest_version.config as Cfg | undefined
+  const [step, setStep] = useState(editing ? 2 : 0)
+  const [route, setRoute] = useState<Route>(editing?.adapter === 'python' ? 'python' : editing ? 'http' : 'curl')
+  const [adapter, setAdapter] = useState<'http' | 'python'>(editing?.adapter === 'python' ? 'python' : 'http')
+  const [cfg, setCfg] = useState<Cfg>(() => (editCfg ? JSON.parse(JSON.stringify(editCfg)) : blankHttp()))
+  const [standard, setStandardState] = useState(editCfg ? editCfg.reply_shape === 'gaugelab' : true)
+  // The standard-shape switch and the config change together.
+  const setStandard = (on: boolean) => {
+    setStandardState(on)
+    if (adapter !== 'http') return
+    setCfg((c) => {
+      if (on) return { ...c, reply_shape: 'gaugelab' }
+      const { reply_shape: _drop, ...rest } = c
+      return { response: { answer: 'answer' }, ...rest }
+    })
+  }
   const [advanced, setAdvanced] = useState(false)
   const [message, setMessage] = useState('What can you help me with?')
   const [probe, setProbe] = useState<Probe | null>(null)
@@ -79,47 +95,29 @@ export function ConnectPage() {
   const [picking, setPicking] = useState<string | null>(null)
   const [pickError, setPickError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!editing.data) return
-    const t = editing.data
-    setAdapter(t.adapter === 'python' ? 'python' : 'http')
-    setRoute(t.adapter === 'python' ? 'python' : 'http')
-    setCfg(t.latest_version.config as Cfg)
-    setStandard((t.latest_version.config as Cfg).reply_shape === 'gaugelab')
-    setStep(2)
-  }, [editing.data])
 
   const chooseRoute = (r: Route) => {
     setRoute(r)
     setProbe(null)
     setTest(null)
-    if (r === 'python') { setAdapter('python'); setCfg({ callable: 'my_bot.app:answer', options: {} }); setStandard(false) }
+    if (r === 'python') { setAdapter('python'); setCfg({ callable: 'my_bot.app:answer', options: {} }); setStandardState(false) }
     else {
       setAdapter('http')
       if (r === 'openai') { applyTemplate(templates.data?.find((t) => t.id === 'builtin:openai-chat')); return }
       if (r === 'stream') { applyTemplate(templates.data?.find((t) => t.id === 'builtin:sse')); return }
-      setCfg((c) => (c.base_url ? c : blankHttp()))
-      setStandard(true)
+      setCfg((c) => (c.base_url ? { ...c, reply_shape: 'gaugelab' } : blankHttp()))
+      setStandardState(true)
     }
   }
   const applyTemplate = (t?: ConnectorTemplate) => {
     if (!t) return
     setAdapter(t.adapter)
     setCfg(JSON.parse(JSON.stringify(t.config)))
-    setStandard((t.config as Cfg).reply_shape === 'gaugelab')
+    setStandardState((t.config as Cfg).reply_shape === 'gaugelab')
     setRoute(t.adapter === 'python' ? 'python' : (t.config as Cfg).stream ? 'stream' : t.id === 'builtin:openai-chat' ? 'openai' : 'template')
     setStep(1)
   }
 
-  // Standard shape switch <-> config.
-  useEffect(() => {
-    if (adapter !== 'http') return
-    setCfg((c) => {
-      if (standard && c.reply_shape !== 'gaugelab') return { ...c, reply_shape: 'gaugelab' }
-      if (!standard && c.reply_shape === 'gaugelab') { const { reply_shape: _drop, ...rest } = c; return { response: { answer: 'answer' }, ...rest } }
-      return c
-    })
-  }, [standard, adapter])
 
   const runProbe = useMutation({
     mutationFn: () => api.post<Probe>('/api/connect/probe', { adapter, config: cfg, message }),
@@ -145,7 +143,7 @@ export function ConnectPage() {
 
   return (
     <>
-      <PageHeader title={fromId ? `Edit ${editing.data?.name ?? 'connection'}` : 'Connect a chatbot'}
+      <PageHeader title={fromId ? `Edit ${editing?.name ?? 'connection'}` : 'Connect a chatbot'}
         description="Each step shows what it found before you go on. Nothing is saved until a test question has come back right."
         actions={<Button variant={advanced ? 'primary' : 'secondary'} onClick={() => setAdvanced((v) => !v)}><Code2 className="size-3.5" />Advanced (JSON)</Button>} />
       <Stepper step={step} onStep={(i) => i <= step && setStep(i)} />
@@ -160,7 +158,7 @@ export function ConnectPage() {
                   probe={probe} runProbe={() => runProbe.mutate()} probing={runProbe.isPending} test={test} runTest={() => runTest.mutate()} testing={runTest.isPending}
                   picking={picking} setPicking={(p) => { setPicking(p); setPickError(null) }} pickError={pickError} setPickError={setPickError} />
               )}
-              {step === 3 && <StepSave adapter={adapter} cfg={cfg} setCfg={setCfg} projects={projects.data ?? []} editing={editing.data ?? null}
+              {step === 3 && <StepSave adapter={adapter} cfg={cfg} setCfg={setCfg} projects={projects.data ?? []} editing={editing}
                 onSaved={(id) => { qc.invalidateQueries({ queryKey: ['targets'] }); qc.invalidateQueries({ queryKey: ['projects'] }); nav(`/targets/${id}`, { viewTransition: true }) }} />}
             </motion.div>
           </AnimatePresence>
@@ -651,16 +649,14 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved }: {
 }
 
 function AdvancedPanel({ adapter, cfg, setCfg }: { adapter: string; cfg: Cfg; setCfg: (f: (c: Cfg) => Cfg) => void }) {
-  const [text, setText] = useState(JSON.stringify(cfg, null, 2))
+  const [draft, setDraft] = useState<string | null>(null) // what you are typing; null = show the live config
   const [err, setErr] = useState<string | null>(null)
-  const [focused, setFocused] = useState(false)
-  const shown = useMemo(() => JSON.stringify(cfg, null, 2), [cfg])
-  useEffect(() => { if (!focused) setText(shown) }, [shown, focused])
+  const text = draft ?? JSON.stringify(cfg, null, 2)
   return (
     <div className="xl:sticky xl:top-16 xl:self-start">
       <Card title={`Configuration (${adapter})`} subtitle="The record of this connection. Edits here update the steps, and the other way round.">
-        <Textarea rows={26} value={text} spellCheck={false} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-          onChange={(e) => { setText(e.target.value); try { const v = JSON.parse(e.target.value); setCfg(() => v); setErr(null) } catch { setErr('Not valid JSON yet - the steps keep the last valid version.') } }} />
+        <Textarea rows={26} value={text} spellCheck={false} onBlur={() => setDraft(null)}
+          onChange={(e) => { setDraft(e.target.value); try { const v = JSON.parse(e.target.value); setCfg(() => v); setErr(null) } catch { setErr('Not valid JSON yet - the steps keep the last valid version.') } }} />
         {err && <p className="mt-1 text-xs text-warn-ink">{err}</p>}
         <p className="mt-2 text-xs text-ink-3">Same format as YAML experiment files and <code>local/targets/*.yaml</code>.</p>
       </Card>
