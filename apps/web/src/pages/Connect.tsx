@@ -1,0 +1,744 @@
+// "Connect a chatbot": four steps, each showing its result before the next.
+// 1 how to reach it  2 the request  3 a test question and the reply mapped by clicking  4 safety, save.
+// The configuration stays the record: the Advanced panel shows it as JSON, in sync both ways.
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import clsx from 'clsx'
+import {
+  ArrowLeft, ArrowRight, Check, CircleAlert, Code2, FileUp, KeyRound, Lock, MousePointerClick, Plug, Radio, Send, Sparkles, Terminal, Wand2, X,
+} from 'lucide-react'
+import { AnimatePresence, motion } from 'motion/react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { JsonTree } from '../components/JsonTree'
+import { Badge, Button, Card, ErrorState, Explain, Field, Input, Json, Notice, PageHeader, Segmented, Select, Textarea, Toggle } from '../components/ui'
+import { api } from '../lib/api'
+import { useCrumbs } from '../lib/crumbs'
+import { ms, usd } from '../lib/format'
+import type { Capability, ConnectorTemplate, Dataset, Project, Target, TargetResult } from '../lib/types'
+
+type Route = 'curl' | 'http' | 'stream' | 'openai' | 'python' | 'logs' | 'template'
+type Cfg = Record<string, unknown> & { response?: Record<string, unknown> }
+
+const ROUTES: { id: Route; title: string; body: string; icon: typeof Terminal; badge?: string }[] = [
+  { id: 'curl', title: 'Paste a curl command', body: 'From browser DevTools ("Copy as cURL") or Postman. Everything fills itself in.', icon: Terminal, badge: 'Recommended' },
+  { id: 'http', title: 'HTTP API (JSON reply)', body: 'Type the URL and request body yourself.', icon: Plug },
+  { id: 'stream', title: 'Streaming chat (SSE)', body: 'The reply arrives as server-sent events.', icon: Radio },
+  { id: 'openai', title: 'OpenAI-compatible endpoint', body: 'Any /chat/completions API. No mapping needed.', icon: Sparkles },
+  { id: 'python', title: 'Python function', body: 'module:function(test_input, options, ctx) in this process.', icon: Code2 },
+  { id: 'logs', title: 'I only have logs', body: 'Upload a JSONL or CSV of past answers and grade those.', icon: FileUp },
+]
+
+const STEPS = ['How to reach it', 'The request', 'Test and map', 'Safety and save']
+
+interface Probe {
+  ok: boolean
+  status?: number
+  kind?: 'json' | 'text' | 'sse' | 'ndjson'
+  json?: unknown
+  text?: string
+  events?: { type: string; count: number; sample: unknown }[]
+  stream_suggestion?: Record<string, unknown>
+  elapsed_ms?: number
+  error?: string
+  explanation?: string | null
+  suggestion?: { mapping: Record<string, unknown>; reasons: Record<string, string>; standard: { matches: boolean; present: string[]; missing: string[]; problems: string[] } }
+}
+
+interface TestResult {
+  ok: boolean
+  elapsed_ms?: number
+  raw?: unknown
+  normalized?: TargetResult
+  error?: string | null
+  explanation?: string | null
+  capabilities?: Capability[]
+  standard?: { matches: boolean; missing: string[] } | null
+}
+
+const blankHttp = (): Cfg => ({ base_url: 'http://localhost:8000', endpoint: '/chat', method: 'POST', timeout_s: 60, body: { message: '{{input.message}}', session_id: 'eval-{{uuid}}' }, reply_shape: 'gaugelab' })
+
+export function ConnectPage() {
+  const [params] = useSearchParams()
+  const fromId = params.get('from')
+  useCrumbs([{ label: 'Targets', to: '/targets' }, { label: fromId ? 'Edit connection' : 'Connect a chatbot' }], `connect-${fromId}`)
+  const nav = useNavigate()
+  const qc = useQueryClient()
+  const projects = useQuery({ queryKey: ['projects'], queryFn: () => api.get<Project[]>('/api/projects') })
+  const templates = useQuery({ queryKey: ['connector-templates'], queryFn: () => api.get<ConnectorTemplate[]>('/api/connector-templates') })
+  const editing = useQuery({ queryKey: ['target', fromId], queryFn: () => api.get<Target>(`/api/targets/${fromId}`), enabled: !!fromId })
+
+  const [step, setStep] = useState(0)
+  const [route, setRoute] = useState<Route>('curl')
+  const [adapter, setAdapter] = useState<'http' | 'python'>('http')
+  const [cfg, setCfg] = useState<Cfg>(blankHttp)
+  const [standard, setStandard] = useState(true)
+  const [advanced, setAdvanced] = useState(false)
+  const [message, setMessage] = useState('What can you help me with?')
+  const [probe, setProbe] = useState<Probe | null>(null)
+  const [test, setTest] = useState<TestResult | null>(null)
+  const [picking, setPicking] = useState<string | null>(null)
+  const [pickError, setPickError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!editing.data) return
+    const t = editing.data
+    setAdapter(t.adapter === 'python' ? 'python' : 'http')
+    setRoute(t.adapter === 'python' ? 'python' : 'http')
+    setCfg(t.latest_version.config as Cfg)
+    setStandard((t.latest_version.config as Cfg).reply_shape === 'gaugelab')
+    setStep(2)
+  }, [editing.data])
+
+  const chooseRoute = (r: Route) => {
+    setRoute(r)
+    setProbe(null)
+    setTest(null)
+    if (r === 'python') { setAdapter('python'); setCfg({ callable: 'my_bot.app:answer', options: {} }); setStandard(false) }
+    else {
+      setAdapter('http')
+      if (r === 'openai') { applyTemplate(templates.data?.find((t) => t.id === 'builtin:openai-chat')); return }
+      if (r === 'stream') { applyTemplate(templates.data?.find((t) => t.id === 'builtin:sse')); return }
+      setCfg((c) => (c.base_url ? c : blankHttp()))
+      setStandard(true)
+    }
+  }
+  const applyTemplate = (t?: ConnectorTemplate) => {
+    if (!t) return
+    setAdapter(t.adapter)
+    setCfg(JSON.parse(JSON.stringify(t.config)))
+    setStandard((t.config as Cfg).reply_shape === 'gaugelab')
+    setRoute(t.adapter === 'python' ? 'python' : (t.config as Cfg).stream ? 'stream' : t.id === 'builtin:openai-chat' ? 'openai' : 'template')
+    setStep(1)
+  }
+
+  // Standard shape switch <-> config.
+  useEffect(() => {
+    if (adapter !== 'http') return
+    setCfg((c) => {
+      if (standard && c.reply_shape !== 'gaugelab') return { ...c, reply_shape: 'gaugelab' }
+      if (!standard && c.reply_shape === 'gaugelab') { const { reply_shape: _drop, ...rest } = c; return { response: { answer: 'answer' }, ...rest } }
+      return c
+    })
+  }, [standard, adapter])
+
+  const runProbe = useMutation({
+    mutationFn: () => api.post<Probe>('/api/connect/probe', { adapter, config: cfg, message }),
+    onSuccess: (p) => {
+      setProbe(p)
+      setTest(null)
+      if (adapter === 'http' && p.ok) {
+        if (p.kind === 'sse' || p.kind === 'ndjson') {
+          if (!cfg.stream && p.stream_suggestion) setCfg((c) => ({ ...c, stream: { ...p.stream_suggestion, format: p.kind } }))
+        } else if (p.suggestion) {
+          if (standard && !p.suggestion.standard.matches) { /* keep standard on; the user is told it does not match */ }
+          if (!standard && (!cfg.response || Object.keys(cfg.response).length <= 1)) setCfg((c) => ({ ...c, response: p.suggestion!.mapping }))
+        }
+      }
+    },
+  })
+  const runTest = useMutation({
+    mutationFn: () => api.post<TestResult>('/api/connect/test', { adapter, config: cfg, message }),
+    onSuccess: setTest,
+  })
+
+  const canNext = step === 0 ? route !== 'logs' : step === 1 ? true : step === 2 ? !!test?.ok : true
+
+  return (
+    <>
+      <PageHeader title={fromId ? `Edit ${editing.data?.name ?? 'connection'}` : 'Connect a chatbot'}
+        description="Each step shows what it found before you go on. Nothing is saved until a test question has come back right."
+        actions={<Button variant={advanced ? 'primary' : 'secondary'} onClick={() => setAdvanced((v) => !v)}><Code2 className="size-3.5" />Advanced (JSON)</Button>} />
+      <Stepper step={step} onStep={(i) => i <= step && setStep(i)} />
+      <div className={clsx('mt-5 grid gap-5', advanced && 'xl:grid-cols-[minmax(0,1fr)_420px]')}>
+        <div className="min-w-0" data-tour="connect">
+          <AnimatePresence mode="wait">
+            <motion.div key={step} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.18 }}>
+              {step === 0 && <StepRoute route={route} onRoute={chooseRoute} templates={templates.data ?? []} onTemplate={applyTemplate} standard={standard} setStandard={setStandard} projects={projects.data ?? []} />}
+              {step === 1 && (route === 'logs' ? null : <StepRequest route={route} adapter={adapter} cfg={cfg} setCfg={setCfg} />)}
+              {step === 2 && (
+                <StepMap adapter={adapter} cfg={cfg} setCfg={setCfg} standard={standard} setStandard={setStandard} message={message} setMessage={setMessage}
+                  probe={probe} runProbe={() => runProbe.mutate()} probing={runProbe.isPending} test={test} runTest={() => runTest.mutate()} testing={runTest.isPending}
+                  picking={picking} setPicking={(p) => { setPicking(p); setPickError(null) }} pickError={pickError} setPickError={setPickError} />
+              )}
+              {step === 3 && <StepSave adapter={adapter} cfg={cfg} setCfg={setCfg} projects={projects.data ?? []} editing={editing.data ?? null}
+                onSaved={(id) => { qc.invalidateQueries({ queryKey: ['targets'] }); qc.invalidateQueries({ queryKey: ['projects'] }); nav(`/targets/${id}`, { viewTransition: true }) }} />}
+            </motion.div>
+          </AnimatePresence>
+          {route === 'logs' && step === 0 && <div className="mt-5"><LogsImport projects={projects.data ?? []} onDone={(id) => nav(`/targets/${id}`)} /></div>}
+          {!(route === 'logs' && step === 0) && (
+            <div className="mt-5 flex items-center gap-2">
+              {step > 0 && <Button onClick={() => setStep(step - 1)}><ArrowLeft className="size-3.5" />Back</Button>}
+              {step < 3 && <Button variant="primary" disabled={!canNext} onClick={() => setStep(step + 1)}>Next: {STEPS[step + 1]} <ArrowRight className="size-3.5" /></Button>}
+              {step === 2 && !test?.ok && <span className="text-xs text-ink-3">Send a test question that comes back right to continue.</span>}
+            </div>
+          )}
+        </div>
+        {advanced && <AdvancedPanel adapter={adapter} cfg={cfg} setCfg={setCfg} />}
+      </div>
+    </>
+  )
+}
+
+function Stepper({ step, onStep }: { step: number; onStep: (i: number) => void }) {
+  return (
+    <ol className="flex flex-wrap items-center gap-2">
+      {STEPS.map((s, i) => (
+        <li key={s} className="flex items-center gap-2">
+          <button type="button" onClick={() => onStep(i)} disabled={i > step}
+            className={clsx('flex items-center gap-2 rounded-full border px-3 py-1 text-[13px] transition-colors',
+              i === step ? 'border-accent bg-accent-wash font-medium text-accent-ink' : i < step ? 'border-good/40 text-good-ink' : 'border-line text-ink-3')}>
+            <span className={clsx('flex size-5 items-center justify-center rounded-full text-[11px] font-semibold', i === step ? 'bg-accent text-on-accent' : i < step ? 'bg-good text-white' : 'bg-surface-3 text-ink-3')}>
+              {i < step ? <Check className="size-3" /> : i + 1}
+            </span>
+            {s}
+          </button>
+          {i < STEPS.length - 1 && <span className="h-px w-6 bg-line-strong" />}
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+function StepRoute({ route, onRoute, templates, onTemplate, standard, setStandard }: {
+  route: Route; onRoute: (r: Route) => void; templates: ConnectorTemplate[]; onTemplate: (t: ConnectorTemplate) => void
+  standard: boolean; setStandard: (v: boolean) => void; projects: Project[]
+}) {
+  return (
+    <div className="space-y-5">
+      <Card title="How do you reach your chatbot?">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" role="radiogroup">
+          {ROUTES.map((r) => (
+            <button key={r.id} type="button" role="radio" aria-checked={route === r.id} onClick={() => onRoute(r.id)}
+              className={clsx('relative rounded-xl border p-4 text-left transition-colors', route === r.id ? 'border-accent bg-accent-wash/50' : 'border-line hover:border-line-strong')}>
+              {route === r.id && <motion.span layoutId="route-ring" className="absolute inset-0 rounded-xl ring-2 ring-accent" />}
+              <div className="flex items-center gap-2"><r.icon className={clsx('size-4', route === r.id ? 'text-accent-ink' : 'text-ink-3')} /><span className="text-[13px] font-semibold">{r.title}</span>{r.badge && <Badge tone="accent">{r.badge}</Badge>}</div>
+              <p className="mt-1 text-xs text-ink-3">{r.body}</p>
+            </button>
+          ))}
+        </div>
+      </Card>
+      {route !== 'logs' && route !== 'python' && (
+        <Card>
+          <Toggle checked={standard} onChange={setStandard} label="My bot replies in the GaugeLab shape"
+            hint={<>The reply is <code>{'{answer, sources, citations, tool_calls, usage}'}</code>: nothing to map. Turn it off for bots you did not build - you will map the reply by clicking it. <a className="text-accent-ink underline" href="/settings?tab=shape">How to add the shape to a bot</a></>} />
+        </Card>
+      )}
+      {route !== 'logs' && (
+        <Card title="Or start from a template" subtitle="Your saved connections appear here too">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {templates.map((t) => (
+              <button key={t.id} type="button" onClick={() => onTemplate(t)} className="rounded-lg border border-line p-3 text-left hover:border-accent/50 hover:bg-surface-2">
+                <div className="flex items-center gap-2 text-[13px] font-medium">{t.name}{!t.builtin && <Badge tone="accent">yours</Badge>}</div>
+                <div className="mt-0.5 line-clamp-2 text-xs text-ink-3">{t.description}</div>
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
+    </div>
+  )
+}
+
+function StepRequest({ route, adapter, cfg, setCfg }: { route: Route; adapter: 'http' | 'python'; cfg: Cfg; setCfg: (f: (c: Cfg) => Cfg) => void }) {
+  const [curl, setCurl] = useState('')
+  const [parsed, setParsed] = useState<null | { secrets: { header: string; prefix: string; value: string; hint: string }[]; session_fields: string[]; question_path: string | null; looks_streaming: boolean }>(null)
+  const [bodyText, setBodyText] = useState(JSON.stringify(cfg.body ?? {}, null, 2))
+  const [bodyErr, setBodyErr] = useState<string | null>(null)
+  const parse = useMutation({
+    mutationFn: () => api.post<Record<string, unknown> & { secrets: { header: string; prefix: string; value: string; hint: string }[]; session_fields: string[]; question_path: string | null; looks_streaming: boolean; body_template: unknown }>('/api/connect/parse-curl', { command: curl }),
+    onSuccess: (p) => {
+      const body = p.body_template as Record<string, unknown> | null
+      if (body && typeof body === 'object') for (const f of p.session_fields) body[f] = 'eval-{{uuid}}'
+      setCfg((c) => ({ ...c, base_url: p.base_url, endpoint: p.endpoint, method: p.method, headers: p.headers, query: p.query, body: body ?? {}, auth: undefined }))
+      setBodyText(JSON.stringify(body ?? {}, null, 2))
+      setParsed(p)
+    },
+  })
+  const field = (k: string) => String(cfg[k] ?? '')
+  const set = (k: string, v: unknown) => setCfg((c) => ({ ...c, [k]: v }))
+  if (adapter === 'python') {
+    return (
+      <Card title="Which function?">
+        <div className="grid gap-3 md:grid-cols-2">
+          <Field label="Callable" hint="package.module:function - called as function(test_input, options, ctx)"><Input value={field('callable')} onChange={(e) => set('callable', e.target.value)} /></Field>
+          <Field label="Options (JSON)"><Input value={JSON.stringify(cfg.options ?? {})} onChange={(e) => { try { set('options', JSON.parse(e.target.value)) } catch { /* typing */ } }} /></Field>
+        </div>
+        <Explain className="mt-3">Return a dict with at least "answer"; add "retrieved_documents", "citations", "tool_calls" and "usage" to unlock more checks.</Explain>
+      </Card>
+    )
+  }
+  return (
+    <div className="space-y-5">
+      {route === 'curl' && (
+        <Card title="Paste the curl command">
+          <Textarea rows={6} value={curl} onChange={(e) => setCurl(e.target.value)} placeholder={"curl 'https://my-bot.example.com/api/chat' \\\n  -H 'Authorization: Bearer sk-...' \\\n  -H 'Content-Type: application/json' \\\n  --data-raw '{\"question\":\"How do I reset it?\"}'"} aria-label="curl command" />
+          <div className="mt-2 flex items-center gap-2">
+            <Button variant="primary" loading={parse.isPending} disabled={curl.trim().length < 6} onClick={() => parse.mutate()}><Wand2 className="size-3.5" />Read it</Button>
+            <span className="text-xs text-ink-3">Chrome / Edge DevTools → Network → right-click the request → Copy → Copy as cURL (bash).</span>
+          </div>
+          {parse.isError && <div className="mt-2"><ErrorState error={parse.error} /></div>}
+          {parsed && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-3 space-y-2">
+              <Notice tone="good" title="Request read">
+                {parsed.question_path ? <>The question goes in <code>{parsed.question_path}</code> - replaced by each test question.</> : 'No question field found: put {{input.message}} where the question goes in the body below.'}
+                {parsed.session_fields.length > 0 && <> A fresh <code>{parsed.session_fields.join(', ')}</code> per question keeps cases from sharing chat history.</>}
+                {parsed.looks_streaming && <> It looks like a streaming endpoint.</>}
+              </Notice>
+              {parsed.secrets.map((s) => <SecretRow key={s.header} secret={s} onStored={(ref) => setCfg((c) => ({ ...c, auth: { header: s.header, prefix: s.prefix, secret_ref: ref } }))} stored={(cfg.auth as { header?: string } | undefined)?.header === s.header} />)}
+            </motion.div>
+          )}
+        </Card>
+      )}
+      <Card title="Request">
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_110px]">
+          <Field label="Base URL"><Input value={field('base_url')} onChange={(e) => set('base_url', e.target.value)} /></Field>
+          <Field label="Endpoint"><Input value={field('endpoint')} onChange={(e) => set('endpoint', e.target.value)} /></Field>
+          <Field label="Method"><Select value={field('method') || 'POST'} onChange={(e) => set('method', e.target.value)}><option>POST</option><option>GET</option></Select></Field>
+        </div>
+        <div className="mt-3">
+          <Field label="Body (JSON)" error={bodyErr ?? undefined} hint={<>Placeholders: <code>{'{{input.message}}'}</code> the question, <code>{'{{uuid}}'}</code> a fresh id per call, <code>{'{{input.fields.x}}'}</code> a per-case field.</>}>
+            <Textarea rows={7} value={bodyText} spellCheck={false} onChange={(e) => { setBodyText(e.target.value); try { set('body', JSON.parse(e.target.value)); setBodyErr(null) } catch { setBodyErr('Not valid JSON yet') } }} />
+          </Field>
+        </div>
+        {!!cfg.auth && <p className="mt-2 flex items-center gap-1.5 text-xs text-good-ink"><Lock className="size-3.5" />Sends {(cfg.auth as { header: string }).header} from {(cfg.auth as { secret_ref: string }).secret_ref} - the key itself is not in this configuration.</p>}
+      </Card>
+    </div>
+  )
+}
+
+function SecretRow({ secret, onStored, stored }: { secret: { header: string; prefix: string; value: string; hint: string }; onStored: (ref: string) => void; stored: boolean }) {
+  const [name, setName] = useState(secret.header.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '') === 'AUTHORIZATION' ? 'BOT_API_KEY' : secret.header.toUpperCase().replace(/[^A-Z0-9]+/g, '_'))
+  const save = useMutation({ mutationFn: () => api.put<{ ref: string }>(`/api/secrets/${name}`, { value: secret.value }), onSuccess: (r) => onStored(r.ref) })
+  return (
+    <div className={clsx('flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2', stored ? 'border-good/40 bg-good-wash/40' : 'border-warn/40 bg-warn-wash/50')}>
+      <KeyRound className={clsx('size-4', stored ? 'text-good-ink' : 'text-warn-ink')} />
+      <span className="text-[13px]"><b>{secret.header}</b> looks like a secret ({secret.hint}).</span>
+      {stored ? <span className="ml-auto text-xs text-good-ink">Stored in the OS credential store</span> : (
+        <>
+          <span className="ml-auto text-xs text-ink-3">Save as</span>
+          <Input className="w-40" value={name} onChange={(e) => setName(e.target.value)} aria-label="Secret name" />
+          <Button size="sm" variant="primary" loading={save.isPending} onClick={() => save.mutate()}><Lock className="size-3.5" />Store securely</Button>
+        </>
+      )}
+      {save.isError && <div className="w-full"><ErrorState error={save.error} /></div>}
+    </div>
+  )
+}
+
+// --------------------------------------------------------------------------------------
+// Step 3: test and map
+// --------------------------------------------------------------------------------------
+
+const ROLES: { id: string; label: string; group: string; list?: string; sub?: string; hint: string }[] = [
+  { id: 'answer', label: 'Answer', group: 'Answer', hint: 'The text the user sees' },
+  { id: 'sources', label: 'Source list', group: 'Sources', hint: 'The list of retrieved documents' },
+  { id: 'sources.id', label: 'Source id', group: 'Sources', list: 'sources', sub: 'id', hint: 'Names a document (used for recall, citations)' },
+  { id: 'sources.title', label: 'Source title', group: 'Sources', list: 'sources', sub: 'title', hint: 'Optional' },
+  { id: 'sources.text', label: 'Source text', group: 'Sources', list: 'sources', sub: 'text', hint: 'Needed for groundedness' },
+  { id: 'sources.score', label: 'Source score', group: 'Sources', list: 'sources', sub: 'score', hint: 'Optional' },
+  { id: 'citations', label: 'Citations', group: 'Citations', hint: 'Ids of the documents the answer cites' },
+  { id: 'tools', label: 'Tool call list', group: 'Tools', hint: 'The list of tool calls' },
+  { id: 'tools.name', label: 'Tool name', group: 'Tools', list: 'tools', sub: 'name', hint: '' },
+  { id: 'tools.arguments', label: 'Tool arguments', group: 'Tools', list: 'tools', sub: 'arguments', hint: '' },
+  { id: 'tools.result', label: 'Tool result', group: 'Tools', list: 'tools', sub: 'result', hint: 'Optional' },
+  { id: 'usage.input_tokens', label: 'Input tokens', group: 'Tokens', hint: '' },
+  { id: 'usage.output_tokens', label: 'Output tokens', group: 'Tokens', hint: '' },
+  { id: 'provider.model', label: 'Model name', group: 'Model', hint: 'For cost estimates' },
+]
+
+type Mapping = Record<string, unknown>
+const listKey = (l: string) => (l === 'sources' ? 'retrieved_documents' : 'tool_calls')
+
+function getRole(m: Mapping, role: string): string | null {
+  const r = ROLES.find((x) => x.id === role)!
+  if (role === 'answer') return (m.answer as string) ?? null
+  if (role === 'citations') return typeof m.citations === 'string' ? m.citations : (m.citations as { path?: string })?.path ?? null
+  if (role === 'sources' || role === 'tools') return ((m[listKey(role)] as { path?: string }) ?? {}).path ?? null
+  if (r.list) return ((m[listKey(r.list)] as { each?: Record<string, string> })?.each ?? {})[r.sub!] ?? null
+  const [obj, k] = role.split('.')
+  return ((m[obj] as Record<string, string>) ?? {})[k] ?? null
+}
+
+function setRole(m: Mapping, role: string, path: string | null): Mapping {
+  const r = ROLES.find((x) => x.id === role)!
+  const out = JSON.parse(JSON.stringify(m)) as Mapping
+  if (role === 'answer') { out.answer = path ?? 'answer'; return out }
+  if (role === 'citations') { if (path) out.citations = path; else delete out.citations; return out }
+  if (role === 'sources' || role === 'tools') {
+    const k = listKey(role)
+    if (!path) { delete out[k]; return out }
+    out[k] = { ...((out[k] as object) ?? {}), path, each: ((out[k] as { each?: object })?.each) ?? (role === 'sources' ? { id: 'id' } : { name: 'name', arguments: 'arguments' }) }
+    return out
+  }
+  if (r.list) {
+    const k = listKey(r.list)
+    const cur = (out[k] as { path: string; each: Record<string, string> }) ?? { path: r.list, each: {} }
+    const each = { ...cur.each }
+    if (path) each[r.sub!] = path; else delete each[r.sub!]
+    out[k] = { ...cur, each }
+    return out
+  }
+  const [obj, key] = role.split('.')
+  const o = { ...((out[obj] as Record<string, string>) ?? {}) }
+  if (path) o[key] = path; else delete o[key]
+  if (Object.keys(o).length) out[obj] = o; else delete out[obj]
+  return out
+}
+
+function marksFor(m: Mapping): Record<string, string> {
+  const marks: Record<string, string> = {}
+  for (const r of ROLES) {
+    const p = getRole(m, r.id)
+    if (!p) continue
+    const first = p.split('|')[0].replace(/\.\*\./g, '.0.').replace(/\[(\d+)\]/g, '.$1')
+    if (r.list) {
+      const lp = getRole(m, r.list)
+      if (lp) marks[`${lp.split('|')[0].replace(/\.\*\./g, '.0.')}.0.${first}`] = r.label
+    } else marks[first] = r.label
+  }
+  return marks
+}
+
+function StepMap(props: {
+  adapter: 'http' | 'python'; cfg: Cfg; setCfg: (f: (c: Cfg) => Cfg) => void; standard: boolean; setStandard: (v: boolean) => void
+  message: string; setMessage: (v: string) => void; probe: Probe | null; runProbe: () => void; probing: boolean
+  test: TestResult | null; runTest: () => void; testing: boolean
+  picking: string | null; setPicking: (p: string | null) => void; pickError: string | null; setPickError: (e: string | null) => void
+}) {
+  const { adapter, cfg, setCfg, standard, setStandard, message, setMessage, probe, runProbe, probing, test, runTest, testing, picking, setPicking, pickError, setPickError } = props
+  const mapping = (cfg.response ?? {}) as Mapping
+  const raw = probe?.kind === 'json' ? probe.json : probe?.kind === 'text' ? probe.text : undefined
+  const isStream = probe?.kind === 'sse' || probe?.kind === 'ndjson'
+  const onPick = (path: string, value: unknown) => {
+    if (!picking) return
+    const r = ROLES.find((x) => x.id === picking)!
+    let p = path
+    if (picking === 'sources' || picking === 'tools') {
+      const m = path.match(/^(.*?)(?:\.\d+)(?:\..*)?$/)
+      if (!Array.isArray(value) && m) p = m[1]
+      else if (!Array.isArray(value)) { setPickError('Pick the list itself (the node marked [n]).'); return }
+    } else if (r.list) {
+      const lp = getRole(mapping, r.list)
+      if (!lp) { setPickError(`Pick the ${r.list === 'sources' ? 'source' : 'tool call'} list first.`); return }
+      const prefix = `${lp.replace(/\.\*\./g, '.0.')}.0.`
+      if (!path.startsWith(prefix)) { setPickError(`Pick a field inside one item of ${lp}.`); return }
+      p = path.slice(prefix.length)
+    }
+    setCfg((c) => ({ ...c, response: setRole((c.response ?? {}) as Mapping, picking, p) }))
+    setPicking(null)
+  }
+  const reasons = probe?.suggestion?.reasons ?? {}
+  return (
+    <div className="space-y-5">
+      <Card title="Send a test question">
+        <div className="flex gap-2">
+          <Input value={message} onChange={(e) => setMessage(e.target.value)} aria-label="Test question" />
+          <Button variant="primary" loading={probing} onClick={runProbe}><Send className="size-3.5" />Send</Button>
+        </div>
+        {probe && !probe.ok && <div className="mt-3"><Notice tone="bad" title={probe.explanation ?? 'The request failed'}><span className="font-mono text-xs">{probe.error}</span></Notice></div>}
+        {probe?.ok && <p className="mt-2 text-xs text-good-ink">Reply received{probe.status ? ` (HTTP ${probe.status}` : ''}{probe.elapsed_ms ? `, ${ms(probe.elapsed_ms)})` : ')'}{isStream ? `: a stream of ${probe.events?.length} event type(s)` : ''}.</p>}
+      </Card>
+
+      {probe?.ok && adapter === 'http' && standard && probe.suggestion && (
+        probe.suggestion.standard.matches
+          ? <Notice tone="good" title="The reply is in the GaugeLab shape - nothing to map">Found: {probe.suggestion.standard.present.join(', ')}.{probe.suggestion.standard.missing.length > 0 && <> Not in this reply: {probe.suggestion.standard.missing.join(', ')}.</>}</Notice>
+          : <Notice tone="warn" title="This reply is not in the GaugeLab shape" action={<Button size="sm" onClick={() => { setStandard(false); setCfg((c) => ({ ...c, response: probe.suggestion!.mapping })) }}>Map it instead</Button>}>
+              {probe.suggestion.standard.problems.concat(probe.suggestion.standard.missing.includes('answer') ? ['There is no top-level "answer" string.'] : []).join(' ')} Turn the switch off and map the reply by clicking it.
+            </Notice>
+      )}
+
+      {probe?.ok && adapter === 'http' && !standard && !isStream && raw !== undefined && (
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <Card title="The reply" subtitle={picking ? 'Click the node for the role you picked' : 'Pick a role on the right, then click where it is'}>
+            <AnimatePresence>{picking && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="mb-2 flex items-center gap-2 text-xs text-accent-ink"><MousePointerClick className="size-3.5" />Picking: <b>{ROLES.find((r) => r.id === picking)?.label}</b><Button size="sm" variant="ghost" onClick={() => setPicking(null)}>Cancel</Button></motion.div>}</AnimatePresence>
+            {pickError && <p className="mb-2 text-xs text-bad-ink">{pickError}</p>}
+            <JsonTree data={raw} onPick={onPick} marks={marksFor(mapping)} picking={!!picking} />
+          </Card>
+          <Card title="Where is each thing?" subtitle="GaugeLab guessed; confirm or fix">
+            <ul className="space-y-1">
+              {ROLES.map((r, i) => {
+                const p = getRole(mapping, r.id)
+                const prevGroup = i > 0 ? ROLES[i - 1].group : null
+                return (
+                  <li key={r.id}>
+                    {r.group !== prevGroup && <div className="mt-2 text-[11px] font-medium uppercase tracking-wide text-ink-3">{r.group}</div>}
+                    <div className={clsx('flex items-center gap-2 rounded-md px-2 py-1', picking === r.id && 'bg-accent-wash')}>
+                      <span className={clsx('size-1.5 shrink-0 rounded-full', p ? 'bg-good' : 'bg-untested')} />
+                      <span className="min-w-0 flex-1">
+                        <span className="text-[13px]">{r.label}</span>
+                        <span className="block truncate font-mono text-[11px] text-ink-3" title={reasons[r.id === 'sources' ? 'retrieved_documents' : r.id === 'tools' ? 'tool_calls' : r.id] ?? ''}>{p ?? (r.hint || 'not mapped')}</span>
+                      </span>
+                      <Button size="sm" variant={picking === r.id ? 'primary' : 'ghost'} onClick={() => setPicking(picking === r.id ? null : r.id)}>{p ? 'Change' : 'Pick'}</Button>
+                      {p && r.id !== 'answer' && <button type="button" aria-label={`Clear ${r.label}`} className="text-ink-3 hover:text-bad-ink" onClick={() => setCfg((c) => ({ ...c, response: setRole((c.response ?? {}) as Mapping, r.id, null) }))}><X className="size-3.5" /></button>}
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          </Card>
+        </div>
+      )}
+
+      {probe?.ok && isStream && (
+        <Card title="Streamed reply" subtitle="Event types seen and how each is folded into one reply">
+          <ul className="space-y-1.5">
+            {probe.events?.map((e) => {
+              const rule = ((cfg.stream as { events?: Record<string, { op?: string; path?: string; into?: string }> })?.events ?? {})[e.type]
+              return (
+                <li key={e.type} className="grid grid-cols-[120px_60px_minmax(0,1fr)_minmax(0,1fr)] items-center gap-2 text-xs">
+                  <code className="font-medium">{e.type}</code><span className="num text-ink-3">x{e.count}</span>
+                  <span className="truncate font-mono text-ink-3">{JSON.stringify(e.sample).slice(0, 80)}</span>
+                  <span>{rule ? <>{rule.op === 'concat' ? 'append text' : rule.op ?? 'keep'} <code>{rule.path}</code> → <code>{rule.into}</code></> : <span className="text-ink-3">ignored</span>}</span>
+                </li>
+              )
+            })}
+          </ul>
+          <Explain className="mt-2">Text pieces ("deltas") are joined into the answer; other events are kept by name so the mapping can read them. Edit the details in Advanced (JSON).</Explain>
+        </Card>
+      )}
+
+      {probe?.ok && (
+        <Card title="What GaugeLab will see" actions={<Button variant="primary" loading={testing} onClick={runTest}><Check className="size-3.5" />Check the mapping</Button>}>
+          {!test ? <p className="text-[13px] text-ink-3">Run the whole connection (request and mapping) to see the result as GaugeLab reads it.</p> : !test.ok ? (
+            <Notice tone="bad" title={test.explanation ?? test.error ?? 'No answer'}>{test.error}</Notice>
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="space-y-2 text-[13px]">
+                <div className="text-xs text-ink-3">Answer ({ms(test.elapsed_ms)})</div>
+                <div className="line-clamp-6 rounded-lg border border-line bg-surface-2/50 px-3 py-2">{test.normalized?.answer}</div>
+                {test.normalized?.retrieved_documents && <div className="text-xs text-ink-2">{test.normalized.retrieved_documents.length} source(s): {test.normalized.retrieved_documents.slice(0, 5).map((d) => <code key={d.id} className="mr-1">{d.id}</code>)}</div>}
+                {test.normalized?.tool_calls && <div className="text-xs text-ink-2">{test.normalized.tool_calls.length} tool call(s): {test.normalized.tool_calls.map((t, i) => <code key={i} className="mr-1">{t.name}</code>)}</div>}
+              </div>
+              <Capabilities caps={test.capabilities ?? []} />
+            </div>
+          )}
+        </Card>
+      )}
+    </div>
+  )
+}
+
+export function Capabilities({ caps }: { caps: Capability[] }) {
+  return (
+    <div>
+      <div className="mb-1.5 text-xs font-medium text-ink-3">What you'll get</div>
+      <ul className="space-y-1.5">
+        {caps.map((c, i) => (
+          <motion.li key={c.field} initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }} className="flex items-start gap-2 text-[13px]">
+            {c.received ? <Check className="mt-0.5 size-4 shrink-0 text-good-ink" /> : c.mapped ? <CircleAlert className="mt-0.5 size-4 shrink-0 text-warn-ink" /> : <X className="mt-0.5 size-4 shrink-0 text-ink-3" />}
+            <span>
+              <b className={clsx(!c.received && 'font-medium text-ink-2')}>{c.label}</b>{c.count !== null && c.received ? ` (${c.count})` : ''}
+              <span className="block text-xs text-ink-3">{c.received ? `→ ${c.unlocks}` : c.mapped ? `Mapped, but empty in this reply - ${c.unlocks} may show "not evaluated"` : `Not mapped: ${c.unlocks} won't run`}</span>
+            </span>
+          </motion.li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+// --------------------------------------------------------------------------------------
+// Step 4: safety and save
+// --------------------------------------------------------------------------------------
+
+function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved }: {
+  adapter: 'http' | 'python'; cfg: Cfg; setCfg: (f: (c: Cfg) => Cfg) => void; projects: Project[]; editing: Target | null; onSaved: (id: number) => void
+}) {
+  const datasets = useQuery({ queryKey: ['datasets'], queryFn: () => api.get<Dataset[]>('/api/datasets') })
+  const [projectMode, setProjectMode] = useState<'existing' | 'new'>(projects.length ? 'existing' : 'new')
+  const [projectId, setProjectId] = useState<number | ''>(editing?.project_id ?? projects[0]?.id ?? '')
+  const [newProject, setNewProject] = useState('')
+  const [name, setName] = useState(editing?.name ?? '')
+  const [label, setLabel] = useState(editing?.latest_version.variant_label ?? '')
+  const [notes, setNotes] = useState('')
+  const [asTemplate, setAsTemplate] = useState(false)
+  const [savesChats, setSavesChats] = useState(!!cfg.cleanup)
+  const [dsv, setDsv] = useState<number | ''>('')
+  const cleanup = (cfg.cleanup as { method?: string; endpoint?: string; only_if?: string } | undefined) ?? { method: 'DELETE', endpoint: '/api/conversations/{{raw.conversation_id}}', only_if: 'conversation_id' }
+  useEffect(() => {
+    if (adapter !== 'http') return
+    setCfg((c) => {
+      if (savesChats && !c.cleanup) return { ...c, cleanup }
+      if (!savesChats && c.cleanup) { const { cleanup: _x, ...rest } = c; return rest }
+      return c
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savesChats])
+  const dry = useMutation({
+    mutationFn: () => api.post<{ calls: { question: string; ok: boolean; elapsed_ms?: number; answer?: string; error?: string; explanation?: string; cost_usd?: number | null; cleanup?: string }[]; median_ms: number | null; full_run_calls: number; full_run_seconds: number | null; full_run_cost_usd: number | null }>('/api/connect/dry-run', { adapter, config: cfg, dataset_version_id: dsv || null, n: 3 }),
+  })
+  const save = useMutation({
+    mutationFn: async () => {
+      let t: Target
+      if (editing) {
+        t = await api.put<Target>(`/api/targets/${editing.id}`, { config: cfg, variant_label: label, notes })
+      } else {
+        let pid = projectMode === 'existing' ? projectId : ''
+        if (!pid) pid = (await api.post<Project>('/api/projects', { name: newProject || name || 'My chatbot' })).id
+        t = await api.post<Target>('/api/targets', { project_id: pid, name, adapter, config: cfg, variant_label: label })
+      }
+      if (asTemplate) await api.post('/api/connector-templates', { name: name || 'My connection', adapter, config: cfg, description: label })
+      await api.post(`/api/targets/${t.id}/check`).catch(() => null)
+      return t
+    },
+    onSuccess: (t) => onSaved(t.id),
+  })
+  return (
+    <div className="space-y-5">
+      {adapter === 'http' && (
+        <Card title="Side effects">
+          <Toggle checked={savesChats} onChange={setSavesChats} label="Each question saves a conversation in the bot" hint="Then GaugeLab deletes it right after the answer, so test runs do not pile up in the bot's history." />
+          {savesChats && (
+            <div className="mt-3 grid gap-3 md:grid-cols-[110px_minmax(0,1fr)_200px]">
+              <Field label="Method"><Select value={cleanup.method} onChange={(e) => setCfg((c) => ({ ...c, cleanup: { ...cleanup, method: e.target.value } }))}><option>DELETE</option><option>POST</option></Select></Field>
+              <Field label="Clean-up endpoint" hint="{{raw.x}} reads a field of the reply"><Input value={cleanup.endpoint} onChange={(e) => setCfg((c) => ({ ...c, cleanup: { ...cleanup, endpoint: e.target.value } }))} /></Field>
+              <Field label="Only if the reply has"><Input value={cleanup.only_if ?? ''} onChange={(e) => setCfg((c) => ({ ...c, cleanup: { ...cleanup, only_if: e.target.value || undefined } }))} /></Field>
+            </div>
+          )}
+          <Explain className="mt-3">Also check what else a question writes (usage tables, shared logs, budgets) before pointing GaugeLab at a shared instance. When that is not acceptable, use an isolated copy or import logs instead.</Explain>
+        </Card>
+      )}
+      <Card title="Dry run" subtitle="A few real questions, to see speed and cost before a full run">
+        <div className="flex flex-wrap items-end gap-2">
+          <Field label="Questions from (optional)">
+            <Select className="w-72" value={dsv} onChange={(e) => setDsv(e.target.value ? Number(e.target.value) : '')}>
+              <option value="">Three generic questions</option>
+              {(datasets.data ?? []).flatMap((d) => d.versions.map((v) => <option key={v.id} value={v.id}>{d.name} v{v.version} ({v.case_count} cases)</option>))}
+            </Select>
+          </Field>
+          <Button loading={dry.isPending} onClick={() => dry.mutate()}><Send className="size-3.5" />Ask 3 questions</Button>
+        </div>
+        {dry.isError && <div className="mt-2"><ErrorState error={dry.error} /></div>}
+        {dry.data && (
+          <div className="mt-3 space-y-2">
+            {dry.data.calls.map((c, i) => (
+              <div key={i} className="flex items-start gap-2 text-[13px]">
+                {c.ok ? <Check className="mt-0.5 size-4 text-good-ink" /> : <X className="mt-0.5 size-4 text-bad-ink" />}
+                <span className="min-w-0 flex-1"><span className="text-ink-2">{c.question}</span><span className="block truncate text-xs text-ink-3">{c.ok ? c.answer : c.explanation ?? c.error}</span></span>
+                <span className="num text-xs text-ink-3">{ms(c.elapsed_ms)}{c.cleanup && ` - clean-up ${c.cleanup}`}</span>
+              </div>
+            ))}
+            <Notice tone="info" title={`A full run (${dry.data.full_run_calls} questions): ${dry.data.full_run_seconds !== null ? `~${Math.max(1, Math.round(dry.data.full_run_seconds / 60))} min` : 'time unknown'}, ${dry.data.full_run_cost_usd !== null ? usd(dry.data.full_run_cost_usd) : 'cost unknown (no token counts or price)'}`}>
+              At 4 questions in parallel, from the median of these answers ({ms(dry.data.median_ms)}).
+            </Notice>
+          </div>
+        )}
+      </Card>
+      <Card title={editing ? `Save as version ${editing.latest_version.version + 1}` : 'Name and save'}>
+        <div className="grid gap-3 md:grid-cols-2">
+          {!editing && (
+            <Field label="Chatbot" hint="A chatbot groups its versions, datasets and gates.">
+              <div className="flex gap-2">
+                <Segmented size="sm" value={projectMode} onChange={setProjectMode} options={[{ id: 'existing', label: 'Existing' }, { id: 'new', label: 'New' }]} />
+                {projectMode === 'existing'
+                  ? <Select value={projectId} onChange={(e) => setProjectId(Number(e.target.value))}>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select>
+                  : <Input placeholder="e.g. Support Assistant" value={newProject} onChange={(e) => setNewProject(e.target.value)} />}
+              </div>
+            </Field>
+          )}
+          {!editing && <Field label="Name of this target"><Input placeholder="e.g. Support bot - staging" value={name} onChange={(e) => setName(e.target.value)} /></Field>}
+          <Field label="What distinguishes this version" hint="Model, prompt, retriever..."><Input placeholder="e.g. gpt-x / hybrid top-20" value={label} onChange={(e) => setLabel(e.target.value)} /></Field>
+          {editing && <Field label="What changed"><Input value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>}
+        </div>
+        <label className="mt-3 flex items-center gap-2 text-[13px]"><input type="checkbox" className="accent-[var(--accent)]" checked={asTemplate} onChange={(e) => setAsTemplate(e.target.checked)} />Also save as a template for connecting similar bots</label>
+        {save.isError && <div className="mt-3"><ErrorState error={save.error} /></div>}
+        <Button variant="primary" size="lg" className="mt-4" loading={save.isPending} disabled={!editing && !name.trim()} onClick={() => save.mutate()}>
+          <Check className="size-4" />{editing ? `Save version ${editing.latest_version.version + 1}` : 'Save connection'}
+        </Button>
+      </Card>
+    </div>
+  )
+}
+
+function AdvancedPanel({ adapter, cfg, setCfg }: { adapter: string; cfg: Cfg; setCfg: (f: (c: Cfg) => Cfg) => void }) {
+  const [text, setText] = useState(JSON.stringify(cfg, null, 2))
+  const [err, setErr] = useState<string | null>(null)
+  const [focused, setFocused] = useState(false)
+  const shown = useMemo(() => JSON.stringify(cfg, null, 2), [cfg])
+  useEffect(() => { if (!focused) setText(shown) }, [shown, focused])
+  return (
+    <div className="xl:sticky xl:top-16 xl:self-start">
+      <Card title={`Configuration (${adapter})`} subtitle="The record of this connection. Edits here update the steps, and the other way round.">
+        <Textarea rows={26} value={text} spellCheck={false} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+          onChange={(e) => { setText(e.target.value); try { const v = JSON.parse(e.target.value); setCfg(() => v); setErr(null) } catch { setErr('Not valid JSON yet - the steps keep the last valid version.') } }} />
+        {err && <p className="mt-1 text-xs text-warn-ink">{err}</p>}
+        <p className="mt-2 text-xs text-ink-3">Same format as YAML experiment files and <code>local/targets/*.yaml</code>.</p>
+      </Card>
+    </div>
+  )
+}
+
+// --------------------------------------------------------------------------------------
+// Logs import: drop a file, preview, map columns by picking
+// --------------------------------------------------------------------------------------
+
+function LogsImport({ projects, onDone }: { projects: Project[]; onDone: (targetId: number) => void }) {
+  const [file, setFile] = useState<File | null>(null)
+  const [name, setName] = useState('Production log')
+  const [projectId, setProjectId] = useState<number | ''>(projects[0]?.id ?? '')
+  const [roles, setRoles] = useState<Record<string, string>>({})
+  const preview = useMutation({
+    mutationFn: (f: File) => { const fd = new FormData(); fd.append('file', f); return api.upload<{ rows: Record<string, unknown>[]; columns: { name: string; type: string; sample: unknown }[]; guess: Record<string, string>; bad_lines: number; approx_lines: number | null }>('/api/imports/preview', fd) },
+    onSuccess: (p) => setRoles(p.guess),
+  })
+  const imp = useMutation({
+    mutationFn: async () => {
+      const response: Record<string, unknown> = { answer: roles.answer ?? 'answer' }
+      if (roles.sources) response.retrieved_documents = { path: roles.sources, each: { id: roles.source_id || 'id|doc_id|source', text: roles.source_text || 'text|content' } }
+      const config: Record<string, unknown> = { case_id: roles.case_id ?? 'id', message: roles.message ?? 'question', response, skip_invalid_lines: true }
+      if (roles.category) config.category = roles.category
+      if (roles.latency_ms) config.latency_ms = roles.latency_ms
+      if (roles.latency_s) config.latency_s = roles.latency_s
+      const fd = new FormData()
+      fd.append('project_id', String(projectId || projects[0]?.id || 1))
+      fd.append('name', name)
+      fd.append('config', JSON.stringify(config))
+      fd.append('file', file!)
+      return api.upload<{ target_id?: number; target?: { id: number } }>('/api/imports', fd)
+    },
+    onSuccess: (r) => onDone(r.target_id ?? r.target?.id ?? 0),
+  })
+  const cols = preview.data?.columns ?? []
+  const ROLE_LIST: [string, string][] = [['case_id', 'Id'], ['message', 'Question'], ['answer', 'Answer'], ['sources', 'Sources (list)'], ['category', 'Category'], ['latency_ms', 'Latency (ms)'], ['latency_s', 'Latency (s)']]
+  return (
+    <Card title="Import past answers">
+      <label className={clsx('flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-8 text-[13px] transition-colors', file ? 'border-good/50 bg-good-wash/30' : 'border-line-strong hover:border-accent')}
+        onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) { setFile(f); preview.mutate(f) } }}>
+        <FileUp className="size-6 text-ink-3" />
+        {file ? <span><b>{file.name}</b> - {Math.round(file.size / 1024)} KB</span> : <span>Drop a <b>.jsonl</b>, <b>.json</b> or <b>.csv</b> file, or click to choose</span>}
+        <input type="file" accept=".jsonl,.json,.csv,.ndjson" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) { setFile(f); preview.mutate(f) } }} />
+      </label>
+      {preview.isError && <div className="mt-3"><ErrorState error={preview.error} /></div>}
+      {preview.data && (
+        <div className="mt-4 space-y-4">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {ROLE_LIST.map(([k, l]) => (
+              <Field key={k} label={l}>
+                <Select value={roles[k] ?? ''} onChange={(e) => setRoles((r) => ({ ...r, [k]: e.target.value }))}>
+                  <option value="">-</option>{cols.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+                </Select>
+              </Field>
+            ))}
+          </div>
+          <div className="scroll-thin max-h-72 overflow-auto rounded-lg border border-line">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-surface-2"><tr>{cols.slice(0, 8).map((c) => <th key={c.name} className={clsx('px-2 py-1 text-left font-medium', Object.values(roles).includes(c.name) && 'text-accent-ink')}>{c.name}</th>)}</tr></thead>
+              <tbody>{preview.data.rows.slice(0, 10).map((r, i) => <tr key={i} className="border-t border-line">{cols.slice(0, 8).map((c) => <td key={c.name} className="max-w-48 truncate px-2 py-1">{typeof r[c.name] === 'object' ? JSON.stringify(r[c.name]) : String(r[c.name] ?? '')}</td>)}</tr>)}</tbody>
+            </table>
+          </div>
+          {preview.data.bad_lines > 0 && <p className="text-xs text-warn-ink">{preview.data.bad_lines} unreadable line(s) will be skipped.</p>}
+          <div className="grid gap-3 md:grid-cols-2">
+            <Field label="Chatbot"><Select value={projectId} onChange={(e) => setProjectId(Number(e.target.value))}>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
+            <Field label="Name"><Input value={name} onChange={(e) => setName(e.target.value)} /></Field>
+          </div>
+          {imp.isError && <ErrorState error={imp.error} />}
+          <Button variant="primary" loading={imp.isPending} disabled={!roles.message} onClick={() => imp.mutate()}><FileUp className="size-3.5" />Import</Button>
+          <Explain>Creates a dataset of the logged questions and a "replay" target that answers with what was logged - graded without calling the bot.</Explain>
+        </div>
+      )}
+    </Card>
+  ) as ReactNode
+}
+
+// Re-exported for the target page's test panel.
+export { Json }

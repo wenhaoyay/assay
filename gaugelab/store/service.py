@@ -498,6 +498,29 @@ async def execute_run(run_id: int) -> None:
             run.status = "completed_with_errors" if errs or stop == "budget" else "completed"
             run.stop_reason = stop
         refresh_summary(s, run)
+        auto_gate(s, run)
+
+
+def auto_gate(s: Session, run: m.Run) -> m.GateResult | None:
+    """A run started with a gate is checked against it when it finishes, relative to the experiment's
+    baseline run or else the previous comparable run (same cases, checks and judge)."""
+    if run.status not in ("completed", "completed_with_errors"):
+        return None
+    e = s.get(m.Experiment, run.experiment_id)
+    if e is None or e.gate_id is None:
+        return None
+    gate = s.get(m.RegressionGate, e.gate_id)
+    if gate is None:
+        return None
+    from gaugelab.store.insights import comparability
+
+    baseline = e.baseline_run_id
+    if baseline is None:
+        key = comparability(run)["key"]
+        prev = s.scalars(select(m.Run).where(m.Run.id < run.id, m.Run.status.in_(["completed", "completed_with_errors"]))
+                         .order_by(m.Run.id.desc())).all()
+        baseline = next((r.id for r in prev if comparability(r)["key"] == key), None)
+    return apply_gate(s, run.id, gate.config, baseline, gate.id)
 
 
 def cancel_run(s: Session, run_id: int) -> m.Run:
@@ -669,6 +692,7 @@ async def execute_reevaluation(new_run_id: int) -> None:
         else:
             run.status = "completed_with_errors" if failed else "completed"
         refresh_summary(s, run)
+        auto_gate(s, run)
 
 
 class _Cancelled(Exception):

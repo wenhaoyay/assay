@@ -3,10 +3,12 @@ import clsx from 'clsx'
 import { Download, FileUp, Lock, Plus, Sparkles } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { Badge, Button, Card, Empty, ErrorState, Field, Input, Json, Loading, Notice, PageHeader, Select, StatusBadge, Table, Tabs, Textarea } from '../components/ui'
+import { CaseMatrixView, MatrixLegend } from '../components/viz'
+import { Badge, Button, Card, Empty, ErrorState, Explain, Field, Input, Json, Loading, Notice, PageHeader, Segmented, Select, StatusBadge, Table, Tabs, Textarea } from '../components/ui'
 import { api } from '../lib/api'
+import { useCrumbs } from '../lib/crumbs'
 import { when } from '../lib/format'
-import type { Candidate, Dataset, DatasetVersion, EditResult, Project, ProviderConfig, TestCase } from '../lib/types'
+import type { Candidate, CaseMatrix, Dataset, DatasetVersion, EditResult, Project, ProviderConfig, TestCase } from '../lib/types'
 
 export function VersionBadge({ v }: { v: Pick<DatasetVersion, 'version' | 'status' | 'run_count'> }) {
   return (
@@ -32,6 +34,7 @@ function GroundTruthNote() {
 }
 
 export function DatasetsPage() {
+  useCrumbs([{ label: 'Setup' }, { label: 'Datasets' }], 'datasets')
   const qc = useQueryClient()
   const datasets = useQuery({ queryKey: ['datasets'], queryFn: () => api.get<Dataset[]>('/api/datasets') })
   const projects = useQuery({ queryKey: ['projects'], queryFn: () => api.get<Project[]>('/api/projects') })
@@ -103,7 +106,7 @@ export function DatasetsPage() {
   )
 }
 
-type DTab = 'cases' | 'generate' | 'versions'
+type DTab = 'cases' | 'history' | 'generate' | 'versions'
 
 export function DatasetPage() {
   const { id } = useParams()
@@ -117,6 +120,10 @@ export function DatasetPage() {
     enabled: !!versionId,
   })
   const [notice, setNotice] = useState<string | null>(null)
+  const projects = useQuery({ queryKey: ['projects'], queryFn: () => api.get<Project[]>('/api/projects') })
+  const matrix = useQuery({ queryKey: ['matrix', id], queryFn: () => api.get<CaseMatrix>(`/api/datasets/${id}/matrix?limit=12`) })
+  const project = projects.data?.find((p) => p.id === ds.data?.project_id)
+  useCrumbs([...(project ? [{ label: project.name, to: `/p/${project.id}` }] : [{ label: 'Datasets', to: '/datasets' }]), { label: ds.data?.name ?? '...' }], `dataset-${id}-${ds.data?.name}-${project?.name}`)
   if (ds.isLoading) return <Loading />
   if (ds.isError) return <ErrorState error={ds.error} />
   const d = ds.data!
@@ -129,10 +136,9 @@ export function DatasetPage() {
         description={d.description}
         actions={
           <>
-            <Select aria-label="Version" value={versionId} onChange={(e) => switchTo(Number(e.target.value))} className="w-40">
-              {[...d.versions].reverse().map((v) => <option key={v.id} value={v.id}>v{v.version} ({v.status}, {v.case_count})</option>)}
+            <Select aria-label="Version" value={versionId} onChange={(e) => switchTo(Number(e.target.value))} className="w-72">
+              {[...d.versions].reverse().map((v) => <option key={v.id} value={v.id}>v{v.version} - {v.case_count} cases - {v.status === 'frozen' ? `frozen, used by ${v.run_count} run${v.run_count === 1 ? '' : 's'}` : 'draft'}</option>)}
             </Select>
-            {version.data && <VersionBadge v={version.data} />}
             <a className="inline-flex h-8 items-center gap-1.5 rounded-md border border-line-strong bg-surface px-3 text-[13px] hover:bg-surface-2" href={`/api/dataset-versions/${versionId}/export?format=yaml`}><Download className="size-3.5" /> YAML</a>
             <a className="inline-flex h-8 items-center gap-1.5 rounded-md border border-line-strong bg-surface px-3 text-[13px] hover:bg-surface-2" href={`/api/dataset-versions/${versionId}/export?format=json`}><Download className="size-3.5" /> JSON</a>
           </>
@@ -142,6 +148,7 @@ export function DatasetPage() {
       <Tabs
         tabs={[
           { id: 'cases', label: `Cases${version.data ? ` (${version.data.case_count})` : ''}` },
+          { id: 'history', label: 'Results across runs' },
           { id: 'generate', label: <span className="inline-flex items-center gap-1.5"><Sparkles className="size-3.5" /> Generate &amp; review{d.unreviewed_candidates ? <Badge tone="warn">{d.unreviewed_candidates}</Badge> : null}</span> },
           { id: 'versions', label: `Versions (${d.versions.length})` },
         ]}
@@ -152,11 +159,14 @@ export function DatasetPage() {
         {tab === 'cases' && (version.isLoading ? <Loading /> : version.isError ? <ErrorState error={version.error} /> : version.data && (
           <CasesPanel
             version={version.data}
+            matrix={matrix.data}
+            focus={params.get('case')}
             onEdited={(r) => {
               if (r.branched) { setNotice(r.notice ?? null); switchTo(r.id) }
             }}
           />
         ))}
+        {tab === 'history' && <HistoryPanel matrix={matrix.data} loading={matrix.isLoading} focus={params.get('case')} />}
         {tab === 'generate' && versionId && <GeneratePanel datasetId={d.id} versionId={versionId} onPromoted={(r) => { if (r.branched) setNotice(r.notice ?? null); switchTo(r.id); setTab('cases') }} />}
         {tab === 'versions' && (
           <Card padded={false}>
@@ -186,18 +196,48 @@ export function DatasetPage() {
 function expectedSummary(c: TestCase): string[] {
   const e = c.expected
   const out: string[] = []
-  if (e.answer.reference) out.push('reference')
-  if (e.answer.must_mention.length) out.push(`mention ${e.answer.must_mention.length}`)
-  if (e.answer.must_not_claim.length) out.push(`forbid ${e.answer.must_not_claim.length}`)
-  if (e.answer.regex.length) out.push('regex')
-  if (e.relevant_documents.length) out.push(`docs ${e.relevant_documents.length}`)
-  if (e.required_tools.length || e.tool_calls.length) out.push('tools')
+  if (e.answer.reference) out.push('reference answer')
+  if (e.answer.must_mention.length) out.push(`must mention ${e.answer.must_mention.length}`)
+  if (e.answer.must_not_claim.length) out.push(`must not claim ${e.answer.must_not_claim.length}`)
+  if (e.answer.regex.length) out.push('pattern')
+  if (e.relevant_documents.length) out.push(`${e.relevant_documents.length} document${e.relevant_documents.length === 1 ? '' : 's'} needed`)
+  if (e.required_tools.length || e.tool_calls.length) out.push('tool use')
   if (Object.keys(e.expected_outcome).length) out.push('outcome')
-  if (e.refusal_expected === true) out.push('refuse')
+  if (e.refusal_expected === true) out.push('should decline')
   return out
 }
 
-function CasesPanel({ version, onEdited }: { version: DatasetVersion; onEdited: (r: EditResult) => void }) {
+function CaseHistory({ matrix, caseId }: { matrix?: CaseMatrix; caseId: string }) {
+  if (!matrix) return null
+  const row = matrix.cells[caseId] ?? {}
+  const runs = matrix.runs.filter((r) => row[String(r.id)])
+  if (!runs.length) return <span className="text-xs text-ink-3">not run</span>
+  return (
+    <span className="inline-flex items-center gap-[3px]" title={runs.map((r) => `#${r.id}: ${row[String(r.id)].passed}/${row[String(r.id)].total}`).join('\n')}>
+      {runs.slice(-8).map((r) => {
+        const v = row[String(r.id)]
+        return <Link key={r.id} to={`/runs/${r.id}?tab=cases&case=${encodeURIComponent(caseId)}`} onClick={(e) => e.stopPropagation()} aria-label={`Run ${r.id}: ${v.passed} of ${v.total} passed`}
+          className={clsx('size-2.5 rounded-[3px]', v.passed === v.total ? 'bg-good' : v.passed === 0 ? 'bg-bad' : 'bg-flaky', r.judge === 'heuristic' && 'hatched')} />
+      })}
+      {matrix.always_fail.includes(caseId) && <Badge tone="bad" className="ml-1">always fails</Badge>}
+    </span>
+  )
+}
+
+function HistoryPanel({ matrix, loading, focus }: { matrix?: CaseMatrix; loading: boolean; focus: string | null }) {
+  const [filter, setFilter] = useState<'all' | 'changed' | 'always_fail' | 'flaky'>('all')
+  if (loading || !matrix) return <Loading />
+  if (!matrix.runs.length) return <Empty title="No runs on this dataset yet">Each completed run adds a column here.</Empty>
+  return (
+    <Card padded={false} title="Every case in every run" subtitle={`${matrix.cases.length} cases x ${matrix.runs.length} runs (oldest on the left)`}
+      actions={<Segmented size="sm" value={filter} onChange={setFilter} options={[{ id: 'all', label: 'All' }, { id: 'changed', label: 'Changed' }, { id: 'flaky', label: 'Flaky' }, { id: 'always_fail', label: `Always failing ${matrix.always_fail.length}` }]} />}>
+      <div className="border-b border-line px-4 py-2"><MatrixLegend /><Explain className="mt-1">A case that fails in every run, whatever the version, is often a wrong or outdated golden answer rather than a bad bot.</Explain></div>
+      <CaseMatrixView data={matrix} filter={filter} focusCase={focus} />
+    </Card>
+  )
+}
+
+function CasesPanel({ version, onEdited, matrix, focus }: { version: DatasetVersion; onEdited: (r: EditResult) => void; matrix?: CaseMatrix; focus?: string | null }) {
   const cases = useMemo(() => version.cases ?? [], [version.cases])
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
@@ -228,16 +268,16 @@ function CasesPanel({ version, onEdited }: { version: DatasetVersion; onEdited: 
       ) : (
         <Card padded={false}>
           <Table>
-            <thead><tr><th>Id</th><th>Question</th><th>Category</th><th>Difficulty</th><th>Expectations</th><th></th></tr></thead>
+            <thead><tr><th>Id</th><th>Question</th><th>Category</th><th>What a right answer needs</th><th>Recent runs</th><th></th></tr></thead>
             <tbody>
               {shown.map((c) => (
-                <tr key={c.id} className="align-top hover:bg-surface-2/60">
+                <tr key={c.id} className={clsx('align-top hover:bg-surface-2/60', focus === c.id && 'bg-accent-wash')}>
                   <td className="whitespace-nowrap font-mono text-xs">{c.id}{c.metadata?.generated ? <Badge tone="info" className="ml-1">generated</Badge> : null}</td>
                   <td className="max-w-xl"><div className="font-medium">{c.title}</div><div className="text-ink-2">{c.input.message}</div></td>
-                  <td><Badge>{c.category}</Badge></td>
-                  <td className="text-ink-2">{c.difficulty}</td>
+                  <td><Badge>{c.category}</Badge><div className="mt-0.5 text-[11px] text-ink-3">{c.difficulty}</div></td>
                   <td><div className="flex flex-wrap gap-1">{expectedSummary(c).map((s) => <Badge key={s}>{s}</Badge>)}</div></td>
-                  <td><Button size="sm" variant="ghost" onClick={() => setEditing(c)}>Edit</Button></td>
+                  <td><CaseHistory matrix={matrix} caseId={c.id} /></td>
+                  <td><Button size="sm" variant="ghost" onClick={() => setEditing(c)}>{version.status === 'frozen' ? 'Edit (new version)' : 'Edit'}</Button></td>
                 </tr>
               ))}
             </tbody>

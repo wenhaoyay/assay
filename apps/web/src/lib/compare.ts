@@ -53,3 +53,27 @@ export function validateSetup(s: SetupState, judgeIds: string[]): string[] {
   if (judges.length && !s.judge) errors.push(`Judge evaluators selected (${judges.join(', ')}) but no judge chosen.`)
   return errors
 }
+
+/** One plain sentence for a comparison: the overall change, how sure, and what moved. */
+export function verdictSentence(o: { overall: ComparisonRow | null; regressions: number; improvements: number; rows?: ComparisonRow[] }): { text: string; tone: 'good' | 'bad' | 'neutral' } {
+  const r = o.overall
+  if (!r || r.delta === null) return { text: 'Not enough shared cases to compare.', tone: 'neutral' }
+  const read = reading(r)
+  const pp = `${r.delta > 0 ? '+' : ''}${(r.delta * 100).toFixed(1)}pp`
+  const head =
+    read.text === 'likely better' ? `Better: pass rate up ${pp}, beyond noise.`
+    : read.text === 'likely worse' ? `Worse: pass rate down ${pp.replace('-', '')}, beyond noise.`
+    : r.delta === 0 ? 'No change in pass rate.'
+    : `No reliable difference: pass rate ${pp}, within noise.`
+  const moved = `${o.regressions} case${o.regressions === 1 ? '' : 's'} regressed, ${o.improvements} improved.`
+  const extras: string[] = []
+  for (const row of o.rows ?? []) {
+    // Rates are already in the sentence as percentage points; mention big moves in latency, tokens, cost.
+    if (row.unit === 'rate' || row.unit === 'score' || row.relative === null || row.relative === undefined) continue
+    if (Math.abs(row.relative) >= 0.25) {
+      const word = row.unit === 'cost' ? 'cost' : row.label.toLowerCase()
+      extras.push(`${word} ${row.relative > 0 ? 'up' : 'down'} ${Math.abs(row.relative * 100).toFixed(0)}%`)
+    }
+  }
+  return { text: [head, moved, extras.length ? `Also: ${extras.join(', ')}.` : ''].filter(Boolean).join(' '), tone: read.tone }
+}

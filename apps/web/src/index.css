@@ -2,86 +2,128 @@
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
-/* Design tokens. Chart chrome, series and status colours come from the validated
-   reference palette (blue/orange series, fixed status steps). Light and dark are each
-   chosen, not flipped. Components use these roles, never raw hex. */
+/* Design tokens - "a precision instrument": calm surfaces, one accent (teal) for "you are here"
+   and the primary act, and colour otherwise only where it means something. The six states have
+   fixed colours everywhere: pass, fail, flaky, not tested, error, heuristic (hatched).
+   Series 1/2 (blue/orange) are the baseline/candidate pair in charts and stay distinct from the
+   accent. Light and dark are each designed, not flipped. Components use these roles, never hex. */
 :root {
   color-scheme: light;
-  --page: #f6f6f4;
-  --surface: #fcfcfb;
-  --surface-2: #f1f1ee;
-  --ink: #0b0b0b;
-  --ink-2: #52514e;
-  --ink-3: #6e6c66;
-  --line: #e1e0d9;
-  --line-strong: #c3c2b7;
-  --accent: #2a78d6;
-  --accent-ink: #1c5cab;
+  --page: #f4f5f3;
+  --surface: #fdfdfc;
+  --surface-2: #f0f1ee;
+  --surface-3: #e7e8e4;
+  --ink: #0f1514;
+  --ink-2: #4a524f;
+  --ink-3: #69716d;
+  --line: #e0e2dd;
+  --line-strong: #c4c8c1;
+  --accent: #0f7f7c;
+  --accent-strong: #0b6966;
+  --accent-ink: #0a5f5c;
+  --accent-wash: #e2f2f0;
+  --on-accent: #ffffff;
   --series-1: #2a78d6;
   --series-2: #eb6834;
-  --good: #0ca30c;
-  --good-ink: #006300;
-  --warn: #fab219;
-  --warn-ink: #7a5000;
+  --good: #149a3c;
+  --good-ink: #0d6b29;
+  --good-wash: #e3f4e7;
   --bad: #d03b3b;
   --bad-ink: #a32727;
-  --good-wash: #e6f4e6;
-  --warn-wash: #fdf2dc;
   --bad-wash: #fbe8e8;
-  --info-wash: #e7f0fb;
+  --warn: #e0a106;
+  --warn-ink: #7a5300;
+  --warn-wash: #fcf2d9;
+  --flaky: #e0a106;
+  --error: #8a4fd0;
+  --error-ink: #6a32ad;
+  --error-wash: #f1e8fb;
+  --untested: #b4b9b2;
+  --info-wash: #e5f1f0;
+  --shadow: 0 1px 2px rgb(15 21 20 / 0.05), 0 4px 16px -6px rgb(15 21 20 / 0.08);
+  --shadow-pop: 0 10px 40px -10px rgb(15 21 20 / 0.28), 0 2px 6px rgb(15 21 20 / 0.08);
+  --row-py: 0.5rem;
+  --card-p: 1rem;
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --page: #0d0d0d;
-  --surface: #1a1a19;
-  --surface-2: #232321;
-  --ink: #ffffff;
-  --ink-2: #c3c2b7;
-  --ink-3: #9a988f;
-  --line: #2c2c2a;
-  --line-strong: #43423e;
-  --accent: #3987e5;
-  --accent-ink: #86b6ef;
-  --series-1: #3987e5;
-  --series-2: #d95926;
-  --good: #0ca30c;
-  --good-ink: #4cc24c;
-  --warn: #fab219;
-  --warn-ink: #fab219;
-  --bad: #d03b3b;
-  --bad-ink: #ec7373;
-  --good-wash: #12260f;
+  --page: #0b0e0e;
+  --surface: #131817;
+  --surface-2: #1b2120;
+  --surface-3: #232a29;
+  --ink: #eef3f1;
+  --ink-2: #b6c0bc;
+  --ink-3: #8b9692;
+  --line: #242c2a;
+  --line-strong: #364240;
+  --accent: #2bb5ad;
+  --accent-strong: #3ccac2;
+  --accent-ink: #6fd8d0;
+  --accent-wash: #0f2a28;
+  --on-accent: #04120f;
+  --series-1: #4b93e8;
+  --series-2: #f07a45;
+  --good: #2fbf5a;
+  --good-ink: #6fd98d;
+  --good-wash: #10261a;
+  --bad: #e5534b;
+  --bad-ink: #f28b85;
+  --bad-wash: #2d1414;
+  --warn: #f0b429;
+  --warn-ink: #f5c95c;
   --warn-wash: #2b230f;
-  --bad-wash: #2e1414;
-  --info-wash: #12233a;
+  --flaky: #f0b429;
+  --error: #a879e6;
+  --error-ink: #c4a3f2;
+  --error-wash: #221a33;
+  --untested: #4a5552;
+  --info-wash: #0f2422;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 6px 20px -8px rgb(0 0 0 / 0.5);
+  --shadow-pop: 0 14px 50px -12px rgb(0 0 0 / 0.75), 0 2px 8px rgb(0 0 0 / 0.4);
+}
+
+:root[data-density="compact"] {
+  --row-py: 0.28rem;
+  --card-p: 0.75rem;
 }
 
 @theme inline {
   --color-page: var(--page);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
   --color-ink: var(--ink);
   --color-ink-2: var(--ink-2);
   --color-ink-3: var(--ink-3);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
   --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
   --color-accent-ink: var(--accent-ink);
+  --color-accent-wash: var(--accent-wash);
+  --color-on-accent: var(--on-accent);
   --color-series-1: var(--series-1);
   --color-series-2: var(--series-2);
   --color-good: var(--good);
   --color-good-ink: var(--good-ink);
-  --color-warn: var(--warn);
-  --color-warn-ink: var(--warn-ink);
+  --color-good-wash: var(--good-wash);
   --color-bad: var(--bad);
   --color-bad-ink: var(--bad-ink);
-  --color-good-wash: var(--good-wash);
-  --color-warn-wash: var(--warn-wash);
   --color-bad-wash: var(--bad-wash);
+  --color-warn: var(--warn);
+  --color-warn-ink: var(--warn-ink);
+  --color-warn-wash: var(--warn-wash);
+  --color-flaky: var(--flaky);
+  --color-error: var(--error);
+  --color-error-ink: var(--error-ink);
+  --color-error-wash: var(--error-wash);
+  --color-untested: var(--untested);
   --color-info-wash: var(--info-wash);
-  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --font-sans: "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --shadow-card: var(--shadow);
+  --shadow-pop: var(--shadow-pop);
 }
 
 html,
@@ -96,16 +138,22 @@ body {
   font-family: var(--font-sans);
   font-size: 14px;
   line-height: 1.45;
+  font-feature-settings: "cv11", "ss01";
   -webkit-font-smoothing: antialiased;
 }
 
 .num {
   font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum", "cv11";
 }
 
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
 .scroll-thin {
@@ -119,4 +167,111 @@ pre.code {
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* Table rows follow the density setting. */
+.gl-table td,
+.gl-table th {
+  padding: var(--row-py) 0.75rem;
+}
+
+/* Heuristic (word-overlap) judge scores: drawn hatched wherever they appear, so they are
+   never read as an LLM verdict. */
+.hatched {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--ink-3) 22%, transparent) 0 2px,
+    transparent 2px 6px
+  );
+}
+
+/* The same on a coloured fill (matrix cells). */
+.hatched-light {
+  background-image: repeating-linear-gradient(-45deg, rgb(255 255 255 / 0.55) 0 2px, transparent 2px 5px);
+}
+
+/* A row picked with j/k. */
+.kb-active {
+  box-shadow: inset 3px 0 0 var(--accent);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+/* Page changes cross-fade (View Transitions). Elements with a view-transition-name morph. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 180ms;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+:root[data-motion="reduced"] ::view-transition-group(*),
+:root[data-motion="reduced"] ::view-transition-old(*),
+:root[data-motion="reduced"] ::view-transition-new(*) {
+  animation: none !important;
+}
+
+/* Skeleton shimmer while data loads (shapes match the real layout). */
+@keyframes gl-shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 37%, var(--surface-2) 63%);
+  background-size: 400% 100%;
+  animation: gl-shimmer 1.4s ease infinite;
+  border-radius: 6px;
+}
+
+/* The logo needle twitches while a run is in progress. */
+@keyframes gl-twitch {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(-14deg); }
+  45% { transform: rotate(9deg); }
+  70% { transform: rotate(-5deg); }
+}
+.needle-live {
+  animation: gl-twitch 1.6s ease-in-out infinite;
+  transform-box: view-box;
+  transform-origin: 16px 21px;
+}
+
+:root[data-motion="reduced"] .needle-live,
+:root[data-motion="reduced"] .skeleton {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .needle-live,
+  .skeleton {
+    animation: none;
+  }
+}
+
+/* Printing a comparison or run gives a clean report (Share > Print / PDF). */
+@media print {
+  :root {
+    --page: #fff;
+    --surface: #fff;
+  }
+  aside,
+  .no-print,
+  [data-topbar] {
+    display: none !important;
+  }
+  main {
+    overflow: visible !important;
+  }
+  section {
+    break-inside: avoid;
+  }
 }

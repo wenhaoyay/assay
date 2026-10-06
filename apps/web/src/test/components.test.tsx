@@ -4,7 +4,11 @@ import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { AgreementPanel } from '../pages/Calibration'
-import { direction, reading, validateSetup } from '../lib/compare'
+import { direction, reading, validateSetup, verdictSentence } from '../lib/compare'
+import { groupByCase } from '../lib/trials'
+import { gateToRules, rulesToGate } from '../pages/Gates'
+import { HighlightedAnswer } from '../pages/Trial'
+import { Consistency, DotStrip } from '../components/ui'
 import { MetricTable } from '../pages/Compare'
 import { VersionBadge } from '../pages/Datasets'
 import { RunPage } from '../pages/Run'
@@ -69,7 +73,9 @@ describe('comparison metrics', () => {
     expect(within(row).getByText('10.0 to 30.0pp (n=58)')).toBeInTheDocument()
     const lat = screen.getByTestId('metric-p95_latency_ms')
     expect(within(lat).getByText('+20.0%')).toBeInTheDocument()
-    expect(within(lat).getByLabelText('worse')).toBeInTheDocument()
+    // the arrow says which way the number moved (up); the colour says it is worse
+    expect(within(lat).getByLabelText('up')).toBeInTheDocument()
+    expect(within(lat).getByText('+20.0%').closest('td')).toHaveClass('text-bad-ink')
   })
 })
 
@@ -108,6 +114,8 @@ describe('failure filtering', () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       const u = new URL(url, 'http://x')
       let body: unknown = run
+      if (u.pathname === '/api/runs' || u.pathname === '/api/projects') body = []
+      if (u.pathname.endsWith('/comparability')) body = { stages: [] }
       if (u.pathname.endsWith('/trials')) {
         const ft = u.searchParams.get('failure_type')
         body = [trial(1, 'retrieval_miss'), trial(2, 'wrong_answer')].filter((t) => !ft || t.failure_types.includes(ft))
@@ -121,9 +129,55 @@ describe('failure filtering', () => {
     wrap(<Routes><Route path="/runs/:id" element={<RunPage />} /></Routes>, '/runs/7?tab=failures')
     expect(await screen.findByText('case_retrieval_miss')).toBeInTheDocument()
     expect(screen.getByText('case_wrong_answer')).toBeInTheDocument()
-    await userEvent.click(screen.getAllByRole('button', { name: 'Retrieval miss' })[0])
+    await userEvent.click(screen.getByRole('button', { name: /Retrieval miss/ }))
     expect(await screen.findByText('Clear filter')).toBeInTheDocument()
     await vi.waitFor(() => expect(screen.queryByText('case_wrong_answer')).not.toBeInTheDocument())
     expect(screen.getByText('case_retrieval_miss')).toBeInTheDocument()
+  })
+})
+
+describe('verdict sentence', () => {
+  it('says better only when the interval excludes zero, and names big cost moves', () => {
+    const s = verdictSentence({ overall: rate({}), regressions: 2, improvements: 9, rows: [rate({ metric: 'average_cost_usd', label: 'Est. cost / query', unit: 'cost', delta: 0.001, relative: 0.9, ci: null })] })
+    expect(s.tone).toBe('good')
+    expect(s.text).toMatch(/^Better: pass rate up \+20.0pp, beyond noise\. 2 cases regressed, 9 improved\. Also: cost up 90%\.$/)
+    const noise = verdictSentence({ overall: rate({ delta: 0.02, ci: { delta: 0.02, ci_low: -0.05, ci_high: 0.09, n: 58, excludes_zero: false } }), regressions: 1, improvements: 1 })
+    expect(noise.text).toMatch(/^No reliable difference/)
+    expect(noise.tone).toBe('neutral')
+  })
+})
+
+describe('cases grouped from trials', () => {
+  const t = (id: number, c: string, i: number, status: string, ft: string[] = []) => ({ id, run_id: 1, case_id: c, trial_index: i, status, answer: '', latency_ms: 1000 + id, total_tokens: null, target_cost_usd: null, judge_cost_usd: null, attempts: 1, failure_types: ft, failure_override: false, failure_note: '', failed_evaluators: [], title: c, category: 'x', difficulty: null, tags: [], question: c }) as never
+  it('marks consistent failures, flaky cases and passes', () => {
+    const g = groupByCase([t(1, 'a', 0, 'failed', ['wrong_answer']), t(2, 'a', 1, 'failed'), t(3, 'b', 0, 'passed'), t(4, 'b', 1, 'failed'), t(5, 'c', 0, 'passed')])
+    const by = Object.fromEntries(g.map((x) => [x.case_id, x]))
+    expect(by.a.state).toBe('failed')
+    expect(by.a.firstFailing?.id).toBe(1)
+    expect(by.a.failure_types).toEqual(['wrong_answer'])
+    expect(by.b.state).toBe('flaky')
+    expect(by.c.state).toBe('passed')
+  })
+  it('shows tries as dots and a plain label', () => {
+    wrap(<><DotStrip statuses={['passed', 'passed', 'failed']} /><Consistency statuses={['passed', 'passed', 'failed']} /></>)
+    expect(screen.getByLabelText('2 of 3 passed')).toBeInTheDocument()
+    expect(screen.getByText(/2\/3 passed - flaky/)).toBeInTheDocument()
+  })
+})
+
+describe('gate rules', () => {
+  it('round-trips between the rule list and the stored config', () => {
+    const cfg = { overall_pass_rate: { min: 0.85 }, p95_latency_ms: { max: 3000 }, regression: { overall_pass_rate: { maximum_drop: 0.03 } } }
+    const rules = gateToRules(cfg)
+    expect(rules).toHaveLength(3)
+    expect(rulesToGate(rules)).toEqual(cfg)
+  })
+})
+
+describe('highlighted answer', () => {
+  it('marks required phrases, forbidden claims and citation markers', () => {
+    const { container } = wrap(<HighlightedAnswer text="Up to 18 hours [device_beta], never 30 hours." good={['18 hours']} bad={['30 hours']} />)
+    const marks = [...container.querySelectorAll('mark')].map((m) => m.textContent)
+    expect(marks).toEqual(['18 hours', '[device_beta]', '30 hours'])
   })
 })

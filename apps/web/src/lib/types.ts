@@ -8,6 +8,8 @@ export interface Project {
   id: number
   name: string
   description: string
+  color?: string
+  icon?: string
 }
 
 export interface TargetVersion {
@@ -26,6 +28,8 @@ export interface Target {
   name: string
   description: string
   adapter: 'http' | 'python' | 'replay'
+  local_judges_only?: boolean
+  last_check?: TargetCheck | null
   latest_version: TargetVersion
   versions?: TargetVersion[]
 }
@@ -120,6 +124,11 @@ export interface JudgeInfo {
 export interface RunHeader {
   id: number
   experiment_id: number
+  project_id?: number | null
+  target_id?: number | null
+  dataset_id?: number | null
+  comparability_key?: string
+  case_filter?: Record<string, string[]> | null
   experiment: string
   status: RunStatus
   source: 'live' | 'imported' | 'reevaluated'
@@ -351,9 +360,16 @@ export interface ProviderConfig {
   model: string
   base_url: string | null
   api_key_ref: string | null
-  key_status: 'set' | 'missing' | null
+  key_status: 'set' | 'missing' | 'invalid' | null
+  key_hint?: string | null
+  key_kind?: 'env' | 'keyring' | null
   temperature: number
   max_tokens: number
+  local?: boolean
+  catalog_id?: string
+  used_by_runs?: boolean
+  default_for?: string[]
+  calibration?: { n: number; by_dimension: Record<string, number>; status: string }
 }
 
 export interface Experiment {
@@ -400,6 +416,8 @@ export interface Agreement {
 export interface CalibrationStats {
   dimension: string
   status: string
+  by_judge?: Record<string, number>
+  judge_filter?: string | null
   agreement: Agreement
   judges: { provider: string; model: string; prompt_hash: string }[]
   disagreements: {
@@ -442,4 +460,166 @@ export interface Candidate {
   edited: boolean
   approved_in_version_id: number | null
   document: string | null
+}
+
+export interface TargetCheck {
+  ok: boolean
+  at: string
+  elapsed_ms?: number | null
+  error?: string | null
+  explanation?: string | null
+  coverage?: string[]
+  note?: string
+}
+
+export interface ProjectCard {
+  id: number
+  name: string
+  description: string
+  color: string
+  icon: string
+  created_at: string | null
+  counts: { targets: number; datasets: number; runs: number }
+  active_runs: number
+  latest_run_id: number | null
+  latest_pass_rate: number | null
+  previous_pass_rate: number | null
+  previous_run_id: number | null
+  latest_at: string | null
+  gate_status: GateStatus | null
+  trend: { run_id: number; pass_rate: number | null }[]
+}
+
+export interface Settings {
+  default_judge: { provider_config_id?: number; provider?: 'heuristic' } | null
+  default_generator: { provider_config_id?: number } | null
+  spend_cap_usd: number | null
+}
+
+export interface HomeData {
+  projects: ProjectCard[]
+  active_runs: RunHeader[]
+  settings: Settings
+  has_providers: boolean
+}
+
+export interface Comparability {
+  key: string
+  dataset: string | null
+  dataset_version: number | null
+  n_cases: number | null
+  case_filter: Record<string, string[]> | null
+  judge: string | null
+  evaluators: string[]
+  trials: number | null
+}
+
+export interface Lineage {
+  key: string
+  comparability: Comparability
+  run_ids: number[]
+  points: { run_id: number; target: string; variant: string; pass_rate: number | null; p95_latency_ms: number | null; cost: number | null; at: string | null }[]
+}
+
+export interface Stage {
+  id: string
+  label: string
+  failures: number
+  checks: string[]
+  types: Record<string, number>
+}
+
+export interface ProjectHome {
+  project: ProjectCard
+  lineages: Lineage[]
+  verdict: {
+    baseline_run_id: number
+    candidate_run_id: number
+    overall: ComparisonRow | null
+    regressions: number
+    improvements: number
+    n_shared_cases: number
+    rows: ComparisonRow[]
+  } | null
+  top_failures: { type: string; count: number }[]
+  latest_run: RunHeader | null
+  recent_runs: RunHeader[]
+  targets: { id: number; name: string; adapter: string; last_check: TargetCheck | null; local_judges_only: boolean; version: number; variant_label: string }[]
+  datasets: { id: number; name: string; versions: number; cases: number }[]
+  stages: Stage[]
+}
+
+export interface CaseMatrix {
+  runs: { id: number; name: string; target: string; variant: string; judge: string | null; pass_rate: number | null }[]
+  cases: { id: string; title: string; category: string | null }[]
+  cells: Record<string, Record<string, { passed: number; total: number; errors: number }>>
+  always_fail: string[]
+}
+
+export interface SearchResults {
+  projects: { id: number; name: string }[]
+  targets: { id: number; name: string; project_id: number }[]
+  runs: { id: number; name: string; status: string }[]
+  datasets: { id: number; name: string }[]
+  cases: { id: string; title: string; dataset_id: number; dataset: string }[]
+}
+
+export interface CatalogEntry {
+  id: string
+  label: string
+  kind: 'openai' | 'ollama' | 'anthropic'
+  base_url: string
+  local: boolean
+  key_name: string | null
+  needs_key: boolean
+  blurb: string
+  key_url?: string
+}
+
+export interface ModelCheck {
+  ok: boolean
+  tries: number
+  answered: number
+  valid_json: number
+  json_reliability: number | null
+  median_ms: number | null
+  cost_per_100_calls_usd: number | null
+  price_known: boolean
+  error: string | null
+  explanation: string | null
+  warnings: string[]
+}
+
+export interface Bakeoff {
+  id: number
+  dimension: string
+  status: 'running' | 'completed' | 'failed'
+  judges: { provider_config_id?: number; provider?: string }[]
+  progress_done: number
+  progress_total: number
+  error: string | null
+  created_at: string
+  results: {
+    judges: { judge: Record<string, unknown>; name: string; agreement: Agreement; unknown: number; median_ms: number | null; cost_usd: number; n: number }[]
+    pairwise: { a: string; b: string; kappa: number | null }[]
+    winner: string | null
+  } | null
+}
+
+export interface ConnectorTemplate {
+  id: string
+  name: string
+  description: string
+  adapter: 'http' | 'python'
+  config: Record<string, unknown>
+  builtin: boolean
+}
+
+export interface Capability {
+  field: string
+  label: string
+  unlocks: string
+  mapped: boolean
+  received: boolean
+  count: number | null
 }
