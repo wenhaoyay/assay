@@ -143,7 +143,7 @@ function Providers() {
 function Pricing() {
   const qc = useQueryClient()
   const q = useQuery({ queryKey: ['pricing'], queryFn: () => api.get<{ provider: string; model: string; input_per_1m: number; output_per_1m: number; effective_from: string; source_note: string }[]>('/api/pricing') })
-  const [f, setF] = useState({ provider: '', model: '', input_per_1m: '', output_per_1m: '', effective_from: new Date().toISOString().slice(0, 10), source_note: '' })
+  const [f, setF] = useState(() => ({ provider: '', model: '', input_per_1m: '', output_per_1m: '', effective_from: new Date().toISOString().slice(0, 10), source_note: '' }))
   const add = useMutation({ mutationFn: () => api.post('/api/pricing', { ...f, input_per_1m: Number(f.input_per_1m), output_per_1m: Number(f.output_per_1m) }), onSuccess: () => qc.invalidateQueries({ queryKey: ['pricing'] }) })
   return (
     <div className="space-y-4">

@@ -198,7 +198,7 @@ function expectedSummary(c: TestCase): string[] {
 }
 
 function CasesPanel({ version, onEdited }: { version: DatasetVersion; onEdited: (r: EditResult) => void }) {
-  const cases = version.cases ?? []
+  const cases = useMemo(() => version.cases ?? [], [version.cases])
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
   const [editing, setEditing] = useState<TestCase | 'new' | null>(null)

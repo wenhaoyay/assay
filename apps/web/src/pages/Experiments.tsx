@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Play, Plus } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { RunsTable } from '../components/RunsTable'
 import { Badge, Button, Card, Empty, ErrorState, Field, Input, Loading, Notice, PageHeader, Select, Textarea } from '../components/ui'
 import { api } from '../lib/api'
+import { type SetupState, validateSetup } from '../lib/compare'
 import { usd } from '../lib/format'
 import type { Dataset, EvaluatorInfo, Experiment, Gate, Project, ProviderConfig, RunHeader, Target } from '../lib/types'
 
@@ -39,24 +40,6 @@ const KIND_LABEL: Record<string, string> = {
   performance: 'Latency and cost', llm_judge: 'LLM judge (semantic; needs a judge)',
 }
 
-export interface SetupState {
-  targetVersionId: number | ''
-  datasetVersionId: number | ''
-  evaluators: string[]
-  judge: string // '' | 'heuristic' | provider id
-}
-
-/** Client-side checks mirror the server's, so problems show before anything is created. */
-export function validateSetup(s: SetupState, judgeIds: string[]): string[] {
-  const errors: string[] = []
-  if (!s.targetVersionId) errors.push('Choose a target.')
-  if (!s.datasetVersionId) errors.push('Choose a dataset version.')
-  if (s.evaluators.length === 0) errors.push('Select at least one evaluator.')
-  const judges = s.evaluators.filter((e) => judgeIds.includes(e))
-  if (judges.length && !s.judge) errors.push(`Judge evaluators selected (${judges.join(', ')}) but no judge chosen.`)
-  return errors
-}
-
 export function NewExperimentPage() {
   const nav = useNavigate()
   const qc = useQueryClient()
@@ -68,7 +51,7 @@ export function NewExperimentPage() {
   const projects = useQuery({ queryKey: ['projects'], queryFn: () => api.get<Project[]>('/api/projects') })
 
   const [name, setName] = useState('')
-  const [setup, setSetup] = useState<SetupState>({ targetVersionId: '', datasetVersionId: '', evaluators: [], judge: '' })
+  const [form, setSetup] = useState<Omit<SetupState, 'evaluators'> & { evaluators: string[] | null }>({ targetVersionId: '', datasetVersionId: '', evaluators: null, judge: '' })
   const [trials, setTrials] = useState(3)
   const [concurrency, setConcurrency] = useState(4)
   const [budget, setBudget] = useState('')
@@ -78,10 +61,8 @@ export function NewExperimentPage() {
   const [touched, setTouched] = useState(false)
   const evaluators = evs.data?.evaluators ?? []
   const judgeIds = evs.data?.judges ?? []
-  useEffect(() => {
-    // Start from the default evaluator set; each one only applies where the case asks for it.
-    if (evs.data) setSetup((s) => (s.evaluators.length ? s : { ...s, evaluators: evs.data!.defaults }))
-  }, [evs.data])
+  // Until the user picks, the default set applies; each evaluator only runs where a case asks for it.
+  const setup: SetupState = { ...form, evaluators: form.evaluators ?? evs.data?.defaults ?? [] }
   const errors = validateSetup(setup, judgeIds)
 
   const datasetVersions = useMemo(() => (datasets.data ?? []).flatMap((d) => d.versions.map((v) => ({ d, v }))), [datasets.data])
@@ -115,7 +96,11 @@ export function NewExperimentPage() {
   })
 
   if (targets.isLoading || datasets.isLoading || evs.isLoading) return <Loading />
-  const toggle = (id: string) => { setTouched(true); setSetup((s) => ({ ...s, evaluators: s.evaluators.includes(id) ? s.evaluators.filter((x) => x !== id) : [...s.evaluators, id] })) }
+  const toggle = (id: string) => {
+    setTouched(true)
+    const cur = setup.evaluators
+    setSetup((s) => ({ ...s, evaluators: cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id] }))
+  }
 
   return (
     <>
@@ -126,13 +111,13 @@ export function NewExperimentPage() {
             <div className="grid gap-3 md:grid-cols-2">
               <Field label="Experiment name"><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="hybrid-retrieval-v2" /></Field>
               <Field label="Target (version)">
-                <Select value={setup.targetVersionId} onChange={(e) => setSetup({ ...setup, targetVersionId: e.target.value ? Number(e.target.value) : '' })} aria-label="Target">
+                <Select value={setup.targetVersionId} onChange={(e) => setSetup({ ...form, targetVersionId: e.target.value ? Number(e.target.value) : '' })} aria-label="Target">
                   <option value="">Choose...</option>
                   {(targets.data ?? []).map((t) => <option key={t.id} value={t.latest_version.id}>{t.name} - v{t.latest_version.version}{t.latest_version.variant_label ? ` (${t.latest_version.variant_label})` : ''}</option>)}
                 </Select>
               </Field>
               <Field label="Dataset version" hint="Running freezes this version; later edits create a new one.">
-                <Select value={setup.datasetVersionId} onChange={(e) => setSetup({ ...setup, datasetVersionId: e.target.value ? Number(e.target.value) : '' })} aria-label="Dataset version">
+                <Select value={setup.datasetVersionId} onChange={(e) => setSetup({ ...form, datasetVersionId: e.target.value ? Number(e.target.value) : '' })} aria-label="Dataset version">
                   <option value="">Choose...</option>
                   {datasetVersions.map(({ d, v }) => <option key={v.id} value={v.id}>{d.name} v{v.version} ({v.case_count} cases, {v.status})</option>)}
                 </Select>
@@ -171,7 +156,7 @@ export function NewExperimentPage() {
           <Card title="Judge and trials">
             <div className="space-y-3">
               <Field label="Judge" hint="Heuristic = word overlap, free and offline, never fails a trial on its own. A real judge (BYOK or local Ollama) is needed for semantic checks.">
-                <Select value={setup.judge} onChange={(e) => setSetup({ ...setup, judge: e.target.value })} aria-label="Judge">
+                <Select value={setup.judge} onChange={(e) => setSetup({ ...form, judge: e.target.value })} aria-label="Judge">
                   <option value="">No judge</option>
                   <option value="heuristic">Heuristic (zero cost, not an LLM)</option>
                   {(providers.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}{p.key_status === 'missing' ? ' - key missing' : ''}</option>)}
