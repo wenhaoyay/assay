@@ -22,7 +22,7 @@ export function SettingsPage() {
   useCrumbs([{ label: 'Settings' }, { label: { models: 'Models & keys', defaults: 'Defaults', appearance: 'Appearance', shape: 'Reply shape', templates: 'Templates', pricing: 'Pricing', server: 'Server' }[tab] }], `settings-${tab}`)
   return (
     <>
-      <PageHeader title="Settings" help={<p>Grading models and keys, workspace defaults, connection templates, prices, and how GaugeLab looks.</p>} />
+      <PageHeader title="Settings" help={<p>Grading models and keys, workspace defaults, connection templates, prices, and how Assay looks.</p>} />
       <Tabs tabs={[
         { id: 'models', label: 'Models & keys' }, { id: 'defaults', label: 'Defaults' }, { id: 'appearance', label: 'Appearance' },
         { id: 'shape', label: 'Reply shape' }, { id: 'templates', label: 'Connection templates' }, { id: 'pricing', label: 'Pricing' }, { id: 'server', label: 'Server' },
@@ -276,11 +276,11 @@ function DefaultsTab() {
           <Button variant="primary" loading={put.isPending} onClick={() => put.mutate({ spend_cap_usd: cap === '' || cap === null ? null : Number(cap) })}>Save</Button>
         </div>
       </Card>
-      <Card title="Demo data" help={<p>The seeded Acme Support Demo chatbot, for trying GaugeLab and for showing it.</p>}>
+      <Card title="Demo data" help={<p>The seeded Acme Support Demo chatbot, for trying Assay and for showing it.</p>}>
         <Toggle checked={!!s.hide_demo} onChange={(v) => { put.mutate({ hide_demo: v }); qc.invalidateQueries({ queryKey: ['projects'] }) }}
           label={<span className="inline-flex items-center gap-1.5">Hide demo data<Help title="Hide demo data"><p>Drops the demo chatbot from the home page and from chatbot pickers. Nothing is deleted; turn it back on before a demo.</p></Help></span>} />
       </Card>
-      <Notice title="No silent fallback">If a grading model fails or is rate-limited, those answers are marked <span className="font-semibold">not evaluated</span>. GaugeLab never switches to another model in the middle of a run, so one run is always graded by one model.</Notice>
+      <Notice title="No silent fallback">If a grading model fails or is rate-limited, those answers are marked <span className="font-semibold">not evaluated</span>. Assay never switches to another model in the middle of a run, so one run is always graded by one model.</Notice>
       {put.isError && <ErrorState error={put.error} />}
     </div>
   )
@@ -310,7 +310,7 @@ function ServerTab() {
   const s = useQuery({ queryKey: ['settings'], queryFn: () => api.get<{ server: { version: string; database: string; database_url: string } }>('/api/settings') })
   const health = useQuery({ queryKey: ['health'], queryFn: () => api.get<{ status: string }>('/api/health'), refetchInterval: 15_000 })
   return (
-    <Card title="GaugeLab server" className="max-w-2xl">
+    <Card title="Assay server" className="max-w-2xl">
       <dl className="grid grid-cols-[160px_minmax(0,1fr)] gap-y-2 text-sm">
         <dt className="t-label self-center">Status</dt><dd className="flex items-center gap-2"><span className={clsx('size-2 rounded-full', health.isSuccess ? 'bg-good' : 'bg-bad')} />{health.isSuccess ? 'running' : 'unreachable'}</dd>
         <dt className="t-label self-center">Version</dt><dd className="num font-mono">{s.data?.server.version}</dd>
@@ -387,7 +387,7 @@ function ShapeTab() {
   const [copied, setCopied] = useState(false)
   return (
     <div className="grid gap-10 xl:grid-cols-2">
-      <Card title="The GaugeLab reply shape" help={<>
+      <Card title="The Assay reply shape" help={<>
         <p>A bot that answers like this connects without any mapping.</p>
         <p>Only "answer" is required. Every extra field unlocks more checks: sources → retrieval and groundedness, tool calls → agent checks, usage → cost.</p>
       </>}>
@@ -402,7 +402,7 @@ function ShapeTab() {
       </Card>
       <Card title="Add it to a bot" help={<>
         <p>One extra endpoint, about 20 lines, in the framework your bot already uses.</p>
-        <p>Bots you did not build keep working: turn "My bot replies in the GaugeLab shape" off in the connect wizard and map their reply by clicking it.</p>
+        <p>Bots you did not build keep working: turn "My bot replies in the Assay shape" off in the connect wizard and map their reply by clicking it.</p>
       </>}
         actions={<Button size="sm" onClick={async () => { await navigator.clipboard.writeText(SNIPPETS[lang]); setCopied(true); setTimeout(() => setCopied(false), 1500) }}>{copied ? <Check className="size-3.5" /> : <Clipboard className="size-3.5" />}{copied ? 'Copied' : 'Copy'}</Button>}>
         <Segmented size="sm" value={lang} onChange={setLang} options={Object.keys(SNIPPETS).map((k) => ({ id: k as keyof typeof SNIPPETS, label: k }))} />

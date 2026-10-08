@@ -30,7 +30,7 @@ export function ShareMenu({ runId, baselineId }: { runId: number; baselineId?: n
         {open && (
           <motion.div initial={{ opacity: 0, y: -4, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.12 }}
             className="absolute right-0 z-30 mt-1 w-64 rounded-xl border border-line bg-surface p-1.5 shadow-pop">
-            <a className={item} href={md} download={`gaugelab-${baselineId ? `${baselineId}-vs-` : ''}${runId}.md`}><FileDown className="size-4 text-ink-3" />Markdown report</a>
+            <a className={item} href={md} download={`assay-${baselineId ? `${baselineId}-vs-` : ''}${runId}.md`}><FileDown className="size-4 text-ink-3" />Markdown report</a>
             <button type="button" className={item} onClick={copy}>{copied ? <Check className="size-4 text-good-ink" /> : <ClipboardCopy className="size-4 text-ink-3" />}{copied ? 'Copied' : 'Copy as Markdown'}</button>
             <button type="button" className={item} onClick={() => { setOpen(false); setTimeout(() => window.print(), 50) }}><Printer className="size-4 text-ink-3" />Print / save as PDF</button>
             <a className={item} href={`/api/runs/${runId}/export?format=json${baselineId ? `&baseline=${baselineId}` : ''}`}><FileJson className="size-4 text-ink-3" />Full JSON</a>

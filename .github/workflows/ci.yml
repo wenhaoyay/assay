@@ -18,7 +18,7 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: "3.12", cache: pip}
       - run: pip install -e ".[dev,pdf]"
-      - run: ruff check gaugelab apps/api tests examples conftest.py
+      - run: ruff check assay apps/api tests examples conftest.py
       - run: mypy
       - run: pytest -q
 
@@ -28,22 +28,22 @@ jobs:
     services:
       postgres:
         image: postgres:16-alpine
-        env: {POSTGRES_USER: gaugelab, POSTGRES_PASSWORD: gaugelab, POSTGRES_DB: gaugelab}
+        env: {POSTGRES_USER: assay, POSTGRES_PASSWORD: assay, POSTGRES_DB: assay}
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U gaugelab" --health-interval 3s --health-retries 20
+          --health-cmd "pg_isready -U assay" --health-interval 3s --health-retries 20
     env:
-      DATABASE_URL: postgresql+psycopg://gaugelab:gaugelab@localhost:5432/gaugelab
+      DATABASE_URL: postgresql+psycopg://assay:assay@localhost:5432/assay
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: "3.12", cache: pip}
       - run: pip install -e ".[dev,postgres]"
-      - run: gaugelab db upgrade
+      - run: assay db upgrade
       - name: Models and migrations agree
         run: python -c "from alembic.config import Config; from alembic import command; command.check(Config('apps/api/alembic.ini'))"
-      - run: gaugelab seed --run --trials 2
-      - run: gaugelab ci benchmarks/acme_support/ci.yaml --out-dir pg-artifacts
+      - run: assay seed --run --trials 2
+      - run: assay ci benchmarks/acme_support/ci.yaml --out-dir pg-artifacts
 
   web:
     name: Web - lint, types, unit tests, build
@@ -77,7 +77,7 @@ jobs:
           npx playwright install --with-deps chromium
           npx playwright test
         env:
-          GAUGELAB_PYTHON: python
+          ASSAY_PYTHON: python
       - if: failure()
         uses: actions/upload-artifact@v4
         with: {name: playwright-traces, path: apps/web/test-results}
@@ -93,12 +93,12 @@ jobs:
       - run: pip install -e .
       # Deterministic evaluators + the heuristic judge only: no keys, no paid calls.
       # Exits 1 when a gate fails, which fails the workflow. The Markdown summary goes to the job summary.
-      - run: gaugelab ci benchmarks/acme_support/ci.yaml --out-dir gaugelab-artifacts
+      - run: assay ci benchmarks/acme_support/ci.yaml --out-dir assay-artifacts
       - if: always()
         uses: actions/upload-artifact@v4
-        with: {name: gaugelab-evaluation, path: gaugelab-artifacts}
+        with: {name: assay-evaluation, path: assay-artifacts}
       - name: The gate catches a real regression
         run: |
-          if gaugelab ci benchmarks/acme_support/ci-regression.yaml --out-dir regression-artifacts; then
+          if assay ci benchmarks/acme_support/ci-regression.yaml --out-dir regression-artifacts; then
             echo "Expected the regressed candidate to FAIL the gate"; exit 1
           fi

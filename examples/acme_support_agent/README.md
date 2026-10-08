@@ -1,7 +1,7 @@
 # Acme support agent (fictional)
 
 A small RAG + tool-using support agent for **Acme Devices**, a company that does not exist.
-It is the system under test for GaugeLab's demo. It is not the product.
+It is the system under test for Assay's demo. It is not the product.
 
 Everything here is invented: 20 short documents in `docs/` (products, warranty, returns,
 regional policies, troubleshooting...), seven orders in `app/data.py`, and five tools in
@@ -50,7 +50,7 @@ to write the final answers with a real local model through Ollama instead.
 | Tool skipped by mistake | 10% | 3% |
 | `get_return_policy` | not used | used |
 
-The weaknesses are **mechanisms, not per-question scripts**. GaugeLab's findings, including
+The weaknesses are **mechanisms, not per-question scripts**. Assay's findings, including
 the candidate's own regressions (an over-eager refusal rule, a return-policy tool that hides
 the holiday exception), come out of running them.
 
@@ -61,6 +61,6 @@ the holiday exception), come out of running them.
 python -c "from acme_support_agent.app import run; print(run({'message': 'Is order 18372 still covered by warranty?'}, {'variant': 'candidate'})['answer'])"
 
 # Over HTTP, with a deliberately different JSON shape so the HTTP adapter's mapping has work to do
-gaugelab demo-agent --port 9040
+assay demo-agent --port 9040
 curl -s localhost:9040/chat -H 'content-type: application/json' -d '{"message": "Can I use Adapter C with Device Gamma?"}'
 ```

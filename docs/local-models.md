@@ -5,16 +5,16 @@ relevant. It can run in the cloud (OpenAI and others: fast, paid per call, the a
 to the provider) or on your own PC with Ollama (free per call, nothing leaves the PC, slower).
 
 > **Third-party notice.** Ollama and the models it downloads are third-party software. They are
-> not made, endorsed, reviewed or supported by GaugeLab, and the links below go to external
+> not made, endorsed, reviewed or supported by Assay, and the links below go to external
 > websites. You download and install them at your own risk. Check each model's licence and
 > terms, and your organisation's rules on installing software and on data; IT approval may be
-> required. GaugeLab gives no warranty for the availability, accuracy, safety or performance of
+> required. Assay gives no warranty for the availability, accuracy, safety or performance of
 > third-party models and is not responsible for their output. Downloads are large (1–10 GB) and
 > running a model uses your PC's memory, disk and power. Models whose names end in `-cloud` or
 > `:cloud` run on the provider's servers: questions and answers leave your PC even though they
 > are reached through the local Ollama. This notice is information, not legal advice.
 >
-> GaugeLab asks you to accept this notice once (Settings > Models & keys) before its first
+> Assay asks you to accept this notice once (Settings > Models & keys) before its first
 > model download, and records when.
 
 ## Is it free?
@@ -32,14 +32,14 @@ The software is free and there is no bill per grading call. You pay in other way
 
 1. Install Ollama from <https://ollama.com/download> (external site) and open the app. It then
    runs in the background at `http://localhost:11434`.
-2. In GaugeLab, open **Settings > Models & keys**. The Ollama card ticks *running* within a few
+2. In Assay, open **Settings > Models & keys**. The Ollama card ticks *running* within a few
    seconds.
 3. Accept the third-party notice, then **Download** the suggested model. The table shows each
    model's size, the memory it needs, and the expected time per grading call on this PC (read
    from its free memory and whether it has a graphics card).
-4. **Use for grading**: GaugeLab connects the model and runs a 5-call check (speed, JSON
+4. **Use for grading**: Assay connects the model and runs a 5-call check (speed, JSON
    reliability).
-5. **Calibrate**: label about 30 answers in *Calibration*. GaugeLab measures how often the model
+5. **Calibrate**: label about 30 answers in *Calibration*. Assay measures how often the model
    agrees with you; the *judge bake-off* compares it with other models on your labels.
 
 ## Choosing a model

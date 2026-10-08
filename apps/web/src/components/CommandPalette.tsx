@@ -92,7 +92,7 @@ export function CommandPalette({ open, onClose, onShortcuts, onTour }: { open: b
       { id: 'a-density', group: 'Preferences', label: prefs.density === 'compact' ? 'Comfortable density' : 'Compact density', icon: Rows3, run: () => { prefs.toggle('density'); onClose() }, keywords: 'density compact rows' },
       { id: 'a-motion', group: 'Preferences', label: prefs.motion === 'reduced' ? 'Turn animations on' : 'Reduce motion', icon: Sparkles, run: () => { prefs.toggle('motion'); onClose() }, keywords: 'animation motion' },
       { id: 'a-keys', group: 'Help', label: 'Keyboard shortcuts', icon: Keyboard, run: () => { onClose(); onShortcuts() }, keywords: 'keys help' },
-      { id: 'a-tour', group: 'Help', label: 'Take the tour', hint: 'A two-minute walk through GaugeLab', icon: Lightbulb, run: () => { onClose(); onTour() }, keywords: 'demo guide tour interview' },
+      { id: 'a-tour', group: 'Help', label: 'Take the tour', hint: 'A two-minute walk through Assay', icon: Lightbulb, run: () => { onClose(); onTour() }, keywords: 'demo guide tour interview' },
       { id: 'p-home', group: 'Go to', label: 'Home', icon: LayoutDashboard, run: go('/') },
       { id: 'p-runs', group: 'Go to', label: 'Runs', icon: FlaskConical, run: go('/runs') },
       { id: 'p-targets', group: 'Go to', label: 'Connections', icon: Target, run: go('/targets') },

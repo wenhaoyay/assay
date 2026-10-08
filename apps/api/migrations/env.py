@@ -1,4 +1,4 @@
-"""Alembic environment: target metadata is GaugeLab's models; URL from DATABASE_URL."""
+"""Alembic environment: target metadata is Assay's models; URL from DATABASE_URL."""
 
 from __future__ import annotations
 
@@ -6,8 +6,8 @@ import os
 
 from alembic import context
 
-from gaugelab.store.db import make_engine
-from gaugelab.store.models import Base
+from assay.store.db import make_engine
+from assay.store.models import Base
 
 config = context.config
 target_metadata = Base.metadata

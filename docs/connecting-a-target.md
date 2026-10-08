@@ -10,7 +10,7 @@
    carries the question is replaced by `{{input.message}}`; a session or conversation id gets
    a fresh `eval-{{uuid}}` per question; an `Authorization`-like header is offered for the OS
    credential store and replaced by a `keyring:NAME` reference.
-3. **Test and map.** Send a question. GaugeLab shows the reply as a tree and guesses where the
+3. **Test and map.** Send a question. Assay shows the reply as a tree and guesses where the
    answer, sources (id, title, text, score), citations, tool calls, tokens and model are,
    with a reason for each guess. Fix any guess by clicking *Change* and then the right node.
    *Check the mapping* runs the whole connection and lists **what you'll get**: each piece of
@@ -19,7 +19,7 @@
    way: a `sources` event becomes the passages read, and markers like `[3]` in the answer
    become citations of the source numbered 3.
 4. **Safety and save.** Choose the chatbot first (it decides which question sets are offered).
-   If each question saves a conversation, turn on clean-up: GaugeLab reads the chat id where
+   If each question saves a conversation, turn on clean-up: Assay reads the chat id where
    the reply actually has it (for a streamed reply, often `done.conversation_id`) and warns
    when the clean-up looks in the wrong place. Dry run: this chatbot's own question sets, three
    questions you type, generic ones, or the test answer's timing at no extra cost; optionally
@@ -30,7 +30,7 @@
 
 **Reading the reply, later.** A connection's page shows what each reply is read for, what
 the last stored reply also contains, and reads it with one click. Past runs can then be read
-again from their stored replies, with no questions asked again. This changes how GaugeLab
+again from their stored replies, with no questions asked again. This changes how Assay
 reads, not what is inside the bot, so it stays the same version. See
 [finding-the-cause.md](finding-the-cause.md).
 
@@ -45,10 +45,10 @@ count their answers. *Max answers* on New run limits a run even when no price is
 *Advanced (JSON)* shows the configuration the wizard is writing, and editing it updates the
 steps: the configuration below is still the record of a connection.
 
-## The GaugeLab reply shape (bots you build)
+## The Assay reply shape (bots you build)
 
 If your bot can answer like this, there is nothing to map - leave *My bot replies in the
-GaugeLab shape* on in the wizard (`"reply_shape": "gaugelab"` in a config):
+Assay shape* on in the wizard (`"reply_shape": "assay"` in a config):
 
 ```json
 {
@@ -147,7 +147,7 @@ answer, with the collected stream available as `raw`:
 ```
 
 Check what else a question writes (usage tables, shared logs, budgets) before pointing
-GaugeLab at a shared instance. When the side effects are not acceptable, run an isolated
+Assay at a shared instance. When the side effects are not acceptable, run an isolated
 instance or use the importer.
 
 ## 4. Grading logged answers without calling the system
@@ -173,7 +173,7 @@ response:
 ```
 
 ```bash
-gaugelab import logs/journal.jsonl --config import.yaml --name "Production journal" --project "My bot"
+assay import logs/journal.jsonl --config import.yaml --name "Production journal" --project "My bot"
 ```
 
 This creates a dataset of the logged questions (inputs only, since nobody has written
@@ -198,7 +198,7 @@ gates: {overall_pass_rate: {min: 0.85}}
 ```
 
 ```bash
-gaugelab run my-bot.yaml        # exits 1 if a gate fails
+assay run my-bot.yaml        # exits 1 if a gate fails
 ```
 
 Keep files that name internal systems in `local/`, which is ignored by git.

@@ -1,6 +1,6 @@
 # Design rules
 
-GaugeLab is a bench instrument that writes a lab report. The body is calm and exact: figures in
+Assay is a bench instrument that writes a lab report. The body is calm and exact: figures in
 monospace, one signal colour (teal), colour otherwise only where it means something. The verdicts
 read like the headline of a report. The needle is the one signature.
 

@@ -86,7 +86,7 @@ export function ComparePage() {
         <RunPicker runs={done} value={candidate} onChange={(v) => set('candidate', v)} side="candidate" />
       </div>
       {done.length < 2 ? (
-        <div className="mt-8"><Empty title="Two finished runs are needed to compare">Run a baseline and a candidate on the same questions (<code className="font-mono">gaugelab seed --run</code> does this for the Acme demo), then pick them above.</Empty></div>
+        <div className="mt-8"><Empty title="Two finished runs are needed to compare">Run a baseline and a candidate on the same questions (<code className="font-mono">assay seed --run</code> does this for the Acme demo), then pick them above.</Empty></div>
       ) : !baseline || !candidate ? (
         <div className="mt-8"><Empty title="Pick a baseline and a candidate">Choose two runs above; the same questions are paired between them.</Empty></div>
       ) : baseline === candidate ? <div className="mt-6"><Notice tone="warn" title="Pick two different runs" /></div>

@@ -2,8 +2,8 @@
 
 import pytest
 
-from gaugelab.cli import judge_override
-from gaugelab.store.service import select_cases
+from assay.cli import judge_override
+from assay.store.service import select_cases
 from tests.conftest import make_case
 
 

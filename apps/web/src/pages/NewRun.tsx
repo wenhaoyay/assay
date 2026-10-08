@@ -329,7 +329,7 @@ export function NewRunPage() {
               </SetupField>
               <SetupField label="Spend cap (USD)" help={<>
                 <p>Stops sending new questions when the cost so far reaches this. Questions already sent are still answered (and paid for), so with several in parallel it can overshoot by that many answers.</p>
-                <p>The cap only sees costs GaugeLab can price: a bot that reports no token counts and has no per-answer cost on its connection counts as $0. Use Max answers for that.</p>
+                <p>The cap only sees costs Assay can price: a bot that reports no token counts and has no per-answer cost on its connection counts as $0. Use Max answers for that.</p>
               </>}>
                 <Input type="number" min={0} step="0.01" value={budget} onChange={(ev) => setBudget(ev.target.value)} placeholder={e?.spend_cap_usd != null ? `default ${e.spend_cap_usd}` : 'no cap'} aria-label="Spend cap" />
               </SetupField>

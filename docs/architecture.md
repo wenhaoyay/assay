@@ -1,7 +1,7 @@
 # Architecture
 
-GaugeLab is one Python package (`gaugelab/`) with two front doors, a FastAPI app
-(`apps/api`) and a CLI (`gaugelab`), plus a React web app (`apps/web`). The front doors
+Assay is one Python package (`assay/`) with two front doors, a FastAPI app
+(`apps/api`) and a CLI (`assay`), plus a React web app (`apps/web`). The front doors
 share one service layer, so a run started from the UI and a run started in CI execute
 the same code.
 
@@ -9,12 +9,12 @@ the same code.
 flowchart LR
   subgraph Clients
     UI[Web app<br/>React + Vite]
-    CLI[gaugelab CLI<br/>CI pipelines]
+    CLI[assay CLI<br/>CI pipelines]
   end
   subgraph API[apps/api - FastAPI]
     R[routers: core, datasets, runs]
   end
-  subgraph Core[gaugelab package]
+  subgraph Core[assay package]
     S[store/service.py<br/>versioning, runs, gates, calibration]
     RUN[runner<br/>concurrency, retries, cancel, budget]
     AD[adapters<br/>http, python, replay]
@@ -43,18 +43,18 @@ flowchart LR
 
 | Path | Responsibility |
 |---|---|
-| `gaugelab/schemas.py` | The contracts: `NormalizedTargetResult`, `TestCase`, `Trace`/`Span`, `EvaluationResult` |
-| `gaugelab/adapters/` | Get a normalized result for one input: `http` (mapping + SSE/NDJSON reducers + clean-up), `python` (call a function), `replay` (imported results) |
-| `gaugelab/evaluators/` | 30 evaluators behind one interface, registered by id |
-| `gaugelab/evaluators/llm_judge/` | Versioned YAML rubrics, prompt construction, strict output parsing, the heuristic stand-in |
-| `gaugelab/providers/` | Thin HTTP clients for OpenAI-compatible, Anthropic and Ollama, with bounded retries |
-| `gaugelab/runner/` | Executes (case, trial) pairs; knows nothing about databases |
-| `gaugelab/analysis.py` | Aggregates, failure taxonomy, baseline-vs-candidate comparison |
-| `gaugelab/diagnosis.py` | Why a failed answer failed: rule-based causes with evidence and the fix (`store/causes.py` applies them to runs, overrides, model explanations and grouped notes) |
-| `gaugelab/statistics/` | Bootstrap, McNemar, pass@k / pass^k, Cohen's kappa, Spearman |
-| `gaugelab/gates/` | Threshold and relative-regression gates |
-| `gaugelab/store/` | SQLAlchemy models, the service layer, imports |
-| `gaugelab/config_run.py` | Experiment YAML -> versioned entities (config as code) |
+| `assay/schemas.py` | The contracts: `NormalizedTargetResult`, `TestCase`, `Trace`/`Span`, `EvaluationResult` |
+| `assay/adapters/` | Get a normalized result for one input: `http` (mapping + SSE/NDJSON reducers + clean-up), `python` (call a function), `replay` (imported results) |
+| `assay/evaluators/` | 30 evaluators behind one interface, registered by id |
+| `assay/evaluators/llm_judge/` | Versioned YAML rubrics, prompt construction, strict output parsing, the heuristic stand-in |
+| `assay/providers/` | Thin HTTP clients for OpenAI-compatible, Anthropic and Ollama, with bounded retries |
+| `assay/runner/` | Executes (case, trial) pairs; knows nothing about databases |
+| `assay/analysis.py` | Aggregates, failure taxonomy, baseline-vs-candidate comparison |
+| `assay/diagnosis.py` | Why a failed answer failed: rule-based causes with evidence and the fix (`store/causes.py` applies them to runs, overrides, model explanations and grouped notes) |
+| `assay/statistics/` | Bootstrap, McNemar, pass@k / pass^k, Cohen's kappa, Spearman |
+| `assay/gates/` | Threshold and relative-regression gates |
+| `assay/store/` | SQLAlchemy models, the service layer, imports |
+| `assay/config_run.py` | Experiment YAML -> versioned entities (config as code) |
 | `apps/api/` | REST endpoints (OpenAPI at `/docs`), Alembic migrations, serves the built web app |
 | `apps/web/` | The UI |
 | `examples/acme_support_agent/` | A fictional system under test |

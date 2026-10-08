@@ -1,4 +1,4 @@
-// One small client for the GaugeLab API. Errors carry the server's message so screens can
+// One small client for the Assay API. Errors carry the server's message so screens can
 // show something actionable instead of "Request failed".
 
 export class ApiError extends Error {
@@ -42,7 +42,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   try {
     res = await fetch(path, init)
   } catch {
-    throw new ApiError(0, 'Cannot reach the GaugeLab API. Is it running? (gaugelab serve, port 8040)')
+    throw new ApiError(0, 'Cannot reach the Assay API. Is it running? (assay serve, port 8040)')
   }
   if (!res.ok) return parse(res)
   const type = res.headers.get('content-type') ?? ''

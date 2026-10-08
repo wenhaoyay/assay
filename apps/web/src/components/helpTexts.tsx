@@ -7,7 +7,7 @@ export function MethodHelp() {
     <Help title="GET or POST: how the question travels" wide>
       <p><b className="font-semibold">POST is a sealed envelope.</b> The address stays plain and the question rides inside, in the <i>body</i> (the JSON box below). Like signing in to a website: your password never shows in the address bar. Most chatbots are asked this way.</p>
       <p><b className="font-semibold">GET is a postcard.</b> There is no body: everything is written in the address itself, like a Google search: <code>google.com/search?q=production+version</code>. With GET, the Body box is ignored.</p>
-      <p><b className="font-semibold">Which one?</b> The one your bot expects. A pasted curl command already says, and GaugeLab fills it in. Pick the wrong one and the bot answers <code>405 Method Not Allowed</code>.</p>
+      <p><b className="font-semibold">Which one?</b> The one your bot expects. A pasted curl command already says, and Assay fills it in. Pick the wrong one and the bot answers <code>405 Method Not Allowed</code>.</p>
     </Help>
   )
 }
@@ -25,7 +25,7 @@ export function CleanupMethodHelp() {
 export function ConnectionHelp() {
   return (
     <Help title="Chatbot, connection, version" wide>
-      <p>GaugeLab files a bot at three levels, like a filing cabinet:</p>
+      <p>Assay files a bot at three levels, like a filing cabinet:</p>
       <ul className="list-disc space-y-1 pl-4">
         <li><b className="font-semibold">Chatbot</b>: the product as a whole, e.g. <i>Production Planning Assistant</i>. It holds the question sets, gates and runs.</li>
         <li><b className="font-semibold">Connection</b>: one place you can reach it, with its address and setup, e.g. <i>PP – local dev (:8120)</i>, <i>PP – test copy</i>, <i>PP – server</i>. Compare them to see whether the deployed bot behaves like your copy.</li>

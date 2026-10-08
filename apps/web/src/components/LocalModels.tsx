@@ -26,14 +26,14 @@ interface Pull { model: string; status: string; completed: number; total: number
 export function ThirdPartyNotice() {
   return (
     <div className="space-y-1.5 text-sm text-ink-2">
-      <p><b className="font-semibold">Ollama and the models it downloads are third-party software.</b> They are not made, endorsed, reviewed or supported by GaugeLab. The install link opens an external website.</p>
+      <p><b className="font-semibold">Ollama and the models it downloads are third-party software.</b> They are not made, endorsed, reviewed or supported by Assay. The install link opens an external website.</p>
       <ul className="list-disc space-y-1 pl-4">
         <li>You download and install them <b className="font-semibold">at your own risk</b>. Check each model's licence and terms, and your organisation's rules on installing software and on data (IT approval may be required).</li>
-        <li>GaugeLab gives <b className="font-semibold">no warranty</b> for the availability, accuracy, safety or performance of third-party models, and is not responsible for their output.</li>
+        <li>Assay gives <b className="font-semibold">no warranty</b> for the availability, accuracy, safety or performance of third-party models, and is not responsible for their output.</li>
         <li>Downloads are large (1–10 GB) and running a model uses this PC's memory, disk and power.</li>
         <li>Models whose names end in <code>-cloud</code> or <code>:cloud</code> <b className="font-semibold">run on the provider's servers</b>: questions and answers leave this PC, even though they are reached through the local Ollama.</li>
       </ul>
-      <p className="text-xs text-ink-2">This notice is information, not legal advice. Have your organisation review it if GaugeLab is used beyond your own PC.</p>
+      <p className="text-xs text-ink-2">This notice is information, not legal advice. Have your organisation review it if Assay is used beyond your own PC.</p>
     </div>
   )
 }
@@ -175,7 +175,7 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
 
       {connected.size > 0 && (
         <div className="mt-4"><Notice title="Calibrate before you trust it" action={<Link to="/calibration" className="text-sm font-medium text-accent-ink underline">Calibration</Link>}>
-          A new grading model is unvalidated. Label about 30 answers yourself and GaugeLab measures how often it agrees with you; small local models disagree more often than large cloud ones.
+          A new grading model is unvalidated. Label about 30 answers yourself and Assay measures how often it agrees with you; small local models disagree more often than large cloud ones.
         </Notice></div>
       )}
 
@@ -200,7 +200,7 @@ function LocalGuide() {
           <li>Install Ollama from <a className="text-accent-ink underline" href={OLLAMA_URL} target="_blank" rel="noreferrer noopener">ollama.com/download</a> (external site) and open the app.</li>
           <li>Here, in Settings → Models &amp; keys, the Ollama card ticks <i>running</i> within a few seconds.</li>
           <li>Accept the third-party notice, then <b className="font-semibold">Download</b> the suggested model. The table shows the size and the expected time per grading call on this PC.</li>
-          <li><b className="font-semibold">Use for grading</b>: GaugeLab connects it and runs a 5-call check (speed, JSON reliability).</li>
+          <li><b className="font-semibold">Use for grading</b>: Assay connects it and runs a 5-call check (speed, JSON reliability).</li>
           <li>Calibrate: label about 30 answers in Calibration; the judge bake-off compares it with other models on your labels.</li>
         </ol>
       </section>

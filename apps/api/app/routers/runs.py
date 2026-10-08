@@ -12,12 +12,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from gaugelab.analysis import FAILURE_TYPES
-from gaugelab.evaluators import REGISTRY, get_evaluator
-from gaugelab.report import markdown_summary
-from gaugelab.store import causes as cz
-from gaugelab.store import models as m
-from gaugelab.store import service as svc
+from assay.analysis import FAILURE_TYPES
+from assay.evaluators import REGISTRY, get_evaluator
+from assay.report import markdown_summary
+from assay.store import causes as cz
+from assay.store import models as m
+from assay.store import service as svc
 
 from .. import serializers as ser
 from ..deps import get_session
@@ -84,7 +84,7 @@ def create_experiment(body: ExperimentIn, s: Session = Depends(get_session)) -> 
         raise HTTPException(422, f"Judge evaluators selected ({', '.join(judges)}) but no judge configured. "
                                  "Pick a judge provider, or remove the judge evaluators.")
     tv = svc.get(s, m.TargetVersion, body.target_version_id)
-    from gaugelab.store.workspace import judge_allowed
+    from assay.store.workspace import judge_allowed
 
     if reason := judge_allowed(s, tv.target_id, body.judge):
         raise HTTPException(422, reason)
@@ -242,7 +242,7 @@ async def reevaluate(run_id: int, body: ReevaluateIn, s: Session = Depends(get_s
     judges = [e for e in evaluators if REGISTRY[e].kind == "llm_judge"]
     if judges and not judge:
         raise HTTPException(422, f"Judge evaluators selected ({', '.join(judges)}) but no judge configured.")
-    from gaugelab.store.workspace import judge_allowed
+    from assay.store.workspace import judge_allowed
 
     if reason := judge_allowed(s, run.snapshot.get("target", {}).get("id"), judge):
         raise HTTPException(422, reason)
@@ -269,7 +269,7 @@ def export(run_id: int, format: str = "json", baseline: int | None = None,
     if comparison:
         doc["comparison"] = {k: v for k, v in comparison.items() if k not in ("baseline", "candidate")}
     return PlainTextResponse(json.dumps(doc, indent=2, default=str), media_type="application/json",
-                             headers={"Content-Disposition": f'attachment; filename="gaugelab-run-{run_id}.json"'})
+                             headers={"Content-Disposition": f'attachment; filename="assay-run-{run_id}.json"'})
 
 
 # --------------------------------------------------------------------------------------
@@ -358,7 +358,7 @@ class CauseIn(BaseModel):
 
 @router.put("/trials/{trial_id}/cause")
 def set_cause(trial_id: int, body: CauseIn, s: Session = Depends(get_session)) -> dict[str, Any]:
-    from gaugelab.diagnosis import CAUSES
+    from assay.diagnosis import CAUSES
 
     t = svc.get(s, m.Trial, trial_id)
     if body.cause is not None and body.cause not in CAUSES:
@@ -429,7 +429,7 @@ class GateIn(BaseModel):
 
 
 def _check_gate(config: dict[str, Any]) -> None:
-    from gaugelab.gates import evaluate_gates
+    from assay.gates import evaluate_gates
 
     try:
         evaluate_gates(config, {}, {})
@@ -519,7 +519,7 @@ def calibration_stats(dimension: str, run_id: int | None = None, judge: str | No
 
 @router.get("/calibration")
 def calibration_summary(s: Session = Depends(get_session)) -> dict[str, Any]:
-    from gaugelab.evaluators import JUDGE_EVALUATORS
+    from assay.evaluators import JUDGE_EVALUATORS
 
     return {d: {k: v for k, v in svc.calibration_stats(s, d).items() if k != "disagreements"}
             for d in JUDGE_EVALUATORS}

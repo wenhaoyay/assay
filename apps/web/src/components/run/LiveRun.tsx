@@ -145,7 +145,7 @@ export function LiveRun({ r, rows, gate }: { r: RunHeader; rows: TrialRow[]; gat
         <div className="min-w-0">
           <div className="t-label mb-2 flex items-center gap-2">Every try <Help title="Every try"><p>One square per try, in the order they finished. Breathing squares are being asked now ({lanes} at a time); green passed, red failed, violet the bot returned an error.</p></Help></div>
           <Tiles total={r.progress_total} fin={fin} inFlight={inFlight} />
-          <div className="t-label mb-2 mt-7 flex items-center gap-2">{active ? 'Just answered' : 'Last answers'} <Help title="Just answered"><p>The latest questions to finish, newest first. GaugeLab sees an answer when it arrives, not while it is being asked.</p></Help></div>
+          <div className="t-label mb-2 mt-7 flex items-center gap-2">{active ? 'Just answered' : 'Last answers'} <Help title="Just answered"><p>The latest questions to finish, newest first. Assay sees an answer when it arrives, not while it is being asked.</p></Help></div>
           <ul className="space-y-1.5" data-testid="live-lanes">
             {latest.length === 0 && <li className="text-sm text-ink-3">{r.status === 'queued' ? 'Waiting for a free slot.' : 'Asking the first questions.'}</li>}
             {latest.map((t) => (

@@ -2,8 +2,8 @@ import math
 
 import pytest
 
-from gaugelab.evaluators.retrieval.metrics import ndcg_at_k, precision_at_k, recall_at_k, reciprocal_rank
-from gaugelab.statistics import (
+from assay.evaluators.retrieval.metrics import ndcg_at_k, precision_at_k, recall_at_k, reciprocal_rank
+from assay.statistics import (
     binary_agreement,
     bootstrap_ci,
     cohen_kappa,

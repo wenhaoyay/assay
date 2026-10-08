@@ -55,7 +55,7 @@ export function App() {
           <Route path="experiments" element={<Navigate to="/runs" replace />} />
           <Route path="experiments/new" element={<Navigate to="/runs/new" replace />} />
           <Route path="traces" element={<Navigate to="/runs" replace />} />
-          <Route path="*" element={<Empty title="Page not found">That address does not match a GaugeLab page.</Empty>} />
+          <Route path="*" element={<Empty title="Page not found">That address does not match an Assay page.</Empty>} />
         </Route>
       </Route>
     </Routes>

@@ -156,7 +156,7 @@ function StatusRow({ noJudge, hasProviders, passing, gated }: { noJudge: boolean
 function FirstSteps() {
   const motionOn = useMotionOn()
   const steps = [
-    { n: 1, title: 'Connect a chatbot', body: 'Paste a curl command or pick a template. Bots that reply in the GaugeLab shape need no mapping.', to: '/targets/new', cta: 'Connect' },
+    { n: 1, title: 'Connect a chatbot', body: 'Paste a curl command or pick a template. Bots that reply in the Assay shape need no mapping.', to: '/targets/new', cta: 'Connect' },
     { n: 2, title: 'Add golden questions', body: 'Import a YAML/CSV dataset, or draft cases from your documents and approve them.', to: '/datasets', cta: 'Datasets' },
     { n: 3, title: 'Run and compare', body: 'Run two versions on the same questions and see what changed, with the uncertainty stated.', to: '/runs/new', cta: 'New run' },
   ]
@@ -173,7 +173,7 @@ function FirstSteps() {
           </motion.div>
         ))}
       </div>
-      <Notice title="Want to see it working first?">Load the fictional Acme demo (a support agent in two variants, 58 golden cases, a release gate): run <Code>gaugelab seed --run</Code>, then reload.</Notice>
+      <Notice title="Want to see it working first?">Load the fictional Acme demo (a support agent in two variants, 58 golden cases, a release gate): run <Code>assay seed --run</Code>, then reload.</Notice>
     </div>
   )
 }

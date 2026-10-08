@@ -6,8 +6,8 @@ import json
 import httpx
 import pytest
 
-from gaugelab.adapters import AdapterContext, TransientTargetError
-from gaugelab.adapters.http import (
+from assay.adapters import AdapterContext, TransientTargetError
+from assay.adapters.http import (
     HttpTargetAdapter,
     HttpTargetConfig,
     collect_stream,
@@ -15,9 +15,9 @@ from gaugelab.adapters.http import (
     parse_sse,
     render,
 )
-from gaugelab.adapters.importer import ImportConfig, ReplayTargetAdapter, import_records
-from gaugelab.adapters.mapping import get_path
-from gaugelab.runner import call_with_retry
+from assay.adapters.importer import ImportConfig, ReplayTargetAdapter, import_records
+from assay.adapters.mapping import get_path
+from assay.runner import call_with_retry
 
 
 def adapter(cfg: dict, handler) -> HttpTargetAdapter:

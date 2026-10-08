@@ -2,10 +2,10 @@
 
 ## Who defines correctness
 
-GaugeLab does not know ground truth. Every expected outcome in a golden dataset was written,
+Assay does not know ground truth. Every expected outcome in a golden dataset was written,
 imported or approved by a person. AI-generated test cases are candidates in a review queue
 until someone approves them, and each candidate carries the quote it was drafted from. When
-GaugeLab cannot find that quote in the source document, it flags the candidate.
+Assay cannot find that quote in the source document, it flags the candidate.
 
 ## Objective first, judges only where meaning must be judged
 
@@ -62,7 +62,7 @@ heuristic judge) are reported but never fail a trial on their own.
 
 ## No single magic score
 
-GaugeLab never folds metrics into a weighted "AI score". Each metric is shown on its own,
+Assay never folds metrics into a weighted "AI score". Each metric is shown on its own,
 with its N, and release decisions go through explicit gates:
 
 ```yaml
@@ -116,7 +116,7 @@ chart and filters use the override.
 
 ## Cost
 
-Costs are estimates: reported tokens × the price table (`gaugelab/pricing/prices.yaml`
+Costs are estimates: reported tokens × the price table (`assay/pricing/prices.yaml`
 plus overrides). Every price row carries the date it took effect and its source. A model
 that is not in the table costs **unknown**, never zero. Before a run, the judge cost is
 estimated from prompt sizes, and an optional budget stops scheduling when spend reaches it.

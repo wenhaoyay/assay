@@ -422,8 +422,8 @@ function ToolCalls({ r }: { r: TrialDetail['result'] }) {
 function RawResponse({ tr }: { tr: TrialDetail }) {
   const [rawTab, setRawTab] = useState<'normalized' | 'raw'>('normalized')
   return (
-    <Card title="Response" help={<p>"As GaugeLab read it" is the bot's response after the connector mapped it to answer, citations, passages and tools; "Raw" is exactly what the bot sent.</p>}
-      actions={<Segmented size="sm" value={rawTab} onChange={setRawTab} options={[{ id: 'normalized', label: 'As GaugeLab read it' }, { id: 'raw', label: 'Raw' }]} />}>
+    <Card title="Response" help={<p>"As Assay read it" is the bot's response after the connector mapped it to answer, citations, passages and tools; "Raw" is exactly what the bot sent.</p>}
+      actions={<Segmented size="sm" value={rawTab} onChange={setRawTab} options={[{ id: 'normalized', label: 'As Assay read it' }, { id: 'raw', label: 'Raw' }]} />}>
       <Json value={rawTab === 'raw' ? tr.raw : tr.result} maxHeight={320} />
     </Card>
   )

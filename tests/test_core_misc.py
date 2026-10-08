@@ -2,13 +2,13 @@
 
 import asyncio
 
-from gaugelab.adapters.base import AdapterContext, TargetAdapter, TargetCall, now
-from gaugelab.adapters.python import PythonTargetAdapter
-from gaugelab.gates import evaluate_gates
-from gaugelab.pricing import PricingRegistry
-from gaugelab.runner import RunSpec, run_trials
-from gaugelab.schemas import NormalizedTargetResult, Usage
-from gaugelab.traces import build_trace, redact
+from assay.adapters.base import AdapterContext, TargetAdapter, TargetCall, now
+from assay.adapters.python import PythonTargetAdapter
+from assay.gates import evaluate_gates
+from assay.pricing import PricingRegistry
+from assay.runner import RunSpec, run_trials
+from assay.schemas import NormalizedTargetResult, Usage
+from assay.traces import build_trace, redact
 from tests.conftest import make_case
 
 

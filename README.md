@@ -1,4 +1,4 @@
-# GaugeLab
+# Assay
 
 **Regression testing for RAG chatbots and tool-using agents: change the model, prompt, retriever
 or tools, and find out whether the system got better, worse, slower, more expensive or less reliable,
@@ -6,7 +6,7 @@ with the uncertainty stated.**
 
 ![Compare: baseline vs candidate](docs/screenshots/compare.png)
 
-GaugeLab runs a versioned golden dataset against two or more versions of a system, grades
+Assay runs a versioned golden dataset against two or more versions of a system, grades
 every answer with objective checks first and an LLM judge only where meaning has to be judged,
 and compares the versions case by case: paired deltas with confidence intervals, the cases that
 regressed, why they failed, and the execution trace behind each one. Release decisions go through
@@ -20,8 +20,8 @@ pasting a curl command into the connect wizard and clicking the reply.
 
 - **Connect any chatbot without writing config.** Paste a curl command; secrets are moved to
   the OS credential store; send a test question and click the reply to say where the answer,
-  sources, tool calls and tokens are (GaugeLab suggests, you confirm); see which checks that
-  unlocks; dry-run three questions for time and cost. Bots that reply in the **GaugeLab reply
+  sources, tool calls and tokens are (Assay suggests, you confirm); see which checks that
+  unlocks; dry-run three questions for time and cost. Bots that reply in the **Assay reply
   shape** (`answer, sources, citations, tool_calls, usage`) need no mapping at all. Underneath:
   an HTTP adapter with field mapping and SSE/NDJSON stream reducers, a Python adapter, and an
   importer that re-grades logged answers without calling the system.
@@ -35,7 +35,7 @@ pasting a curl command into the connect wizard and clicking the reply.
   its evidence quote (flagged if the quote is not in the document). Nothing enters a dataset
   until a person approves it.
 - **Golden sets without the typing.** A dataset's *Build* tab: approve or correct a run's
-  answers as flashcards (GaugeLab suggests the codes, numbers and names a correct answer must
+  answers as flashcards (Assay suggests the codes, numbers and names a correct answer must
   mention), a copy-paste prompt kit for your own ChatGPT or Claude whose output lands in the
   review queue, real questions from chat history grouped by how often they were asked, an
   expert interview mode, a spreadsheet template for colleagues, and variations of a case
@@ -85,7 +85,7 @@ pasting a curl command into the connect wizard and clicking the reply.
 | ![Execution trace](docs/screenshots/trace.png) | ![Every case in every run](docs/screenshots/dataset-history.png) |
 | **Trace.** Request, retrieval, model and tool calls with timings; the slowest step called out; the checks that graded it. | **Results across runs.** A case red in every run is often a wrong golden answer, not a bad bot. |
 | ![Connect wizard](docs/screenshots/connect.png) | ![Models and keys](docs/screenshots/models.png) |
-| **Connect a chatbot.** Paste curl, send a question, click the reply; GaugeLab guesses, you confirm. | **Models & keys.** Bring a better grading model; keys live in the OS credential store. |
+| **Connect a chatbot.** Paste curl, send a question, click the reply; Assay guesses, you confirm. | **Models & keys.** Bring a better grading model; keys live in the OS credential store. |
 | ![Calibration flashcards](docs/screenshots/calibration.png) | ![Compare in dark mode](docs/screenshots/compare-dark.png) |
 | **Calibration.** Label blind with P / F / U; agreement with the judge fills in as you go. | **Dark mode**, designed rather than inverted: warm blacks, figures that glow. |
 
@@ -94,7 +94,7 @@ pasting a curl command into the connect wizard and clicking the reply.
 ```mermaid
 flowchart LR
   UI[Web app] --> API[FastAPI]
-  CLI[gaugelab CLI / CI] --> SVC
+  CLI[assay CLI / CI] --> SVC
   API --> SVC[Service layer]
   SVC --> RUN[Runner] --> AD[Adapters: http / python / replay] --> T[Your chatbot or agent]
   RUN --> EV[Evaluators] --> J[Judge: BYOK cloud or local Ollama]
@@ -111,7 +111,7 @@ See [docs/architecture.md](docs/architecture.md).
 Requires Python 3.12+ and Node 20+.
 
 ```bash
-git clone <this repo> gaugelab && cd gaugelab
+git clone <this repo> assay && cd assay
 cp .env.example .env            # optional: only needed for cloud judge keys
 make setup                      # venv + Python and web dependencies
 make web                        # build the web app
@@ -120,7 +120,7 @@ make serve                      # http://localhost:8040
 ```
 
 Open it and press **Take the tour** on the home page (or Ctrl+K > "Take the tour"): eight
-steps from a chatbot's verdict to connecting your own bot. `gaugelab seed --run --fresh`
+steps from a chatbot's verdict to connecting your own bot. `assay seed --run --fresh`
 (`make demo-fresh`) starts again from an empty database - stop the server first.
 
 Without `make` (for example on Windows):
@@ -128,8 +128,8 @@ Without `make` (for example on Windows):
 ```bash
 python -m venv .venv && .venv/Scripts/pip install -e ".[dev,pdf]"      # .venv/bin on macOS/Linux
 cd apps/web && npm ci && npm run build && cd ../..
-.venv/Scripts/gaugelab seed --run
-.venv/Scripts/gaugelab serve
+.venv/Scripts/assay seed --run
+.venv/Scripts/assay serve
 ```
 
 With Docker (Postgres, API + web app, demo agent):
@@ -138,17 +138,17 @@ With Docker (Postgres, API + web app, demo agent):
 docker compose up --build       # http://localhost:8040 ; demo agent on :9040
 ```
 
-The database defaults to SQLite at `data/gaugelab.db`. Set `DATABASE_URL` for Postgres.
+The database defaults to SQLite at `data/assay.db`. Set `DATABASE_URL` for Postgres.
 
 ## Example evaluation flow
 
 ```bash
-gaugelab validate benchmarks/acme_support/dataset.yaml
-gaugelab run benchmarks/acme_support/variants/baseline.yaml
-gaugelab run benchmarks/acme_support/variants/candidate.yaml
-gaugelab compare 1 2 --md
-gaugelab gate 2 --config benchmarks/acme_support/gates.yaml --baseline 1
-gaugelab export 2 --format json --out run-2.json
+assay validate benchmarks/acme_support/dataset.yaml
+assay run benchmarks/acme_support/variants/baseline.yaml
+assay run benchmarks/acme_support/variants/candidate.yaml
+assay compare 1 2 --md
+assay gate 2 --config benchmarks/acme_support/gates.yaml --baseline 1
+assay export 2 --format json --out run-2.json
 ```
 
 An experiment is a YAML file:
@@ -205,7 +205,7 @@ calibration page exists for: measure a judge against people before letting it ga
 
 You do. A test case states what a person expects: a reference answer, phrases that must or
 must not appear, relevant documents, required tools and arguments, the expected outcome
-(`warranty_status: active`), or that the assistant should decline. GaugeLab never infers
+(`warranty_status: active`), or that the assistant should decline. Assay never infers
 ground truth. Generated candidates are drafts until approved, and approval is recorded with
 the reviewer's name. A case does not need a written model answer: a question plus two or three
 phrases a correct answer cannot avoid is a useful case, and takes a minute to write.
@@ -224,7 +224,7 @@ that cannot be computed shows as *not applicable* or *not evaluated*, never as a
 - **Local:** Settings > Models & keys has an Ollama card: it detects the app, suggests a model
   from this PC's free memory and graphics card (size, memory, seconds per grading call),
   downloads it after you accept a third-party notice, connects and checks it. Free per call;
-  nothing leaves the machine, except with Ollama's `-cloud` models, which GaugeLab labels as
+  nothing leaves the machine, except with Ollama's `-cloud` models, which Assay labels as
   cloud and refuses under *local judges only*. See [docs/local-models.md](docs/local-models.md).
 - **Cloud:** in Settings > Models & keys, pick OpenAI (or another provider), paste the key once:
   it is stored in the operating system's credential store (Windows Credential Manager, macOS
@@ -238,13 +238,13 @@ that cannot be computed shows as *not applicable* or *not evaluated*, never as a
 - **CI:** the default pipeline uses the heuristic judge, which is free and offline. An optional
   workflow runs the suite with a cloud judge when you add a key as a repository secret.
 
-There are no demo credentials: GaugeLab has no login. It is a local, single-user workbench.
+There are no demo credentials: Assay has no login. It is a local, single-user workbench.
 
 ## Connecting your own chatbot
 
 Targets > *Connect a chatbot*: paste a curl command (or pick a template: OpenAI-compatible,
 Anthropic, LangServe, Flowise, Dify, n8n, SSE), send a test question, map the reply by
-clicking it, check what you get, dry-run, save. For bots you build, return the GaugeLab reply
+clicking it, check what you get, dry-run, save. For bots you build, return the Assay reply
 shape and skip the mapping (Settings > *Reply shape* has FastAPI, Flask and Express snippets).
 The wizard writes an ordinary target config, which you can also write by hand: configuration
 that names internal systems belongs in `local/`, which git ignores. See
@@ -253,7 +253,7 @@ that names internal systems belongs in `local/`, which git ignores. See
 ## Repository layout
 
 ```text
-gaugelab/                    core package: adapters, evaluators, judge, runner, statistics, gates, store, CLI
+assay/                    core package: adapters, evaluators, judge, runner, statistics, gates, store, CLI
 apps/api/                    FastAPI app, Alembic migrations, API tests
 apps/web/                    React + TypeScript + Vite + Tailwind + Motion + Recharts; Vitest and Playwright tests
 examples/acme_support_agent/ fictional system under test (docs, mock tools, two variants, HTTP server)
@@ -279,7 +279,7 @@ make ci-regression   # the same gate on a deliberately regressed candidate (exit
 Postgres, the Playwright flows, and the evaluation gate:
 
 ```text
-## GaugeLab evaluation
+## Assay evaluation
 | | Metric | Baseline | Candidate | Delta | 95% CI (paired) |
 | - | Overall pass rate | 73.0% | 67.2% | -5.7pp | ... |
 | - | Tool accuracy     | 95.2% | 81.0% | -14.3pp | ... |
@@ -302,7 +302,7 @@ to prove that the gate fails when it should.
 - **The heuristic judge is shallow.** It exists so CI is free and it never fails a trial by
   itself. Semantic grading needs an LLM judge, and an LLM judge needs calibration.
 - **Small samples.** Fifty-eight cases give intervals of roughly ±13 percentage points.
-  GaugeLab reports that rather than hiding it.
+  Assay reports that rather than hiding it.
 - **Verified locally, not yet in CI.** Development and every test ran on SQLite on Windows.
   The Docker Compose stack and the GitHub Actions workflows (including the Postgres job) are
   written but had not been run when this was written: the development machine has no Docker,
@@ -318,7 +318,7 @@ simulated users; inter-annotator agreement; PR comments through the GitHub API; 
 
 ## Privacy
 
-GaugeLab stores what you evaluate, in its own database. Deterministic checks and the
+Assay stores what you evaluate, in its own database. Deterministic checks and the
 heuristic and Ollama judges send nothing anywhere. A cloud judge receives the question,
 reference, context and answer. Raw responses are redacted before storage. See
 [docs/security-and-privacy.md](docs/security-and-privacy.md). The repository contains only

@@ -46,7 +46,7 @@ export function DatasetsPage() {
     <>
       <PageHeader title="Datasets" help={<>
         <p>Versioned golden datasets: test cases with the outcomes a person expects. A version used by a run is frozen for good; editing it makes a new version.</p>
-        <p><span className="font-semibold">Who decides what is correct? You do.</span> GaugeLab cannot infer ground truth: every expected outcome in a dataset was written, imported or approved by a person. AI-generated cases stay in a review queue until someone approves them.</p>
+        <p><span className="font-semibold">Who decides what is correct? You do.</span> Assay cannot infer ground truth: every expected outcome in a dataset was written, imported or approved by a person. AI-generated cases stay in a review queue until someone approves them.</p>
       </>} />
       <div className="mb-10 grid gap-10 lg:grid-cols-[minmax(0,1fr)_400px]">
         <WaysToBuild />
@@ -55,7 +55,7 @@ export function DatasetsPage() {
         </Card>
       </div>
       {datasets.isLoading ? <Loading /> : datasets.isError ? <ErrorState error={datasets.error} /> : all.length === 0 ? (
-        <Empty title="No datasets yet. A gauge with nothing to read.">Add questions above, or run <Code>gaugelab seed</Code> for the 58-case Acme golden set.</Empty>
+        <Empty title="No datasets yet. A gauge with nothing to read.">Add questions above, or run <Code>assay seed</Code> for the 58-case Acme golden set.</Empty>
       ) : (
         <Card padded={false} title="Your datasets" meta={`${shown.length}`} help={<p>Each dataset belongs to one chatbot; change it here. A set that runs have used can only be archived (its questions stay with those runs); an unused one can be deleted.</p>}
           actions={archivedCount > 0 && <Button size="sm" variant="ghost" onClick={() => setShowArchived((v) => !v)}>{showArchived ? 'Hide' : 'Show'} {archivedCount} archived</Button>}>
@@ -76,7 +76,7 @@ function WaysToBuild() {
   return (
     <Card title="Ways to build a set" help={<p>The machine does the typing; you vouch for every case. Each way ends in the same place: cases a person has approved.</p>}>
       <ul className="grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
-        <li><span className="font-semibold text-ink">Approve good answers</span><span className="mt-0.5 block text-sm text-ink-2">Open a dataset → <i>Build</i>: mark a bot's answers right or wrong; GaugeLab suggests what a correct answer must mention.</span></li>
+        <li><span className="font-semibold text-ink">Approve good answers</span><span className="mt-0.5 block text-sm text-ink-2">Open a dataset → <i>Build</i>: mark a bot's answers right or wrong; Assay suggests what a correct answer must mention.</span></li>
         <li><span className="font-semibold text-ink">Prompt kit</span><span className="mt-0.5 block text-sm text-ink-2">Copy a ready prompt into your own ChatGPT or Claude with your documents; the result lands in the review queue.</span></li>
         <li><span className="font-semibold text-ink">Real questions</span><span className="mt-0.5 block text-sm text-ink-2">Upload chat history; similar questions are grouped by how often they were asked.</span></li>
         <li><span className="font-semibold text-ink">Colleagues</span><span className="mt-0.5 block text-sm text-ink-2">Send the <a className="text-accent-ink underline" href="/api/datasets/template.csv">spreadsheet template</a> or use expert interview mode.</span></li>
@@ -461,7 +461,7 @@ function GeneratePanel({ datasetId, versionId, onPromoted }: { datasetId: number
     <div className="space-y-4">
       <Notice tone="warn" title="Generated cases are candidates, not ground truth">
         A model drafts questions and answers from your documents. Each one stays <span className="font-semibold">unreviewed</span> until a person approves,
-        edits or rejects it; only approved cases can be added to a dataset version. Check the evidence quote: GaugeLab flags quotes it cannot find in the document.
+        edits or rejects it; only approved cases can be added to a dataset version. Check the evidence quote: Assay flags quotes it cannot find in the document.
       </Notice>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <Card boxed title="1. Reference documents" help={<p>Upload Markdown, TXT, JSON or PDF, then tick the documents to draft questions from.</p>}>
@@ -498,7 +498,7 @@ function GeneratePanel({ datasetId, versionId, onPromoted }: { datasetId: number
 
       <Card
         title="3. Review queue"
-        help={<p>Approve, edit or reject each candidate; every decision records who made it. Check the evidence quote: GaugeLab flags quotes it cannot find in the document. Add approved to dataset puts the approved ones into a version.</p>}
+        help={<p>Approve, edit or reject each candidate; every decision records who made it. Check the evidence quote: Assay flags quotes it cannot find in the document. Add approved to dataset puts the approved ones into a version.</p>}
         actions={
           <>
             <Input className="h-7 w-40 text-xs" placeholder="Your name (reviewer)" value={reviewer} onChange={(e) => setReviewer(e.target.value)} aria-label="Reviewer" />
@@ -569,7 +569,7 @@ function PlainMatchers({ onAdd }: { onAdd: (pattern: string) => void }) {
   }
   return (
     <div className="rounded-lg border border-line p-2">
-      <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-ink-2">Or a rule in plain words<Help title="Rules in plain words"><p>GaugeLab writes the pattern (shown below the rule) so "91" does not match "910", and capitals do not matter.</p></Help></div>
+      <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-ink-2">Or a rule in plain words<Help title="Rules in plain words"><p>Assay writes the pattern (shown below the rule) so "91" does not match "910", and capitals do not matter.</p></Help></div>
       <div className="flex flex-wrap gap-2">
         <Select className="w-48" value={kind} onChange={(e) => setKind(e.target.value as typeof kind)} aria-label="Rule kind">
           <option value="any">contains any of</option><option value="word">contains the whole word</option><option value="number">contains the exact number</option>

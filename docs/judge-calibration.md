@@ -5,12 +5,12 @@
 An LLM judge is a model grading a model. Its verdicts can be biased (lenient on fluent
 answers, harsh on short ones), inconsistent, or simply wrong about the domain. Before a
 judge's pass rate is trusted for a release decision, it should be checked against people.
-GaugeLab therefore shows every judge as **Uncalibrated** until human labels exist, and as
+Assay therefore shows every judge as **Uncalibrated** until human labels exist, and as
 **Calibrated on N samples** afterwards, with the agreement figures alongside.
 
 ## How the judge is built
 
-- **Labels with definitions, not scores.** Each rubric (`gaugelab/evaluators/llm_judge/rubrics/*.yaml`)
+- **Labels with definitions, not scores.** Each rubric (`assay/evaluators/llm_judge/rubrics/*.yaml`)
   defines PASS, FAIL and UNKNOWN for one dimension. UNKNOWN is a legitimate answer: "the
   reference is not enough to decide".
 - **Strict output.** The judge must return
@@ -53,7 +53,7 @@ With labels from a person (H) and the judge (J) on the same trials:
 - **Disagreements** are listed with the judge's reason and your note. They are often the
   quickest way to find a rubric that is ambiguous.
 
-For numeric scores, `gaugelab.statistics` also provides MAE and Spearman's rank correlation.
+For numeric scores, `assay.statistics` also provides MAE and Spearman's rank correlation.
 
 ## What this looks like in practice
 

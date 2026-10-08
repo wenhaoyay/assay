@@ -1,5 +1,5 @@
 // Regenerate the README screenshots from a running server with the seeded demo and its history
-// (`gaugelab seed --run --history --fresh`: run #4 = baseline, #9 = candidate) and the demo agent
+// (`assay seed --run --history --fresh`: run #4 = baseline, #9 = candidate) and the demo agent
 // on :9040 for the connect-wizard shot.
 //   node e2e/screenshots.mjs            (BASE=http://127.0.0.1:8040, OUT=../../docs/screenshots)
 import { mkdirSync } from 'node:fs'

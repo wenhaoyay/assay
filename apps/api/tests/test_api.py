@@ -21,7 +21,7 @@ EVALUATORS = ["must_mention", "forbidden_claims", "citation_validity", "refusal_
 def client(fresh_db):
     from app.main import app
 
-    from gaugelab.seed import seed
+    from assay.seed import seed
 
     seeded = seed(run=False)
     with TestClient(app) as c:
@@ -103,7 +103,7 @@ def test_full_flow(client):
 
     # Export.
     md = c.get(f"/api/runs/{cand['id']}/export", params={"format": "md", "baseline": base["id"]}).text
-    assert "GaugeLab evaluation" in md and "Gate:" in md
+    assert "Assay evaluation" in md and "Gate:" in md
     js = json.loads(c.get(f"/api/runs/{cand['id']}/export").text)
     assert js["run"]["id"] == cand["id"] and len(js["trials"]) == 116
 
@@ -176,7 +176,7 @@ def test_cancel_keeps_finished_trials(client):
 def test_candidate_generation_requires_review(client, monkeypatch):
     from app.routers import datasets as ds_router
 
-    from gaugelab.providers import ScriptedProvider
+    from assay.providers import ScriptedProvider
 
     reply = json.dumps({"cases": [
         {"kind": "factual", "question": "How many points for a $5 voucher?", "answer": "500 points.",

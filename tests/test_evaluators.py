@@ -1,9 +1,9 @@
 import pytest
 
-from gaugelab.evaluators import get_evaluator
-from gaugelab.evaluators.agent.tools import argument_diff, tool_selection, values_match
-from gaugelab.evaluators.base import EvalContext
-from gaugelab.schemas import NormalizedTargetResult as R
+from assay.evaluators import get_evaluator
+from assay.evaluators.agent.tools import argument_diff, tool_selection, values_match
+from assay.evaluators.base import EvalContext
+from assay.schemas import NormalizedTargetResult as R
 from tests.conftest import make_case
 
 

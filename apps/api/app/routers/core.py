@@ -10,13 +10,13 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from gaugelab.adapters import AdapterContext, TransientTargetError, build_adapter
-from gaugelab.evaluators import DEFAULT_EVALUATORS, JUDGE_EVALUATORS, all_evaluators
-from gaugelab.evaluators.llm_judge.judge import load_rubric
-from gaugelab.providers import ChatMessage, ProviderError, ProviderSpec, build_provider
-from gaugelab.store import models as m
-from gaugelab.store import service as svc
-from gaugelab.traces import redact
+from assay.adapters import AdapterContext, TransientTargetError, build_adapter
+from assay.evaluators import DEFAULT_EVALUATORS, JUDGE_EVALUATORS, all_evaluators
+from assay.evaluators.llm_judge.judge import load_rubric
+from assay.providers import ChatMessage, ProviderError, ProviderSpec, build_provider
+from assay.store import models as m
+from assay.store import service as svc
+from assay.traces import redact
 
 from .. import serializers as ser
 from ..deps import get_session
@@ -69,7 +69,7 @@ class TargetUpdate(BaseModel):
 
 
 class ConnectionTest(BaseModel):
-    message: str = "Hello - this is a GaugeLab connection test."
+    message: str = "Hello - this is an Assay connection test."
     adapter: str | None = None  # for testing an unsaved config
     config: dict[str, Any] | None = None
 
@@ -187,7 +187,7 @@ class ProviderIn(BaseModel):
 
 @router.get("/providers")
 def list_providers(s: Session = Depends(get_session)) -> list[dict[str, Any]]:
-    from gaugelab.store.workspace import provider_public
+    from assay.store.workspace import provider_public
 
     return [provider_public(s, p) for p in s.scalars(select(m.ProviderConfig).order_by(m.ProviderConfig.id))]
 

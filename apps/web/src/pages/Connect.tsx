@@ -59,7 +59,10 @@ interface TestResult {
   standard?: { matches: boolean; missing: string[] } | null
 }
 
-const blankHttp = (): Cfg => ({ base_url: 'http://localhost:8000', endpoint: '/chat', method: 'POST', timeout_s: 60, body: { message: '{{input.message}}', session_id: 'eval-{{uuid}}' }, reply_shape: 'gaugelab' })
+/** The bot replies in the standard shape ("gaugelab": saved before the project was renamed). */
+export const isStandardShape = (s: unknown) => s === 'assay' || s === 'gaugelab'
+
+const blankHttp = (): Cfg => ({ base_url: 'http://localhost:8000', endpoint: '/chat', method: 'POST', timeout_s: 60, body: { message: '{{input.message}}', session_id: 'eval-{{uuid}}' }, reply_shape: 'assay' })
 
 export function ConnectPage() {
   const [params] = useSearchParams()
@@ -81,13 +84,13 @@ function ConnectWizard({ editing }: { editing: Target | null }) {
   const [route, setRoute] = useState<Route>(editing?.adapter === 'python' ? 'python' : editing ? 'http' : 'curl')
   const [adapter, setAdapter] = useState<'http' | 'python'>(editing?.adapter === 'python' ? 'python' : 'http')
   const [cfg, setCfg] = useState<Cfg>(() => (editCfg ? JSON.parse(JSON.stringify(editCfg)) : blankHttp()))
-  const [standard, setStandardState] = useState(editCfg ? editCfg.reply_shape === 'gaugelab' : true)
+  const [standard, setStandardState] = useState(editCfg ? isStandardShape(editCfg.reply_shape) : true)
   // The standard-shape switch and the config change together.
   const setStandard = (on: boolean) => {
     setStandardState(on)
     if (adapter !== 'http') return
     setCfg((c) => {
-      if (on) return { ...c, reply_shape: 'gaugelab' }
+      if (on) return { ...c, reply_shape: 'assay' }
       const { reply_shape: _drop, ...rest } = c
       return { response: { answer: 'answer' }, ...rest }
     })
@@ -109,7 +112,7 @@ function ConnectWizard({ editing }: { editing: Target | null }) {
       setAdapter('http')
       if (r === 'openai') { applyTemplate(templates.data?.find((t) => t.id === 'builtin:openai-chat')); return }
       if (r === 'stream') { applyTemplate(templates.data?.find((t) => t.id === 'builtin:sse')); return }
-      setCfg((c) => (c.base_url ? { ...c, reply_shape: 'gaugelab' } : blankHttp()))
+      setCfg((c) => (c.base_url ? { ...c, reply_shape: 'assay' } : blankHttp()))
       setStandardState(true)
     }
   }
@@ -117,7 +120,7 @@ function ConnectWizard({ editing }: { editing: Target | null }) {
     if (!t) return
     setAdapter(t.adapter)
     setCfg(JSON.parse(JSON.stringify(t.config)))
-    setStandardState((t.config as Cfg).reply_shape === 'gaugelab')
+    setStandardState(isStandardShape((t.config as Cfg).reply_shape))
     setRoute(t.adapter === 'python' ? 'python' : (t.config as Cfg).stream ? 'stream' : t.id === 'builtin:openai-chat' ? 'openai' : 'template')
     setStep(1)
   }
@@ -229,7 +232,7 @@ function StepRoute({ route, onRoute, templates, onTemplate, standard, setStandar
       {route !== 'logs' && route !== 'python' && (
         <Card>
           <Toggle checked={standard} onChange={setStandard}
-            label={<LabelHelp label="My bot replies in the GaugeLab shape" title="The GaugeLab reply shape">
+            label={<LabelHelp label="My bot replies in the Assay shape" title="The Assay reply shape">
               <p>The reply is <code>{'{answer, sources, citations, tool_calls, usage}'}</code>: nothing to map.</p>
               <p>Turn it off for bots you did not build: you will map the reply by clicking it. <a className="text-accent-ink underline" href="/settings?tab=shape">How to add the shape to a bot</a></p>
             </LabelHelp>} />
@@ -315,7 +318,7 @@ function StepRequest({ route, adapter, cfg, setCfg }: { route: Route; adapter: '
     <div className="space-y-5">
       {route === 'curl' && (
         <Card title="Paste the curl command" help={<>
-          <p>Copy a real request to your bot as curl and GaugeLab reads the address, headers and body from it, finds where the question goes, and offers to store any key securely.</p>
+          <p>Copy a real request to your bot as curl and Assay reads the address, headers and body from it, finds where the question goes, and offers to store any key securely.</p>
           <p>Chrome / Edge DevTools → Network → right-click the request → Copy → Copy as cURL (bash).</p>
         </>}>
           <Textarea rows={6} value={curl} onChange={(e) => setCurl(e.target.value)} placeholder={"curl 'https://my-bot.example.com/api/chat' \\\n  -H 'Authorization: Bearer sk-...' \\\n  -H 'Content-Type: application/json' \\\n  --data-raw '{\"question\":\"How do I reset it?\"}'"} aria-label="curl command" />
@@ -486,7 +489,7 @@ function StepMap(props: {
   const reasons = probe?.suggestion?.reasons ?? {}
   return (
     <div className="space-y-5">
-      <Card title="Send a test question" help={<p>Sends one question with the request so far and shows the raw reply. With the GaugeLab shape off, map the reply below by clicking it.</p>}>
+      <Card title="Send a test question" help={<p>Sends one question with the request so far and shows the raw reply. With the Assay shape off, map the reply below by clicking it.</p>}>
         <div className="flex gap-2">
           <Input value={message} onChange={(e) => setMessage(e.target.value)} aria-label="Test question" />
           <Button variant="primary" loading={probing} onClick={runProbe}><Send className="size-3.5" />Send</Button>
@@ -497,8 +500,8 @@ function StepMap(props: {
 
       {probe?.ok && adapter === 'http' && standard && probe.suggestion && (
         probe.suggestion.standard.matches
-          ? <Notice tone="good" title="The reply is in the GaugeLab shape - nothing to map">Found: {probe.suggestion.standard.present.join(', ')}.{probe.suggestion.standard.missing.length > 0 && <> Not in this reply: {probe.suggestion.standard.missing.join(', ')}.</>}</Notice>
-          : <Notice tone="warn" title="This reply is not in the GaugeLab shape" action={<Button size="sm" onClick={() => { setStandard(false); setCfg((c) => ({ ...c, response: probe.suggestion!.mapping })) }}>Map it instead</Button>}>
+          ? <Notice tone="good" title="The reply is in the Assay shape - nothing to map">Found: {probe.suggestion.standard.present.join(', ')}.{probe.suggestion.standard.missing.length > 0 && <> Not in this reply: {probe.suggestion.standard.missing.join(', ')}.</>}</Notice>
+          : <Notice tone="warn" title="This reply is not in the Assay shape" action={<Button size="sm" onClick={() => { setStandard(false); setCfg((c) => ({ ...c, response: probe.suggestion!.mapping })) }}>Map it instead</Button>}>
               {probe.suggestion.standard.problems.concat(probe.suggestion.standard.missing.includes('answer') ? ['There is no top-level "answer" string.'] : []).join(' ')} Turn the switch off and map the reply by clicking it.
             </Notice>
       )}
@@ -510,7 +513,7 @@ function StepMap(props: {
             {pickError && <p className="mb-2 text-xs text-bad-ink">{pickError}</p>}
             <JsonTree data={raw} onPick={onPick} marks={marksFor(mapping)} picking={!!picking} />
           </Card>
-          <Card title="Where is each thing?" boxed help={<p>GaugeLab guessed from the reply; confirm or fix. A green dot is mapped. Hover a path to see why it was guessed.</p>}>
+          <Card title="Where is each thing?" boxed help={<p>Assay guessed from the reply; confirm or fix. A green dot is mapped. Hover a path to see why it was guessed.</p>}>
             <ul className="space-y-1">
               {ROLES.map((r, i) => {
                 const p = getRole(mapping, r.id)
@@ -556,7 +559,7 @@ function StepMap(props: {
       )}
 
       {probe?.ok && (
-        <Card title="What GaugeLab will see" help={<p>Runs the whole connection (request and mapping) and shows the result as GaugeLab reads it, and which checks that makes possible.</p>} actions={<Button variant="primary" loading={testing} onClick={runTest}><Check className="size-3.5" />Check the mapping</Button>}>
+        <Card title="What Assay will see" help={<p>Runs the whole connection (request and mapping) and shows the result as Assay reads it, and which checks that makes possible.</p>} actions={<Button variant="primary" loading={testing} onClick={runTest}><Check className="size-3.5" />Check the mapping</Button>}>
           {!test ? <p className="text-sm text-ink-2">Not checked yet: press Check the mapping.</p> : !test.ok ? (
             <Notice tone="bad" title={test.explanation ?? test.error ?? 'No answer'}>{test.error}</Notice>
           ) : (
@@ -716,9 +719,9 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved, reply, tes
         </Card>
       )}
       {adapter === 'http' && (
-        <Card title="Side effects" help={<p>Also check what else a question writes (usage tables, shared logs, budgets) before pointing GaugeLab at a shared instance. When that is not acceptable, use an isolated copy or import logs instead.</p>}>
+        <Card title="Side effects" help={<p>Also check what else a question writes (usage tables, shared logs, budgets) before pointing Assay at a shared instance. When that is not acceptable, use an isolated copy or import logs instead.</p>}>
           <Toggle checked={savesChats} onChange={setCleanup}
-            label={<LabelHelp label="Each question saves a conversation in the bot" title="Clean-up"><p>Then GaugeLab deletes it right after the answer, so test runs do not pile up in the bot's history.</p></LabelHelp>} />
+            label={<LabelHelp label="Each question saves a conversation in the bot" title="Clean-up"><p>Then Assay deletes it right after the answer, so test runs do not pile up in the bot's history.</p></LabelHelp>} />
           {!savesChats && idPath && (
             <div className="mt-3">
               <Notice tone="info" title={<>The reply carries a chat id (<code>{idPath}</code>)</>} action={<Button size="sm" onClick={() => setCleanup(true)}>Clean up after each question</Button>}>

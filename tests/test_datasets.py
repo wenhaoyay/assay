@@ -1,6 +1,6 @@
 import pytest
 
-from gaugelab.datasets import DatasetError, content_hash, export_dataset, parse_dataset
+from assay.datasets import DatasetError, content_hash, export_dataset, parse_dataset
 
 YAML = """
 name: demo

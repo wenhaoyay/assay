@@ -2,7 +2,7 @@
 
 A run tells you which answers failed. To improve the bot you need to know why, because the fix
 depends on it: a search problem is fixed in the documents or the retriever, a model problem in
-the prompt or the model, and a test problem in the question set. GaugeLab gives every failed
+the prompt or the model, and a test problem in the question set. Assay gives every failed
 answer a **likely cause**, shows the evidence for it, and says what to change.
 
 ## The loop
@@ -21,7 +21,7 @@ answer a **likely cause**, shows the evidence for it, and says what to change.
 
 For a retrieval chatbot, an answer goes wrong at one of a few points (after Barnett et al.,
 *Seven Failure Points When Engineering a Retrieval Augmented Generation System*, 2024). For
-each failed answer, GaugeLab takes what a correct answer needed (missing must-mention phrases,
+each failed answer, Assay takes what a correct answer needed (missing must-mention phrases,
 required patterns that did not match, the exact answer, or the codes and numbers of the
 reference answer when a grading model judged the answer wrong) and looks for it:
 
@@ -50,7 +50,7 @@ verdict is **Can't tell yet** rather than a guess.
 
 Two things make the verdicts sharper:
 
-- **Let the connection read the bot's sources.** Without them GaugeLab cannot tell "search
+- **Let the connection read the bot's sources.** Without them Assay cannot tell "search
   missed it" from "found but not used". See *Reading the reply* on the connection's page:
   it shows what a reply already stored contains, reads it with one click, and re-reads past
   runs from their stored replies. No questions are asked again; checks that need no grading

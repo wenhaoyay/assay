@@ -63,7 +63,7 @@ export function RunsPage() {
       </div>
       {runs.isLoading ? <Loading /> : runs.isError ? <ErrorState error={runs.error} /> : rows.length === 0 ? (
         (runs.data ?? []).length === 0
-          ? <Empty title="No runs yet. The needle is resting on zero." action={<Link to="/runs/new" className={linkButton('primary')}>Start a run</Link>}>Run a chatbot version on a dataset, or load the Acme demo with <Code>gaugelab seed --run</Code>.</Empty>
+          ? <Empty title="No runs yet. The needle is resting on zero." action={<Link to="/runs/new" className={linkButton('primary')}>Start a run</Link>}>Run a chatbot version on a dataset, or load the Acme demo with <Code>assay seed --run</Code>.</Empty>
           : <Empty title="Nothing matches that search.">Clear the search or pick all chatbots.</Empty>
       ) : group === 'flat' ? (
         <Card title="All runs" meta={`${rows.length} runs`} padded={false}><RunsTable runs={rows} selectable selected={selected} onToggle={toggle} keyboard /></Card>

@@ -12,13 +12,13 @@ from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from gaugelab.datasets import BOM, DatasetError, export_dataset, parse_dataset, validate_cases
-from gaugelab.datasets.generate import extract_text, generate_candidates
-from gaugelab.providers import ProviderSpec, build_provider
-from gaugelab.schemas import TestCase
-from gaugelab.store import models as m
-from gaugelab.store import service as svc
-from gaugelab.store import workspace
+from assay.datasets import BOM, DatasetError, export_dataset, parse_dataset, validate_cases
+from assay.datasets.generate import extract_text, generate_candidates
+from assay.providers import ProviderSpec, build_provider
+from assay.schemas import TestCase
+from assay.store import models as m
+from assay.store import service as svc
+from assay.store import workspace
 
 from .. import serializers as ser
 from ..deps import get_session
@@ -155,9 +155,9 @@ TEMPLATE_CSV = (
 
 @router.get("/datasets/template.csv")
 def template_csv() -> PlainTextResponse:
-    """A spreadsheet colleagues can fill in Excel without ever opening GaugeLab."""
+    """A spreadsheet colleagues can fill in Excel without ever opening Assay."""
     return PlainTextResponse(BOM + TEMPLATE_CSV, media_type="text/csv",
-                             headers={"Content-Disposition": 'attachment; filename="gaugelab-questions-template.csv"'})
+                             headers={"Content-Disposition": 'attachment; filename="assay-questions-template.csv"'})
 
 
 @router.post("/datasets/validate")
@@ -392,8 +392,8 @@ def _project_documents(s: Session, project_id: int) -> list[m.DocumentSource]:
 def lint_version(version_id: int, s: Session = Depends(get_session)) -> dict[str, Any]:
     """Weak cases: duplicates, phrases too generic to test anything, patterns that cannot fail,
     expectations in none of the chatbot's documents, cases that fail in every run."""
-    from gaugelab.datasets.golden import lint
-    from gaugelab.store.insights import case_matrix
+    from assay.datasets.golden import lint
+    from assay.store.insights import case_matrix
 
     v = svc.get(s, m.DatasetVersion, version_id)
     ds = svc.get(s, m.Dataset, v.dataset_id)
@@ -406,7 +406,7 @@ def lint_version(version_id: int, s: Session = Depends(get_session)) -> dict[str
 
 @router.get("/dataset-versions/{version_id}/coverage")
 def coverage_version(version_id: int, s: Session = Depends(get_session)) -> dict[str, Any]:
-    from gaugelab.datasets.golden import coverage
+    from assay.datasets.golden import coverage
 
     v = svc.get(s, m.DatasetVersion, version_id)
     ds = svc.get(s, m.Dataset, v.dataset_id)
@@ -422,7 +422,7 @@ def coverage_version(version_id: int, s: Session = Depends(get_session)) -> dict
 @router.post("/questions/group")
 async def group_real_questions(file: UploadFile = File(...)) -> dict[str, Any]:
     """Questions from chat history, near-duplicates grouped, most asked first."""
-    from gaugelab.datasets.golden import group_questions, read_questions
+    from assay.datasets.golden import group_questions, read_questions
 
     text = (await _read(file)).decode("utf-8", errors="replace")
     try:
@@ -438,7 +438,7 @@ async def group_real_questions(file: UploadFile = File(...)) -> dict[str, Any]:
 
 @router.post("/suggest-terms")
 def suggest(body: dict[str, Any]) -> dict[str, Any]:
-    from gaugelab.datasets.golden import suggest_terms
+    from assay.datasets.golden import suggest_terms
 
     return {"terms": suggest_terms(str(body.get("text") or ""), int(body.get("limit") or 8))}
 
@@ -446,7 +446,7 @@ def suggest(body: dict[str, Any]) -> dict[str, Any]:
 @router.post("/datasets/{dataset_id}/candidates/import", status_code=201)
 async def import_candidates(dataset_id: int, file: UploadFile = File(...), source: str = Form("prompt-kit"),
                             s: Session = Depends(get_session)) -> dict[str, Any]:
-    """Cases drafted outside GaugeLab (e.g. by your own ChatGPT/Claude with the prompt kit) enter
+    """Cases drafted outside Assay (e.g. by your own ChatGPT/Claude with the prompt kit) enter
     the review queue as UNREVIEWED candidates, never straight into the dataset."""
     svc.get(s, m.Dataset, dataset_id)
     text = (await _read(file)).decode("utf-8", errors="replace")
@@ -461,7 +461,7 @@ async def import_candidates(dataset_id: int, file: UploadFile = File(...), sourc
         quote = str(meta.pop("evidence_quote", "") or "")
         evidence = [{"document": where, "quote": quote, "found": None,
                      "warnings": [] if quote else ["No quoted passage: check the answer against the source yourself."]}]
-        case = c.model_copy(update={"metadata": {**meta, "provenance": {"source": source, "drafted_by": "AI (outside GaugeLab)",
+        case = c.model_copy(update={"metadata": {**meta, "provenance": {"source": source, "drafted_by": "AI (outside Assay)",
                                                                        "file": file.filename}}})
         row = m.GeneratedTestCandidate(dataset_id=dataset_id, kind=c.category or "factual",
                                        case=case.model_dump(mode="json"), evidence=evidence,
@@ -485,7 +485,7 @@ LANGS = {"zh": "Simplified Chinese", "ja": "Japanese"}
 async def variations(version_id: int, case_key: str, body: VariationsIn, s: Session = Depends(get_session)) -> dict[str, Any]:
     """Copies of a case asked differently (a typo, other words, another language) that keep its
     expectations. They go to the review queue: a translation can change what must be mentioned."""
-    from gaugelab.datasets.golden import typo_variant
+    from assay.datasets.golden import typo_variant
 
     v = svc.get(s, m.DatasetVersion, version_id)
     case = next((c for _, c in svc.version_cases(s, v.id) if c.id == case_key), None)
@@ -503,7 +503,7 @@ async def variations(version_id: int, case_key: str, body: VariationsIn, s: Sess
         pc = svc.get(s, m.ProviderConfig, int(pid))
         provider = build_provider(ProviderSpec(provider=pc.provider, model=pc.model, base_url=pc.base_url,
                                                api_key_ref=pc.api_key_ref, temperature=0.4, max_tokens=400))
-        from gaugelab.providers import ChatMessage
+        from assay.providers import ChatMessage
 
         for k in llm_kinds:
             ask = ("Rewrite this question the way a different user might ask it: same meaning, different words. "
@@ -521,7 +521,7 @@ async def variations(version_id: int, case_key: str, body: VariationsIn, s: Sess
         new = case.model_copy(deep=True, update={"id": f"{case.id}__{kind}", "title": f"{case.title or case.id} ({kind})"})
         new.input.message = q
         new.metadata = {**case.metadata, "variation_of": case.id, "variation": kind,
-                        "provenance": {"source": f"variation:{kind}", "drafted_by": "GaugeLab" if kind == "typo" else "AI"}}
+                        "provenance": {"source": f"variation:{kind}", "drafted_by": "Assay" if kind == "typo" else "AI"}}
         row = m.GeneratedTestCandidate(dataset_id=v.dataset_id, kind="variation", case=new.model_dump(mode="json"),
                                        evidence=[{"document": f"variation ({kind}) of {case.id}", "quote": case.input.message,
                                                   "found": None, "warnings": [] if kind == "typo" else
@@ -541,8 +541,8 @@ async def variations(version_id: int, case_key: str, body: VariationsIn, s: Sess
 @router.post("/imports", status_code=201)
 async def import_results(project_id: int = Form(...), name: str = Form(...), config: str = Form("{}"),
                          file: UploadFile = File(...), s: Session = Depends(get_session)) -> dict[str, Any]:
-    from gaugelab.adapters.importer import ImportConfig
-    from gaugelab.store.imports import create_import
+    from assay.adapters.importer import ImportConfig
+    from assay.store.imports import create_import
 
     try:
         cfg = ImportConfig.model_validate(json.loads(config or "{}"))

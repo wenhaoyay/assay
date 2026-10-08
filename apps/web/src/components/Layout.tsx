@@ -57,7 +57,7 @@ const GROUPS = [
 
 export function Logo({ live }: { live: boolean }) {
   return (
-    <Link to="/" className="flex items-center gap-2.5 px-4 pb-3 pt-4" aria-label="GaugeLab home">
+    <Link to="/" className="flex items-center gap-2.5 px-4 pb-3 pt-4" aria-label="Assay home">
       <svg viewBox="0 0 32 32" className="size-7" aria-hidden>
         <rect width="32" height="32" rx="8" className="fill-ink" />
         <path d="M8 21a8 8 0 1 1 16 0" fill="none" className="stroke-surface" strokeWidth="2.5" strokeLinecap="round" />
@@ -66,7 +66,7 @@ export function Logo({ live }: { live: boolean }) {
         </g>
         <circle cx="16" cy="21" r="2" className="fill-surface" />
       </svg>
-      <span className="text-base font-semibold tracking-tight max-md:hidden">GaugeLab</span>
+      <span className="text-base font-semibold tracking-tight max-md:hidden">Assay</span>
       {live && <span className="relative ml-auto flex size-2 max-md:hidden" title="A run is in progress"><span className="absolute inline-flex size-full animate-ping rounded-full bg-accent opacity-60" /><span className="relative inline-flex size-2 rounded-full bg-accent" /></span>}
     </Link>
   )

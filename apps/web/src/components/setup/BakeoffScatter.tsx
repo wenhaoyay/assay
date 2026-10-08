@@ -13,7 +13,7 @@ import { useMotionOn } from '../../lib/prefs'
 import type { Bakeoff, TrialDetail } from '../../lib/types'
 import { Badge, Loading, Select } from '../ui'
 
-/** What the bake-off endpoint returns beyond the shared type (gaugelab/store/workspace.py). */
+/** What the bake-off endpoint returns beyond the shared type (assay/store/workspace.py). */
 type JudgeResult = NonNullable<Bakeoff['results']>['judges'][number] & { labels?: string[]; scores?: (number | null)[]; reasons?: (string | null)[] }
 type Results = Omit<NonNullable<Bakeoff['results']>, 'judges'> & { judges: JudgeResult[]; human?: string[]; trial_ids?: number[] }
 

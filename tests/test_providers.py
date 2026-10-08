@@ -3,14 +3,14 @@ No network: ``_post`` is replaced with a recorder."""
 
 import pytest
 
-from gaugelab.providers import (
+from assay.providers import (
     AnthropicProvider,
     ChatMessage,
     OllamaProvider,
     OpenAICompatibleProvider,
     ProviderError,
 )
-from gaugelab.providers.base import TransientProviderError
+from assay.providers.base import TransientProviderError
 
 MSGS = [ChatMessage("system", "rubric"), ChatMessage("user", "grade this")]
 
@@ -73,7 +73,7 @@ async def test_ollama_is_local_json_mode_and_kept_loaded():
 
 
 async def test_transient_errors_retry_with_backoff_then_raise(monkeypatch):
-    import gaugelab.providers.base as base
+    import assay.providers.base as base
 
     async def no_sleep(_):
         return None

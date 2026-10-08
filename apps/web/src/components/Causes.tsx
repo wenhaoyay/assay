@@ -15,7 +15,7 @@ import { causeColor, SampleSize } from './instrument'
 import { Badge, Button, Card, ErrorState, Field, Help, Notice, ProgressBar, Select } from './ui'
 import { Capabilities } from '../pages/Connect'
 
-/** Every cause, in the order the server ranks them (gaugelab/diagnosis.py CAUSES). */
+/** Every cause, in the order the server ranks them (assay/diagnosis.py CAUSES). */
 export const CAUSE_LABELS: Record<string, string> = {
   search_missed: 'Search missed it',
   not_in_documents: 'Not in the documents',
@@ -45,20 +45,20 @@ export function useRunCauses(runId: number | undefined, enabled = true) {
 
 export function CauseBadge({ v, className }: { v: Pick<Verdict, 'label' | 'kind' | 'source'>; className?: string }) {
   return (
-    <Badge tone={KIND_TONE[v.kind]} className={className} title={v.source === 'you' ? 'Set by you' : v.source === 'ai' ? 'Explained by a grading model' : 'Found by GaugeLab\'s rules'}>
+    <Badge tone={KIND_TONE[v.kind]} className={className} title={v.source === 'you' ? 'Set by you' : v.source === 'ai' ? 'Explained by a grading model' : 'Found by Assay\'s rules'}>
       {v.source === 'ai' && <Sparkles className="size-3" />}{v.source === 'you' && <Pencil className="size-3" />}{v.label}
     </Badge>
   )
 }
 
 export function CauseHelp() {
-  return <Help title="How GaugeLab finds the cause" wide><CauseHelpBody /></Help>
+  return <Help title="How Assay finds the cause" wide><CauseHelpBody /></Help>
 }
 
 function CauseHelpBody() {
   return (
     <>
-      <p>For each failed answer, GaugeLab looks for what a correct answer needed (the must-mention phrases, the patterns, the reference answer's codes and numbers) in three places:</p>
+      <p>For each failed answer, Assay looks for what a correct answer needed (the must-mention phrases, the patterns, the reference answer's codes and numbers) in three places:</p>
       <ol className="mt-1.5 list-decimal space-y-1 pl-4">
         <li><b>In the answer</b>: missing, so the answer failed.</li>
         <li><b>In the passages the bot read</b>: there, so search worked and the model left it out: <i>Found but not used</i>.</li>
@@ -148,7 +148,7 @@ function CauseRow({ c, max, delay, onPick, selected, compact }: {
 function SourcesNotice({ targetId }: { targetId?: number | null }) {
   return (
     <div className="mb-3">
-      <Notice tone="info" title="GaugeLab cannot see what the bot read"
+      <Notice tone="info" title="Assay cannot see what the bot read"
         action={targetId ? <Link className="inline-flex h-7 items-center gap-1 rounded-md border border-line bg-surface px-2.5 text-xs font-medium hover:bg-surface-2" to={`/targets/${targetId}#reading`}>Check the connection<ArrowRight className="size-3" /></Link> : undefined}>
         This connection reads only the answer, so "search missed it" and "found but not used" cannot be told apart. If the bot sends its sources, let the connection read them, then re-read this run's replies (free: no questions are asked again).
       </Notice>
@@ -333,11 +333,11 @@ export function ReadingCard({ targetId }: { targetId: number }) {
   const gained = (d.suggested_caps ?? []).filter((c) => c.received && !(d.current_caps ?? []).find((x) => x.field === c.field)?.received)
   return (
     <Card id="reading" title="Reading the reply"
-      help={<><p>What GaugeLab takes from each reply. Each reply from the bot is read for its answer and, when the bot sends them, the passages it read, its citations, tool calls and token counts. The more GaugeLab reads, the more checks can run and the more precisely it can say why an answer failed.</p><p>Changing this changes how GaugeLab reads, not what is inside the bot, so it does not make a new version.</p></>}
+      help={<><p>What Assay takes from each reply. Each reply from the bot is read for its answer and, when the bot sends them, the passages it read, its citations, tool calls and token counts. The more Assay reads, the more checks can run and the more precisely it can say why an answer failed.</p><p>Changing this changes how Assay reads, not what is inside the bot, so it does not make a new version.</p></>}
       meta={d.updated_at ? `changed ${when(d.updated_at)}` : undefined}>
       {q.isLoading ? <div className="skeleton h-16" /> : (
         <div className="space-y-4">
-          {d.standard ? <p className="text-sm text-ink-2">The bot replies in the GaugeLab shape: everything it sends is read.</p> : (
+          {d.standard ? <p className="text-sm text-ink-2">The bot replies in the Assay shape: everything it sends is read.</p> : (
             <div className="grid gap-4 md:grid-cols-2">
               <div><div className="mb-1 text-xs font-medium text-ink-3">Now</div><Capabilities caps={d.current_caps ?? []} /></div>
               {d.suggestion && !d.same && gained.length > 0 && (

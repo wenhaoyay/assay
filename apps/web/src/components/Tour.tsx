@@ -1,4 +1,4 @@
-// A short guided walk through GaugeLab (for a demo, or a first visit). Each step opens a page,
+// A short guided walk through Assay (for a demo, or a first visit). Each step opens a page,
 // spotlights one element (data-tour="...") and says what it is for. Steps whose element is not on
 // the page are shown centred instead of failing.
 import { useQuery } from '@tanstack/react-query'
@@ -29,13 +29,13 @@ export function Tour({ open, onClose }: { open: boolean; onClose: () => void }) 
     const base = p?.previous_run_id ?? 1
     const cand = p?.latest_run_id ?? 2
     return [
-      { path: '/', target: 'projects', title: 'One card per chatbot', body: 'Every chatbot you test has a card: its latest pass rate, the change since the last comparable run, a trend line and the release gate. GaugeLab is not tied to any one bot.' },
+      { path: '/', target: 'projects', title: 'One card per chatbot', body: 'Every chatbot you test has a card: its latest pass rate, the change since the last comparable run, a trend line and the release gate. Assay is not tied to any one bot.' },
       { path: p ? `/p/${p.id}` : '/', target: 'verdict', title: 'The verdict first', body: 'A chatbot\'s home answers "did it get better?" in one sentence, with the evidence underneath: the interval, the regressed and improved cases, and where in the pipeline failures start.' },
       { path: `/compare?baseline=${base}&candidate=${cand}`, target: 'forest', title: 'Compare two versions', body: 'Each metric is a dot with its 95% interval. If the line crosses zero, the difference could be noise - you can see it rather than take it on trust.' },
       { path: `/runs/${cand}?tab=failures`, target: 'failures', title: 'Why it failed', body: 'Failures are grouped by case and by type. Press J/K to move, Enter to open the trial: the failing check, the answer with the required phrases highlighted, the reference, the trace.' },
-      { path: '/calibration', target: 'flashcard', title: 'Can you trust the judge?', body: 'Label answers yourself with P / F / U. GaugeLab measures how often each grading model agrees with you; a new model starts uncalibrated. The bake-off pits models against your labels.' },
+      { path: '/calibration', target: 'flashcard', title: 'Can you trust the judge?', body: 'Label answers yourself with P / F / U. Assay measures how often each grading model agrees with you; a new model starts uncalibrated. The bake-off pits models against your labels.' },
       { path: '/settings?tab=models', target: 'models', title: 'Bring a better grading model', body: 'Connect OpenAI (or any compatible API) with a key stored in the operating system\'s credential store, check its speed, JSON reliability and cost, and make it the default.' },
-      { path: '/targets/new', target: 'connect', title: 'Connect any chatbot', body: 'Paste a curl command, send a test question, and click the reply to say where the answer and sources are. Bots that reply in the GaugeLab shape need no mapping at all.' },
+      { path: '/targets/new', target: 'connect', title: 'Connect any chatbot', body: 'Paste a curl command, send a test question, and click the reply to say where the answer and sources are. Bots that reply in the Assay shape need no mapping at all.' },
       { path: '/', target: 'palette', title: 'Everything is a keystroke away', body: 'Ctrl+K searches runs, cases and chatbots and runs commands ("compare 5 6"). Every heading has a circled ? that says what it shows and how to use it; press ? for all shortcuts.' },
     ]
   }, [home.data])

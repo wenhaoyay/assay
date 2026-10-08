@@ -64,7 +64,7 @@ export function CalibrationPage() {
     <>
       <PageHeader eyebrow="Judge trust" title={<>Can you trust <em>the judge</em>?</>}
         help={<>
-          <p>Label answers yourself; GaugeLab measures how often each grading model agrees with you, beyond what chance would give (Cohen's kappa).</p>
+          <p>Label answers yourself; Assay measures how often each grading model agrees with you, beyond what chance would give (Cohen's kappa).</p>
           <p>A model is shown as validated only once your labels exist - per model, so a new one starts uncalibrated. Above the trust line its grades can run unattended; below it, keep a person in the loop.</p>
           <p>The dimension picks which kind of grade you are checking (correctness, groundedness...); the second list narrows the figures to one grading model.</p>
         </>}
@@ -308,7 +308,7 @@ function BakeoffTab({ dimension }: { dimension: string }) {
   return (
     <div className="space-y-12">
       <Card title="Which grading model agrees with you most?" meta={n ? `${n} labelled` : undefined} help={<>
-        <p>Each judge grades the {n} {dim} answer(s) you labelled; GaugeLab compares their verdicts with yours, and with each other.</p>
+        <p>Each judge grades the {n} {dim} answer(s) you labelled; Assay compares their verdicts with yours, and with each other.</p>
         <p>A local model on a CPU takes ~30 s per answer; cloud models cost money (see Settings for the per-100 price). Pick up to four.</p>
         <p>Pick the cheapest judge whose agreement with you is close to the best. A judge that agrees with you no better than chance (kappa near 0) should not gate a release.</p>
       </>}>

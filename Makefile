@@ -3,7 +3,7 @@ PY ?= .venv/bin/python
 ifeq ($(OS),Windows_NT)
 PY = .venv/Scripts/python
 endif
-GL = $(PY) -m gaugelab.cli
+GL = $(PY) -m assay.cli
 
 .PHONY: setup web seed demo demo-fresh serve dev agent test test-py test-web e2e lint typecheck ci ci-regression docker clean
 
@@ -45,7 +45,7 @@ e2e:              ## Playwright flows on a fresh seeded server (:8041)
 	cd apps/web && npx playwright test
 
 lint:
-	$(PY) -m ruff check gaugelab apps/api tests examples conftest.py
+	$(PY) -m ruff check assay apps/api tests examples conftest.py
 	cd apps/web && npm run lint
 
 typecheck:
@@ -62,4 +62,4 @@ docker:
 	docker compose up --build
 
 clean:
-	rm -rf data gaugelab-artifacts apps/web/dist
+	rm -rf data assay-artifacts apps/web/dist

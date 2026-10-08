@@ -1,6 +1,6 @@
 # Security and privacy
 
-## What GaugeLab stores (in its own database, on your machine or server)
+## What Assay stores (in its own database, on your machine or server)
 
 - Golden datasets: questions, expected outcomes, tags.
 - Uploaded reference documents (as extracted text) and AI-generated candidate cases.
@@ -14,7 +14,7 @@
 - Workspace settings (default judge, default generator, spend cap) and connection templates
   (which hold key references, never keys).
 
-The default database is `data/gaugelab.db` (SQLite), which is ignored by git. Treat it as
+The default database is `data/assay.db` (SQLite), which is ignored by git. Treat it as
 sensitive as the data you put into it.
 
 ## What can leave the machine
@@ -36,9 +36,9 @@ entirely: connect Ollama or LM Studio in Settings > Models & keys.
 and re-grades of that target are then refused with any judge whose address is not on this
 machine, so a confidential bot's answers cannot reach a cloud API by a wrong click. Ollama
 models whose names end in `-cloud` or `:cloud` are reached through the local Ollama but run on
-Ollama's servers; GaugeLab treats them as cloud models and refuses them here too.
+Ollama's servers; Assay treats them as cloud models and refuses them here too.
 
-**Third-party software.** GaugeLab never downloads or installs Ollama itself. A model download
+**Third-party software.** Assay never downloads or installs Ollama itself. A model download
 through the Ollama card starts only after the person accepted a third-party notice (recorded
 with its date in the workspace settings); see [local-models.md](local-models.md).
 
@@ -48,8 +48,8 @@ Two places a key can live; configurations only ever hold a reference to it:
 
 - **The OS credential store** (`keyring:NAME`): paste the key in Settings > Models & keys, or
   click *Store securely* when the connect wizard finds an `Authorization` header in a pasted
-  curl command. The key is sent once to the local GaugeLab server, which writes it to Windows
-  Credential Manager / macOS Keychain / Secret Service under the service name `gaugelab`.
+  curl command. The key is sent once to the local Assay server, which writes it to Windows
+  Credential Manager / macOS Keychain / Secret Service under the service name `assay`.
 - **The server environment** (`env:NAME`): set it in `.env` (ignored by git) or the
   deployment, for Docker and CI.
 
@@ -64,7 +64,7 @@ motion) and the reviewer name you typed.
 
 ## Redaction
 
-Before a raw response is stored, `gaugelab.traces.redact`:
+Before a raw response is stored, `assay.traces.redact`:
 
 - replaces the value of any field whose name is a known secret (`api_key`, `authorization`,
   `password`, `secret`, `token`, `access_token`, `refresh_token`, `cookie`, `x-api-key`...) at
@@ -85,6 +85,6 @@ a live run, or grade logged answers through the importer instead of calling the 
 
 ## Not in scope
 
-GaugeLab is a local, single-user workbench. It has no authentication, no multi-tenancy and
+Assay is a local, single-user workbench. It has no authentication, no multi-tenancy and
 no role-based access control. Do not expose the API to an untrusted network. Put it behind
 your own authentication if it has to be shared.

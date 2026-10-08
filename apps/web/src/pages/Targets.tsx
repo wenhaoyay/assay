@@ -10,7 +10,7 @@ import { api } from '../lib/api'
 import { useCrumbs } from '../lib/crumbs'
 import { ms, pct, usd, when } from '../lib/format'
 import type { Capability, Project, Target, TargetCheck, TargetResult } from '../lib/types'
-import { Capabilities } from './Connect'
+import { Capabilities, isStandardShape } from './Connect'
 
 export function HealthDot({ check, size = 10 }: { check: TargetCheck | null | undefined; size?: number }) {
   const tone = !check ? 'bg-untested' : check.ok ? 'bg-good' : 'bg-bad'
@@ -46,7 +46,7 @@ export function TargetsPage() {
       />
       {targets.isLoading ? <Loading /> : targets.isError ? <ErrorState error={targets.error} /> : targets.data!.length === 0 ? (
         <Empty title="Nothing connected. A gauge needs something to point at." action={<Link to="/targets/new" className={linkButton('primary')}>Connect a chatbot</Link>}>
-          Paste a curl command, send a test question, click the reply to say where the answer is. Or run <Code>gaugelab seed</Code> for the Acme demo.
+          Paste a curl command, send a test question, click the reply to say where the answer is. Or run <Code>assay seed</Code> for the Acme demo.
         </Empty>
       ) : (
         <div className="space-y-10">
@@ -64,7 +64,7 @@ export function TargetsPage() {
                         {t.shared && <Badge className="ml-1.5">shared</Badge>}
                         <div className="line-clamp-1 text-xs text-ink-2">{t.description}</div>
                       </td>
-                      <td><Badge>{t.adapter === 'replay' ? 'imported' : t.adapter}</Badge>{(t.latest_version.config as { reply_shape?: string }).reply_shape === 'gaugelab' && <Badge tone="accent" className="ml-1">standard shape</Badge>}</td>
+                      <td><Badge>{t.adapter === 'replay' ? 'imported' : t.adapter}</Badge>{isStandardShape((t.latest_version.config as { reply_shape?: string }).reply_shape) && <Badge tone="accent" className="ml-1">standard shape</Badge>}</td>
                       <td className="num font-mono text-xs">v{t.latest_version.version}</td>
                       <td className="text-ink-2">{t.latest_version.variant_label || '-'}</td>
                       <td className="whitespace-nowrap text-xs text-ink-3">{t.last_check ? (t.last_check.ok ? <>ok, <span className="font-mono">{ms(t.last_check.elapsed_ms)}</span></> : <span className="text-bad-ink">{t.last_check.explanation ?? 'failed'}</span>) : 'never'}</td>
@@ -93,7 +93,7 @@ interface TestResponse {
 
 /** The mapping as a readable list: "answer ← reply.text". */
 function MappingSummary({ config }: { config: Record<string, unknown> }) {
-  if (config.reply_shape === 'gaugelab') return <p className="text-sm"><Badge tone="accent">standard shape</Badge> The bot replies with answer, sources, citations, tool calls and usage - nothing mapped.</p>
+  if (isStandardShape(config.reply_shape)) return <p className="text-sm"><Badge tone="accent">standard shape</Badge> The bot replies with answer, sources, citations, tool calls and usage - nothing mapped.</p>
   const resp = (config.response ?? {}) as Record<string, unknown>
   const rows: [string, string][] = []
   for (const [k, v] of Object.entries(resp)) {
@@ -136,7 +136,7 @@ export function TargetPage() {
         title={<span className="inline-flex items-center gap-3"><HealthDot check={lc} size={12} />{target.name}</span>}
         help={<>
           <p>{target.description || `A ${target.adapter} connection.`}</p>
-          <p>Ask it something to see a reply the way GaugeLab reads it. Edit makes a new version; past runs keep the version they used.</p>
+          <p>Ask it something to see a reply the way Assay reads it. Edit makes a new version; past runs keep the version they used.</p>
         </>}
         actions={
           <>
@@ -152,7 +152,7 @@ export function TargetPage() {
       <div className="grid gap-10 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
         <div className="space-y-10">
           <Card title={<span className="inline-flex items-center gap-1.5"><Send className="size-4 text-ink-3" /> Ask it something</span>}
-            help={<p>Sends one question with this version's configuration and shows the reply the way GaugeLab reads it, and which checks that makes possible.</p>}>
+            help={<p>Sends one question with this version's configuration and shows the reply the way Assay reads it, and which checks that makes possible.</p>}>
             <div className="flex gap-2">
               <Input value={message} onChange={(e) => setMessage(e.target.value)} aria-label="Test message" />
               <Button variant="primary" loading={test.isPending} onClick={() => test.mutate()}>Send</Button>
@@ -163,7 +163,7 @@ export function TargetPage() {
                 {test.data.ok ? <Notice tone="good" title={`Answered in ${ms(test.data.elapsed_ms)}`} /> : <Notice tone="bad" title={test.data.explanation ?? test.data.error ?? 'No answer'}>{test.data.error}</Notice>}
                 {test.data.normalized && (
                   <>
-                    <Segmented size="sm" value={view} onChange={setView} options={[{ id: 'seen', label: 'As GaugeLab reads it' }, { id: 'raw', label: 'Raw reply' }]} />
+                    <Segmented size="sm" value={view} onChange={setView} options={[{ id: 'seen', label: 'As Assay reads it' }, { id: 'raw', label: 'Raw reply' }]} />
                     {view === 'seen' ? (
                       <div className="grid gap-4 md:grid-cols-2">
                         <div className="space-y-2 text-sm">
@@ -199,7 +199,7 @@ export function TargetPage() {
             <Toggle checked={!!target.shared} onChange={(val) => flags.mutate({ shared: val })}
               label={<span className="inline-flex items-center gap-1.5">Other people use this bot<Help title="A shared bot"><p>New runs then ask 2 questions at a time by default, and warn above that: test questions all at once would slow down real users' answers.</p></Help></span>} />
             <div className="mt-4">
-              <Field label={<span className="inline-flex items-center gap-1.5">Cost per answer (USD, your estimate)<Help title="Cost per answer"><p>For bots that report no token counts (GaugeLab cannot price them). With it, the spend cap and estimates can count this bot's answers.</p></Help></span>}
+              <Field label={<span className="inline-flex items-center gap-1.5">Cost per answer (USD, your estimate)<Help title="Cost per answer"><p>For bots that report no token counts (Assay cannot price them). With it, the spend cap and estimates can count this bot's answers.</p></Help></span>}
                 hint={target.cost_per_answer_usd != null ? <>Now <span className="font-mono">{usd(target.cost_per_answer_usd)}</span> per answer.</> : 'Not set: the spend cap cannot limit this bot.'}>
                 <div className="flex gap-2">
                   <Input className="w-32" type="number" min={0} step="0.001" aria-label="Cost per answer" placeholder="e.g. 0.04"

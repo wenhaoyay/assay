@@ -19,7 +19,7 @@ export function EvaluatorsPage() {
   return (
     <>
       <PageHeader title="Evaluators" help={<>
-        <p>The checks GaugeLab can run, grouped by how they decide. Every score names the check and version that produced it.</p>
+        <p>The checks Assay can run, grouped by how they decide. Every score names the check and version that produced it.</p>
         <p>Gating checks count toward the pass rate; diagnostic ones are shown but never fail a run. Checks that use a grading model show their rubric and prompt.</p>
         <p>Grading models are set up in <Link className="text-accent-ink underline" to="/settings?tab=models">Settings · Models &amp; keys</Link>.</p>
       </>} />
@@ -82,7 +82,7 @@ export function Pricing() {
   const add = useMutation({ mutationFn: () => api.post('/api/pricing', { ...f, input_per_1m: Number(f.input_per_1m), output_per_1m: Number(f.output_per_1m) }), onSuccess: () => qc.invalidateQueries({ queryKey: ['pricing'] }) })
   return (
     <div className="space-y-4">
-      <Notice tone="warn" title="Costs are estimates">GaugeLab multiplies reported token counts by this table. A model that is not listed shows cost as <span className="font-semibold">unknown</span>, never as zero. Prices change: every row records when it took effect and where it came from.</Notice>
+      <Notice tone="warn" title="Costs are estimates">Assay multiplies reported token counts by this table. A model that is not listed shows cost as <span className="font-semibold">unknown</span>, never as zero. Prices change: every row records when it took effect and where it came from.</Notice>
       <Card title="Prices" meta={`${(q.data ?? []).length}`} padded={false}>
         <Table>
           <thead><tr className="whitespace-nowrap"><th className="t-label">Provider</th><th className="t-label">Model</th><th className="t-label text-right">Input / 1M</th><th className="t-label text-right">Output / 1M</th><th className="t-label">From</th><th className="t-label">Source</th></tr></thead>

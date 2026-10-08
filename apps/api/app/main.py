@@ -1,4 +1,4 @@
-"""GaugeLab API. Wiring only: middleware, routers, error mapping, the built web app."""
+"""Assay API. Wiring only: middleware, routers, error mapping, the built web app."""
 
 from __future__ import annotations
 
@@ -11,17 +11,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import select
 
-from gaugelab import __version__
-from gaugelab.datasets import DatasetError
-from gaugelab.env import load_dotenv
-from gaugelab.store import db
-from gaugelab.store import models as m
-from gaugelab.store.service import Conflict, NotFound
+from assay import __version__
+from assay.datasets import DatasetError
+from assay.env import load_dotenv
+from assay.store import db
+from assay.store import models as m
+from assay.store.service import Conflict, NotFound
 
 from .routers import core, datasets, runs, workspace
 
 load_dotenv()
-log = logging.getLogger("gaugelab")
+log = logging.getLogger("assay")
 WEB_DIST = Path(__file__).resolve().parents[2] / "web" / "dist"
 
 
@@ -35,7 +35,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="GaugeLab API", version=__version__, lifespan=lifespan,
+app = FastAPI(title="Assay API", version=__version__, lifespan=lifespan,
               description="Evaluation and regression testing for RAG chatbots and tool-using agents.")
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5240", "http://127.0.0.1:5240"],
                    allow_methods=["*"], allow_headers=["*"])

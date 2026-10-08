@@ -19,7 +19,7 @@ EVS = ["must_mention", "refusal_check", "recall_at_k", "tool_selection", "latenc
 def client(fresh_db):
     from app.main import app
 
-    from gaugelab.seed import seed
+    from assay.seed import seed
 
     seeded = seed(run=False)
     with TestClient(app) as c:
@@ -115,7 +115,7 @@ def test_keys_live_in_the_os_store(client, memory_keyring):
     assert m["key_status"] == "set" and m["key_hint"] == "••••7890" and m["local"] is False
     assert m["calibration"]["status"] == "Uncalibrated"
     assert "sk-test" not in str(c.get("/api/models").json())
-    from gaugelab.secrets import resolve
+    from assay.secrets import resolve
 
     assert resolve("keyring:OPENAI_API_KEY") == "sk-test-1234567890"
     c.delete("/api/secrets/OPENAI_API_KEY")
@@ -175,18 +175,18 @@ def test_connect_helpers(client):
 def test_templates_and_reply_shape(client):
     c = client
     names = [t["name"] for t in c.get("/api/connector-templates").json()]
-    assert "GaugeLab reply shape" in names and "OpenAI-compatible chat" in names
+    assert "Assay reply shape" in names and "OpenAI-compatible chat" in names
     saved = c.post("/api/connector-templates", json={"name": "My bot", "adapter": "http",
-                                                     "config": {"base_url": "http://x", "reply_shape": "gaugelab"}}).json()
+                                                     "config": {"base_url": "http://x", "reply_shape": "assay"}}).json()
     assert saved["id"].startswith("saved:")
     assert any(t["name"] == "My bot" for t in c.get("/api/connector-templates").json())
     c.delete(f"/api/connector-templates/{saved['id'].split(':')[1]}")
     assert not any(t["name"] == "My bot" for t in c.get("/api/connector-templates").json())
 
-    from gaugelab.adapters.connect import STANDARD_SHAPE_EXAMPLE
-    from gaugelab.adapters.http import HttpTargetAdapter, HttpTargetConfig, normalize
+    from assay.adapters.connect import STANDARD_SHAPE_EXAMPLE
+    from assay.adapters.http import HttpTargetAdapter, HttpTargetConfig, normalize
 
-    a = HttpTargetAdapter(HttpTargetConfig(base_url="http://x", reply_shape="gaugelab"))
+    a = HttpTargetAdapter(HttpTargetConfig(base_url="http://x", reply_shape="assay"))
     r = normalize(STANDARD_SHAPE_EXAMPLE, a.mapping())
     assert r.answer and r.retrieved_documents[0].id == "warranty" and r.citations[0].id == "warranty"
     assert r.tool_calls[0].name == "lookup_order" and r.usage.total_tokens == 940
@@ -334,7 +334,7 @@ def test_dry_run_typed_questions_and_load_check(client):
 
 
 def test_local_models_notice_gates_downloads(client, monkeypatch):
-    from gaugelab import local_models
+    from assay import local_models
 
     c = client
     adv = c.get("/api/local-models/advice").json()

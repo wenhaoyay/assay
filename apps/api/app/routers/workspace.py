@@ -16,17 +16,17 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from gaugelab import local_models
-from gaugelab.adapters import AdapterContext, build_adapter
-from gaugelab.adapters import connect as cx
-from gaugelab.providers.catalog import CATALOG, list_models
-from gaugelab.secrets import SecretError, keyring_available, list_stored
-from gaugelab.secrets import delete as delete_secret
-from gaugelab.secrets import store as store_secret
-from gaugelab.store import insights, workspace
-from gaugelab.store import models as m
-from gaugelab.store import service as svc
-from gaugelab.traces import redact
+from assay import local_models
+from assay.adapters import AdapterContext, build_adapter
+from assay.adapters import connect as cx
+from assay.providers.catalog import CATALOG, list_models
+from assay.secrets import SecretError, keyring_available, list_stored
+from assay.secrets import delete as delete_secret
+from assay.secrets import store as store_secret
+from assay.store import insights, workspace
+from assay.store import models as m
+from assay.store import service as svc
+from assay.traces import redact
 
 from ..deps import get_session
 
@@ -69,7 +69,7 @@ def project_home(project_id: int, s: Session = Depends(get_session)) -> dict[str
 @router.get("/projects/{project_id}/notes")
 def project_notes(project_id: int, s: Session = Depends(get_session)) -> list[dict[str, Any]]:
     """Your notes on failed answers, across this chatbot's runs."""
-    from gaugelab.store.causes import project_notes as notes
+    from assay.store.causes import project_notes as notes
 
     return notes(s, project_id)
 
@@ -80,7 +80,7 @@ class GroupNotesIn(BaseModel):
 
 @router.post("/projects/{project_id}/notes/group")
 async def group_project_notes(project_id: int, body: GroupNotesIn, s: Session = Depends(get_session)) -> dict[str, Any]:
-    from gaugelab.store.causes import group_notes
+    from assay.store.causes import group_notes
 
     try:
         return await group_notes(s, project_id, body.provider_config_id)
@@ -159,8 +159,8 @@ def estimate(body: EstimateIn, s: Session = Depends(get_session)) -> dict[str, A
 
 @router.get("/settings")
 def get_settings(s: Session = Depends(get_session)) -> dict[str, Any]:
-    from gaugelab import __version__
-    from gaugelab.store import db
+    from assay import __version__
+    from assay.store import db
 
     return {"values": workspace.get_settings(s), "keyring_available": keyring_available(),
             "server": {"version": __version__, "database": db.database_url().split(":", 1)[0],
@@ -190,7 +190,7 @@ def secrets_put(name: str, body: SecretIn) -> dict[str, Any]:
         ref = store_secret(name, body.value)
     except SecretError as exc:
         raise HTTPException(422, str(exc)) from exc
-    from gaugelab.secrets import describe
+    from assay.secrets import describe
 
     return describe(ref)
 
@@ -334,7 +334,7 @@ class NormalizeIn(BaseModel):
 
 @router.post("/connect/test")
 async def normalize_test(body: NormalizeIn) -> dict[str, Any]:
-    """Run the full adapter (request + mapping) and say what GaugeLab would see and unlock."""
+    """Run the full adapter (request + mapping) and say what Assay would see and unlock."""
     try:
         adapter = build_adapter(body.adapter, body.config)
     except Exception as exc:
@@ -351,7 +351,7 @@ async def normalize_test(body: NormalizeIn) -> dict[str, Any]:
         await adapter.aclose()
     r = call.result
     normalized = r.model_dump(mode="json")
-    mapping = cx.STANDARD_MAPPING if body.config.get("reply_shape") == "gaugelab" else body.config.get("response", {})
+    mapping = cx.STANDARD_MAPPING if body.config.get("reply_shape") in cx.STANDARD_SHAPES else body.config.get("response", {})
     error = r.error or (None if r.answer else "No answer found in the reply (check the answer mapping).")
     return {"ok": not error, "elapsed_ms": round((time.perf_counter() - t0) * 1000, 1), "raw": redact(call.raw),
             "normalized": normalized, "missing_telemetry": r.missing_telemetry(), "error": error,
@@ -468,7 +468,7 @@ def _latest_reply(s: Session, target_id: int) -> m.Trial | None:
 def target_reading(target_id: int, s: Session = Depends(get_session)) -> dict[str, Any]:
     """What the connection reads from each reply, what a stored reply suggests it could read,
     and the runs whose replies can be read again. No bot calls."""
-    from gaugelab.adapters.http import normalize
+    from assay.adapters.http import normalize
 
     t = svc.get(s, m.Target, target_id)
     if t.adapter != "http":
@@ -477,7 +477,7 @@ def target_reading(target_id: int, s: Session = Depends(get_session)) -> dict[st
     current = (tv.config or {}).get("response") or {}
     trial = _latest_reply(s, t.id)
     out: dict[str, Any] = {"supported": True, "current": current,
-                           "standard": (tv.config or {}).get("reply_shape") == "gaugelab",
+                           "standard": (tv.config or {}).get("reply_shape") in cx.STANDARD_SHAPES,
                            "updated_at": (tv.config or {}).get("reading_updated_at"),
                            "sample_trial_id": trial.id if trial else None}
     if trial is None:
@@ -508,7 +508,7 @@ class ReadingIn(BaseModel):
 
 @router.put("/targets/{target_id}/reading")
 def set_target_reading(target_id: int, body: ReadingIn, s: Session = Depends(get_session)) -> dict[str, Any]:
-    """Change how the connection reads replies. It is how GaugeLab reads, not what is inside the bot,
+    """Change how the connection reads replies. It is how Assay reads, not what is inside the bot,
     so it applies to the current version rather than making a new one."""
     t = svc.get(s, m.Target, target_id)
     if t.adapter != "http":

@@ -51,7 +51,7 @@ export function ReleaseReceipt({ run, className }: { run: RunDetail; className?:
   const checks = gate.results?.gates ?? []
   const ok = checks.filter((c) => c.status === 'PASS').length
   return (
-    <Receipt title="Release receipt" sub={`GaugeLab · ${run.experiment} · ${when(run.finished_at ?? run.created_at)}`} className={className}>
+    <Receipt title="Release receipt" sub={`Assay · ${run.experiment} · ${when(run.finished_at ?? run.created_at)}`} className={className}>
       <ReceiptLine label="Chatbot" value={run.target} />
       <ReceiptLine label="Version" value={run.variant_label || `v${run.target_version}`} />
       <ReceiptLine label="Run" value={`#${run.id}${gate.baseline_run_id ? ` vs #${gate.baseline_run_id}` : ''}`} />

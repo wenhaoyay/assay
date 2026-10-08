@@ -34,7 +34,7 @@ jobs:
       - if: steps.key.outputs.ok == 'true'
         run: |
           pip install -e .
-          gaugelab ci benchmarks/acme_support/ci.yaml --judge "${{ inputs.judge }}" --out-dir cloud-judge-artifacts
+          assay ci benchmarks/acme_support/ci.yaml --judge "${{ inputs.judge }}" --out-dir cloud-judge-artifacts
       - if: always() && steps.key.outputs.ok == 'true'
         uses: actions/upload-artifact@v4
         with: {name: cloud-judge-evaluation, path: cloud-judge-artifacts}

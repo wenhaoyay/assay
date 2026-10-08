@@ -1,14 +1,14 @@
 """Regression tests for bugs found in code review (each test failed before its fix)."""
 
-from gaugelab.adapters.base import AdapterContext, TargetAdapter, TargetCall
-from gaugelab.evaluators import get_evaluator
-from gaugelab.evaluators.agent.tools import tool_selection
-from gaugelab.evaluators.base import EvalContext
-from gaugelab.evaluators.retrieval.metrics import ndcg_at_k, recall_at_k
-from gaugelab.gates import evaluate_gates
-from gaugelab.runner import RunSpec, run_trials
-from gaugelab.schemas import NormalizedTargetResult as R
-from gaugelab.store.service import select_cases
+from assay.adapters.base import AdapterContext, TargetAdapter, TargetCall
+from assay.evaluators import get_evaluator
+from assay.evaluators.agent.tools import tool_selection
+from assay.evaluators.base import EvalContext
+from assay.evaluators.retrieval.metrics import ndcg_at_k, recall_at_k
+from assay.gates import evaluate_gates
+from assay.runner import RunSpec, run_trials
+from assay.schemas import NormalizedTargetResult as R
+from assay.store.service import select_cases
 from tests.conftest import make_case
 
 

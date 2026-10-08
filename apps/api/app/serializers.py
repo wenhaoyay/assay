@@ -7,8 +7,8 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from gaugelab.store import models as m
-from gaugelab.store.service import latest_target_version, version_cases
+from assay.store import models as m
+from assay.store.service import latest_target_version, version_cases
 
 
 def iso(dt: Any) -> str | None:
@@ -80,7 +80,7 @@ def score(sc: m.Score) -> dict[str, Any]:
 
 
 def trial_row(t: m.Trial, case: dict[str, Any] | None = None) -> dict[str, Any]:
-    from gaugelab.analysis import TrialView
+    from assay.analysis import TrialView
 
     view = TrialView(case_id=t.case_key, trial_index=t.trial_index, status=t.status,
                      scores=[{"evaluator_id": sc.evaluator_id, "status": sc.status, "failure_type": sc.failure_type,
@@ -98,6 +98,6 @@ def trial_row(t: m.Trial, case: dict[str, Any] | None = None) -> dict[str, Any]:
 
 
 def provider_cfg(pc: m.ProviderConfig) -> dict[str, Any]:
-    from gaugelab.store.service import provider_public
+    from assay.store.service import provider_public
 
     return provider_public(pc)

@@ -3,9 +3,9 @@
 Setup, before the demo (stop any running server first):
 
 ```bash
-gaugelab seed --run --fresh   # an empty database, then the dataset, two variants, gate and both runs (~10 s)
-gaugelab demo-agent           # optional: the Acme bot over HTTP on :9040, for the connect wizard
-gaugelab serve                # http://localhost:8040
+assay seed --run --fresh   # an empty database, then the dataset, two variants, gate and both runs (~10 s)
+assay demo-agent           # optional: the Acme bot over HTTP on :9040, for the connect wizard
+assay serve                # http://localhost:8040
 ```
 
 Short on time? Press **Take the tour** on the home page: it walks through the same story in
@@ -31,7 +31,7 @@ last *comparable* run, a trend line, the release gate. Nothing here is specific 
 
 - McNemar p = 0.003: of the questions where the versions disagree, the split is lopsided.
 - The forest plot: each metric's interval against zero. Answer correctness, must-mention and
-  refusal cross zero: GaugeLab does not overclaim. Hatched rows come from the heuristic judge.
+  refusal cross zero: Assay does not overclaim. Hatched rows come from the heuristic judge.
 - Measured once: tokens +140%, cost +98%, p95 +8% - arrow up, coloured worse. A trade-off,
   not a free win.
 - Open `multi_08` under *Regressed*: both answers side by side. The candidate now calls
@@ -50,7 +50,7 @@ last *comparable* run, a trend line, the release gate. Nothing here is specific 
 ## 5. The dataset (30 s) - Datasets > acme-support > Results across runs
 
 - Every case in every run. Cases that fail in every run whatever the version (marked *always
-  fails*) are often a sign the golden answer is wrong, not the bot. People define correctness; GaugeLab
+  fails*) are often a sign the golden answer is wrong, not the bot. People define correctness; Assay
   shows where to look.
 
 ## 6. Can you trust the judge? (40 s) - Calibration
@@ -58,7 +58,7 @@ last *comparable* run, a trend line, the release gate. Nothing here is specific 
 - Flashcards: label with P / F / U; the judge's verdict stays hidden until you have labelled.
 - Progress toward 30 labels and an agreement meter (Cohen's kappa) fill in as you go.
 - *Judge bake-off*: run the heuristic judge and the local Ollama model (or OpenAI) over your
-  labels; GaugeLab ranks them by agreement with you, speed and cost.
+  labels; Assay ranks them by agreement with you, speed and cost.
 
 ## 7. Bring your own model and your own bot (40 s)
 
@@ -72,8 +72,8 @@ last *comparable* run, a trend line, the release gate. Nothing here is specific 
 ## 8. The CI gate (30 s) - terminal
 
 ```bash
-gaugelab ci benchmarks/acme_support/ci.yaml             # PASS, exit 0
-gaugelab ci benchmarks/acme_support/ci-regression.yaml  # prompt v3 dropped the tool rules
+assay ci benchmarks/acme_support/ci.yaml             # PASS, exit 0
+assay ci benchmarks/acme_support/ci-regression.yaml  # prompt v3 dropped the tool rules
 ```
 
 The second run prints *REGRESSION DETECTED*: tool accuracy dropped 14.3pp against

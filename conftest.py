@@ -14,7 +14,7 @@ sys.path.insert(0, str(ROOT / "apps" / "api" / "tests"))
 @pytest.fixture()
 def fresh_db(tmp_path, monkeypatch):
     """A migrated, empty SQLite database for one test."""
-    from gaugelab.store import db
+    from assay.store import db
 
     url = f"sqlite:///{(tmp_path / 'test.db').as_posix()}"
     monkeypatch.setenv("DATABASE_URL", url)

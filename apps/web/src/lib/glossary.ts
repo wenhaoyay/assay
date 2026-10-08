@@ -1,4 +1,4 @@
-// Plain-English meanings of the terms GaugeLab shows. The terms stay on screen; these appear on
+// Plain-English meanings of the terms Assay shows. The terms stay on screen; these appear on
 // hover (always) and inline when "Explain" is on.
 
 export const GLOSSARY: Record<string, { term: string; plain: string }> = {
@@ -21,7 +21,7 @@ export const GLOSSARY: Record<string, { term: string; plain: string }> = {
   heuristic: { term: 'Heuristic judge', plain: 'Scores by word overlap with the reference, not by an LLM. Free and offline, but cannot recognise paraphrase or negation. Shown hatched.' },
   flaky: { term: 'Flaky', plain: 'Passed on some tries and failed on others: the bot is not consistent on this question.' },
   gating: { term: 'Gating check', plain: 'A check that can fail a test question. Diagnostic checks are shown but never fail anything.' },
-  calibrated: { term: 'Calibrated', plain: 'You labelled some answers yourself and GaugeLab measured how often this judge agrees with you. Uncalibrated judges are unvalidated.' },
+  calibrated: { term: 'Calibrated', plain: 'You labelled some answers yourself and Assay measured how often this judge agrees with you. Uncalibrated judges are unvalidated.' },
   comparable: { term: 'Comparable runs', plain: 'Runs on the same questions, with the same checks and the same judge. Only these can be read side by side.' },
   p95: { term: 'p95 latency', plain: '95% of answers came faster than this. The slow tail users actually notice.' },
   p50: { term: 'p50 latency', plain: 'The median: half the answers came faster than this.' },

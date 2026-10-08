@@ -309,7 +309,7 @@ export interface TrialDetail extends TrialRow {
   cause_ai: { cause: string; reason: string; confidence: string; model: string; cost_usd: number | null; at: string } | null
 }
 
-/** Why a failed answer failed (gaugelab/diagnosis.py). */
+/** Why a failed answer failed (assay/diagnosis.py). */
 export interface Verdict {
   cause: string
   label: string

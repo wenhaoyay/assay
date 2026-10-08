@@ -1,5 +1,5 @@
 [project]
-name = "gaugelab"
+name = "assay"
 version = "0.1.0"
 description = "Local-first evaluation and regression testing for RAG chatbots and tool-using agents."
 readme = "README.md"
@@ -30,18 +30,18 @@ dev = [
 ]
 
 [project.scripts]
-gaugelab = "gaugelab.cli:main"
+assay = "assay.cli:main"
 
 [build-system]
 requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["gaugelab*", "acme_support*"]
+include = ["assay*", "acme_support*"]
 where = [".", "examples"]
 
 [tool.setuptools.package-data]
-gaugelab = ["evaluators/llm_judge/rubrics/*.yaml", "pricing/*.yaml"]
+assay = ["evaluators/llm_judge/rubrics/*.yaml", "pricing/*.yaml"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -60,5 +60,5 @@ ignore = ["E501", "B008"]
 [tool.mypy]
 python_version = "3.12"
 ignore_missing_imports = true
-packages = ["gaugelab"]
+packages = ["assay"]
 check_untyped_defs = true

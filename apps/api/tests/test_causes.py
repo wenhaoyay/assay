@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from test_api import wait  # noqa: E402
 
-from gaugelab import diagnosis as dx  # noqa: E402
+from assay import diagnosis as dx  # noqa: E402
 
 CASES = [
     {"id": "rem", "question": "Which REM profile does SCRS use?",
@@ -27,7 +27,7 @@ CASES = [
 def client(fresh_db):
     from app.main import app
 
-    from gaugelab.seed import seed
+    from assay.seed import seed
 
     seeded = seed(run=False)
     with TestClient(app) as c:
@@ -89,8 +89,8 @@ def test_rules_for_claims_citations_scope_and_errors():
 
 
 def test_stream_replies_suggest_sources_and_citations():
-    from gaugelab.adapters.connect import suggest_mapping
-    from gaugelab.adapters.http import normalize
+    from assay.adapters.connect import suggest_mapping
+    from assay.adapters.http import normalize
 
     collected = {"answer": "SCRS uses ZP17 [2].", "done": {"conversation_id": "abc"},
                  "sources": {"type": "sources", "sources": [
@@ -109,9 +109,9 @@ def test_stream_replies_suggest_sources_and_citations():
 
 
 async def _eval(eid, case, result):
-    from gaugelab.evaluators import get_evaluator
-    from gaugelab.evaluators.base import EvalContext
-    from gaugelab.schemas import NormalizedTargetResult, TestCase
+    from assay.evaluators import get_evaluator
+    from assay.evaluators.base import EvalContext
+    from assay.schemas import NormalizedTargetResult, TestCase
 
     return await get_evaluator(eid).run(TestCase.model_validate({"id": "x", **case}),
                                         NormalizedTargetResult.model_validate(result), None, EvalContext())
@@ -134,7 +134,7 @@ async def test_checks_ignore_citation_markers_and_label_content_patterns():
 
 
 def test_short_titles_cut_at_a_word():
-    from gaugelab.datasets import short_title
+    from assay.datasets import short_title
 
     assert short_title("Item 8's standing rule. A global total is the confusion.") == "Item 8's standing rule."
     long = "word " * 40
@@ -161,8 +161,8 @@ def _start(c, t, ds, name, evaluators=("must_mention", "numbers_grounded", "cita
 def test_causes_reading_sources_and_rereading_a_run(client):
     from sqlalchemy import select
 
-    from gaugelab.store import db
-    from gaugelab.store import models as m
+    from assay.store import db
+    from assay.store import models as m
 
     c = client
     ds, t = _setup(c)

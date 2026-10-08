@@ -1,4 +1,4 @@
-"""The Acme agent over HTTP, with a deliberately non-GaugeLab response shape so the HTTP
+"""The Acme agent over HTTP, with a deliberately non-Assay response shape so the HTTP
 adapter's field mapping has something real to map.
 
     POST /chat {"message": "...", "variant": "candidate", "seed": 0}

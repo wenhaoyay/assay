@@ -2,12 +2,12 @@
 
 By default the 'model' is SIMULATED: tool choice is rule-based and the answer is
 extractive (best-matching sentences from the retrieved context) or templated from tool
-results. That keeps the demo free, offline and reproducible, so GaugeLab's numbers can be
+results. That keeps the demo free, offline and reproducible, so Assay's numbers can be
 regenerated exactly. Latency and tokens follow a documented cost model (see ``_cost``)
 instead of sleeping. Set ``options.llm`` to write answers with a real model (Ollama).
 
 Each variant is a bundle of settings. The weaknesses are mechanisms, not per-question
-scripts, so what GaugeLab finds is what the mechanisms produce:
+scripts, so what Assay finds is what the mechanisms produce:
 
 * baseline - lexical BM25 top-5, small context, "simple prompt": no refusal rule (it answers
   even when nothing relevant was retrieved), no injection guard (it repeats claims a user
@@ -336,7 +336,7 @@ def _llm_answer(llm: dict[str, Any], message: str, context: str, tools: str, dra
     import asyncio
     import time
 
-    from gaugelab.providers import ChatMessage, OllamaProvider
+    from assay.providers import ChatMessage, OllamaProvider
 
     provider = OllamaProvider(llm.get("model", "llama3.1:8b"), base_url=llm.get("base_url", "http://localhost:11434"),
                               temperature=float(llm.get("temperature", 0.2)), max_tokens=300)

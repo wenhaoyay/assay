@@ -2,7 +2,7 @@
 
 A trace records what a trial observably did: the request, the steps the target chose to
 report (retrieval, model calls, tool calls), errors, and every evaluator that graded it.
-GaugeLab does not require or store hidden reasoning. If a provider returns an explicit
+Assay does not require or store hidden reasoning. If a provider returns an explicit
 reasoning summary, a target may report it as a step's `output_summary` like any other output.
 
 ## Span
@@ -27,7 +27,7 @@ reasoning summary, a target may report it as a step's `output_summary` like any 
 - If the target reports **steps** (`NormalizedTargetResult.steps`), each becomes a child span
   with the target's own timings. Tool spans are joined to the reported tool calls in order.
   The first retrieval span lists the retrieved documents.
-- If it reports **no steps**, GaugeLab still adds a `retrieval (reported)` span when documents
+- If it reports **no steps**, Assay still adds a `retrieval (reported)` span when documents
   were returned and one `tool_call` span per tool call, without inventing timings.
 - A black-box target produces a single `target_request` span. Its metadata lists the
   telemetry that was not reported.

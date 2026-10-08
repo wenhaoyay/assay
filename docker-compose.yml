@@ -3,19 +3,19 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: gaugelab
-      POSTGRES_PASSWORD: gaugelab
-      POSTGRES_DB: gaugelab
+      POSTGRES_USER: assay
+      POSTGRES_PASSWORD: assay
+      POSTGRES_DB: assay
     ports: ["5432:5432"]
     volumes: [pgdata:/var/lib/postgresql/data]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U gaugelab"]
+      test: ["CMD-SHELL", "pg_isready -U assay"]
       interval: 3s
       retries: 20
 
   demo-agent:
     build: .
-    command: ["gaugelab", "demo-agent", "--host", "0.0.0.0", "--port", "9040"]
+    command: ["assay", "demo-agent", "--host", "0.0.0.0", "--port", "9040"]
     ports: ["9040:9040"]
 
   api:
@@ -24,10 +24,10 @@ services:
       - path: .env
         required: false
     environment:
-      DATABASE_URL: postgresql+psycopg://gaugelab:gaugelab@db:5432/gaugelab
-      GAUGELAB_DEMO_AGENT_URL: http://demo-agent:9040
+      DATABASE_URL: postgresql+psycopg://assay:assay@db:5432/assay
+      ASSAY_DEMO_AGENT_URL: http://demo-agent:9040
     # Migrate, load the demo (runs only once), then serve.
-    command: ["sh", "-c", "gaugelab db upgrade && gaugelab seed --run && gaugelab serve --host 0.0.0.0 --port 8040"]
+    command: ["sh", "-c", "assay db upgrade && assay seed --run && assay serve --host 0.0.0.0 --port 8040"]
     ports: ["8040:8040"]
     depends_on:
       db: {condition: service_healthy}

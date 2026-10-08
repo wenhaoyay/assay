@@ -6,7 +6,7 @@ from collections.abc import Iterator
 
 from sqlalchemy.orm import Session
 
-from gaugelab.store import db
+from assay.store import db
 
 
 def get_session() -> Iterator[Session]:

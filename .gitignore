@@ -9,7 +9,7 @@ __pycache__/
 
 # Local state
 data/
-gaugelab-artifacts/
+assay-artifacts/
 .env
 
 # Private target connectors and imports (never committed - may name internal systems)
