@@ -157,6 +157,10 @@ export interface RunHeader {
   n_cases: number | null
   failed_trials: number | null
   gate_status: GateStatus | null
+  /** 95% interval of the overall pass rate. */
+  overall_ci?: [number | null, number | null]
+  /** The chatbot whose questions this run asked, when they were written for another one. */
+  off_topic?: string | null
 }
 
 export interface EvaluatorSummary {
@@ -536,6 +540,11 @@ export interface ProjectCard {
   latest_at: string | null
   gate_status: GateStatus | null
   trend: { run_id: number; pass_rate: number | null }[]
+  latest_variant?: string | null
+  /** The latest run, one entry per question in dataset order. */
+  fingerprint?: { id: string; passed: number; total: number }[]
+  /** Runs that asked another chatbot's questions (kept out of the card and trends). */
+  off_topic_runs?: number
 }
 
 export interface Settings {
@@ -568,7 +577,7 @@ export interface Lineage {
   key: string
   comparability: Comparability
   run_ids: number[]
-  points: { run_id: number; target: string; variant: string; pass_rate: number | null; p95_latency_ms: number | null; cost: number | null; concurrency?: number | null; at: string | null }[]
+  points: { run_id: number; target: string; variant: string; pass_rate: number | null; p95_latency_ms: number | null; cost: number | null; concurrency?: number | null; at: string | null; ci_low?: number | null; ci_high?: number | null; off_topic?: string | null }[]
 }
 
 export interface Stage {
@@ -672,4 +681,33 @@ export interface Capability {
   mapped: boolean
   received: boolean
   count: number | null
+}
+
+/** One try, compact, for the run's flow diagram and the Explore charts (GET /api/runs/{id}/explore). */
+export interface ExploreTrial {
+  id: number
+  case_id: string
+  trial_index: number
+  status: 'passed' | 'failed' | 'error' | string
+  title: string
+  question: string
+  category: string | null
+  difficulty: string | null
+  latency_ms: number | null
+  total_tokens: number | null
+  cost_usd: number | null
+  answer_length: number
+  top_score: number | null
+  n_documents: number
+  needs_documents: boolean
+  should_refuse: boolean
+  needs_tool: boolean
+  must_mention: string[]
+  scores: Record<string, { status: string; score: number | null; kind: string }>
+  cause: { cause: string; label: string; kind: string } | null
+}
+export interface ExploreData {
+  run_id: number
+  judge: JudgeInfo | null
+  trials: ExploreTrial[]
 }
