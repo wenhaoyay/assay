@@ -26,6 +26,9 @@ class EvalContext:
     pricing: Any = None  # assay.pricing.PricingRegistry | None
     target_model: str | None = None
     options: dict[str, Any] = field(default_factory=dict)
+    # Checks this run's connection cannot measure (it does not map their telemetry): reported as
+    # not measured and left out of the pass/fail decision, instead of making every answer incomplete.
+    not_measured: frozenset[str] = frozenset()
 
 
 class Evaluator(ABC):

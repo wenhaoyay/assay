@@ -46,6 +46,10 @@ class Conflict(ValueError):
     pass
 
 
+class PolicyError(ValueError):
+    """A privacy rule forbids this action (e.g. a cloud judge for a local-judges-only connection)."""
+
+
 def now() -> datetime:
     return datetime.now(UTC)
 
@@ -314,6 +318,29 @@ def record_evaluator_versions(s: Session, ids: list[str]) -> list[dict[str, Any]
 # Experiments & runs
 # --------------------------------------------------------------------------------------
 
+# The telemetry each check reads. A check whose telemetry a connection does not map at all is
+# "not measured" for that connection's runs (decided when the run starts, kept in its snapshot).
+NEEDS: dict[str, tuple[str, ...]] = {
+    **dict.fromkeys(("recall_at_k", "precision_at_k", "mrr", "ndcg_at_k", "search_found_it"),
+                    ("retrieved_documents",)),
+    **dict.fromkeys(("tool_selection", "forbidden_tools", "tool_arguments", "unnecessary_tools", "step_count",
+                     "tool_result_consistency", "error_recovery"), ("tool_calls",)),
+    "task_success": ("tool_calls", "structured_output"),
+    **dict.fromkeys(("numbers_grounded", "groundedness"), ("retrieved_documents", "tool_calls")),
+    "citation_validity": ("citations", "retrieved_documents"),
+    "token_budget": ("usage",),
+}
+
+
+def not_measured(adapter: str, config: dict[str, Any], evaluators: list[str]) -> list[str]:
+    """Checks this connection cannot measure: an HTTP mapping that maps none of a check's telemetry.
+    Python, imported and standard-shape connections can report everything, so nothing is excluded."""
+    if adapter != "http" or config.get("reply_shape") in ("assay", "gaugelab"):
+        return []
+    mapped = set((config.get("response") or {}).keys())
+    return sorted(e for e in evaluators if e in NEEDS and not mapped & set(NEEDS[e]))
+
+
 DEFAULT_RUN_CONFIG = {"trials": 1, "concurrency": 4, "seed": 7, "k": 5, "options": {}, "budget_usd": None,
                       "max_answers": None, "redact_fields": [], "case_filter": None}
 
@@ -398,6 +425,10 @@ def start_run(s: Session, experiment_id: int, source: str = "live", parent_run_i
     target = get(s, m.Target, tv.target_id)
     dv = get(s, m.DatasetVersion, e.dataset_version_id)
     ds = get(s, m.Dataset, dv.dataset_id)
+    from assay.store.workspace import judge_allowed
+
+    if reason := judge_allowed(s, target.id, e.config.get("judge")):
+        raise PolicyError(reason)
     freeze(s, dv)
     judge = build_judge(s, e.config.get("judge"))
     cases = select_cases([c for _, c in version_cases(s, dv.id)], e.config.get("case_filter"))
@@ -410,6 +441,7 @@ def start_run(s: Session, experiment_id: int, source: str = "live", parent_run_i
                     "content_hash": dv.content_hash, "case_count": dv.case_count},
         "evaluators": record_evaluator_versions(s, e.config["evaluators"]),
         "judge": judge.describe() if judge else None,
+        "not_measured": not_measured(target.adapter, tv.config or {}, e.config["evaluators"]),
     }
     run = m.Run(experiment_id=e.id, status="queued", source=source, parent_run_id=parent_run_id,
                 progress_total=len(cases) * e.config["trials"], snapshot=snapshot)
@@ -477,8 +509,13 @@ async def execute_run(run_id: int) -> None:
                        concurrency=cfg["concurrency"], seed=cfg["seed"], k=cfg["k"], options=cfg.get("options") or {},
                        budget_usd=cfg.get("budget_usd"), redact_fields=set(cfg.get("redact_fields") or []),
                        max_answers=cfg.get("max_answers"), cost_per_answer_usd=target.cost_per_answer_usd,
-                       run_id=str(run_id))
+                       run_id=str(run_id), not_measured=set((run.snapshot or {}).get("not_measured") or []))
         run.status, run.started_at = "running", now()
+        ran = record_evaluator_versions(s, cfg["evaluators"])
+        queued = {e["id"]: e.get("definition_hash") for e in (run.snapshot or {}).get("evaluators") or []}
+        if changed := sorted(e["id"] for e in ran if queued.get(e["id"]) != e["definition_hash"]):
+            run.snapshot = {**run.snapshot, "evaluators": ran,
+                            "evaluators_changed_since_queued": {"checks": changed, "queued": queued}}
     flag = ACTIVE.setdefault(run_id, {"cancel": False})
 
     def persist(rec: TrialRecord) -> None:
@@ -722,7 +759,9 @@ async def execute_reevaluation(new_run_id: int) -> None:
         j = build_judge(s, e2.config.get("judge"))
         from assay.evaluators.base import EvalContext
 
-        ctx = EvalContext(k=e2.config["k"], judge=j, pricing=pricing(s), options=e2.config.get("options") or {})
+        ctx = EvalContext(k=e2.config["k"], judge=j, pricing=pricing(s), options=e2.config.get("options") or {},
+                          not_measured=frozenset() if reread is not None
+                          else frozenset((run.snapshot or {}).get("not_measured") or []))
         new_run_id, evs = run.id, e2.config["evaluators"]
         if reread is not None:  # the grading model's verdicts are carried over, not asked again
             evs = [x for x in evs if get_evaluator(x).kind != "llm_judge"]

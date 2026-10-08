@@ -48,6 +48,7 @@ class RunSpec:
     # spend cap can count answers it otherwise could not price.
     cost_per_answer_usd: float | None = None
     redact_fields: set[str] = field(default_factory=set)
+    not_measured: set[str] = field(default_factory=set)
     max_retries: int = 3
     run_id: str | None = None
 
@@ -73,6 +74,10 @@ def trial_status(result: NormalizedTargetResult, scores: list[EvaluationResult])
     gating = [s for s in scores if s.metadata.get("gating", True)]
     if any(s.status in (EvalStatus.FAIL, EvalStatus.ERROR) for s in gating):
         return "failed"
+    # A required check that could not decide (no telemetry this time, judge said UNKNOWN) leaves the
+    # answer incomplete: "unscored", outside the pass rate, never a pass.
+    if any(s.status in (EvalStatus.NOT_EVALUATED, EvalStatus.UNKNOWN) for s in gating):
+        return "unscored"
     if any(s.status == EvalStatus.PASS for s in gating):
         return "passed"
     return "unscored"
@@ -105,8 +110,23 @@ async def evaluate_trial(case: TestCase, result: NormalizedTargetResult, trace: 
             scores.append(EvaluationResult(evaluator_id=eid, evaluator_version="?", kind="unknown",
                                            status=EvalStatus.ERROR, explanation=f"Unknown evaluator {eid!r}"))
             continue
-        scores.append(await ev.run(case, result, trace, ctx))
+        sc = await ev.run(case, result, trace, ctx)
+        if eid in ctx.not_measured and sc.status == EvalStatus.NOT_EVALUATED:
+            sc.metadata.update(gating=False, not_measured=True)
+        scores.append(sc)
     return scores
+
+
+def redact_record(result: NormalizedTargetResult, trace: Trace | None, scores: list[EvaluationResult],
+                  fields: set[str]) -> tuple[NormalizedTargetResult, Trace | None, list[EvaluationResult]]:
+    """What is stored: the result, trace and verdicts with configured field names and key-like
+    strings masked at any depth (tool arguments and results, metadata, errors, explanations).
+    Called after grading, so the checks saw the real values."""
+    result = NormalizedTargetResult.model_validate(redact(result.model_dump(mode="json"), fields))
+    if trace is not None:
+        trace = Trace.model_validate(redact(trace.model_dump(mode="json"), fields))
+    scores = [EvaluationResult.model_validate(redact(sc.model_dump(mode="json"), fields)) for sc in scores]
+    return result, trace, scores
 
 
 def target_cost(result: NormalizedTargetResult, pricing: Any) -> float | None:
@@ -123,10 +143,17 @@ def _sum(values: list[float | None]) -> float | None:
 async def run_trials(spec: RunSpec, on_trial: Callable[[TrialRecord], Awaitable[None]] | None = None,
                      should_stop: Callable[[], bool] | None = None) -> tuple[list[TrialRecord], str | None]:
     """Returns (records, stop_reason). stop_reason is None, 'cancelled', 'budget' or 'max_answers'."""
-    ctx = EvalContext(k=spec.k, judge=spec.judge, pricing=spec.pricing, options=spec.options)
+    ctx = EvalContext(k=spec.k, judge=spec.judge, pricing=spec.pricing, options=spec.options,
+                      not_measured=frozenset(spec.not_measured))
     sem = asyncio.Semaphore(max(1, spec.concurrency))
     spent = 0.0
+    reserved = 0.0  # expected cost of answers in flight
+    costs: list[float] = []  # finished answers' actual costs
     asked = 0  # questions sent to the bot so far
+
+    def expected() -> float:
+        """One answer's expected cost: the average so far, else the connection's cost per answer."""
+        return sum(costs) / len(costs) if costs else (spec.cost_per_answer_usd or 0.0)
     stop_reason: str | None = None
     lock = asyncio.Lock()
     records: list[TrialRecord] = []
@@ -137,19 +164,22 @@ async def run_trials(spec: RunSpec, on_trial: Callable[[TrialRecord], Awaitable[
             return True
         if should_stop and should_stop():
             stop_reason = "cancelled"
-        elif spec.budget_usd is not None and spent >= spec.budget_usd:
+        elif spec.budget_usd is not None and (spent >= spec.budget_usd or
+                                              (expected() > 0 and spent + reserved + expected() > spec.budget_usd)):
             stop_reason = "budget"
         elif spec.max_answers is not None and asked >= spec.max_answers:
             stop_reason = "max_answers"
         return stop_reason is not None
 
     async def one(case: TestCase, trial: int) -> None:
-        nonlocal spent, asked
+        nonlocal spent, asked, reserved
         async with sem:
             if stopping():
                 rec = TrialRecord(case.id, trial, "cancelled", None, None, [])
             else:
                 asked += 1
+                hold = expected()
+                reserved += hold  # no await between the check and this: no other answer can slip in
                 test_input = case.input.model_dump()
                 actx = AdapterContext(case_id=case.id, trial_index=trial,
                                       seed=zlib.crc32(f"{spec.seed}:{case.id}:{trial}".encode()), run_id=spec.run_id)
@@ -172,9 +202,12 @@ async def run_trials(spec: RunSpec, on_trial: Callable[[TrialRecord], Awaitable[
                 add_evaluator_spans(trace, scores)
                 j_cost = _sum([s.judge_cost_usd for s in scores])
                 total = _sum([t_cost, j_cost])
-                rec = TrialRecord(case.id, trial, trial_status(result, scores), result, trace, scores,
+                result, stored_trace, scores = redact_record(result, trace, scores, spec.redact_fields)
+                rec = TrialRecord(case.id, trial, trial_status(result, scores), result, stored_trace, scores,
                                   raw=redact(call.raw, spec.redact_fields), attempts=attempts, cost_usd=total,
                                   target_cost_usd=t_cost, judge_cost_usd=j_cost)
+                reserved -= hold
+                costs.append(total or 0.0)
                 if total:
                     spent += total
             async with lock:

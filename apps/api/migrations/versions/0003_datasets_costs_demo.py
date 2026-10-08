@@ -27,7 +27,7 @@ def upgrade() -> None:
     add("targets", sa.Column("cost_per_answer_usd", sa.Float(), nullable=True))
     add("projects", sa.Column("is_demo", sa.Boolean(), nullable=False, server_default=sa.false()))
     # The seeded demo chatbot predates the flag.
-    op.execute(sa.text("UPDATE projects SET is_demo = 1 WHERE name = 'Acme Support Demo'"))
+    op.execute(sa.text("UPDATE projects SET is_demo = TRUE WHERE name = 'Acme Support Demo'"))
 
 
 def downgrade() -> None:

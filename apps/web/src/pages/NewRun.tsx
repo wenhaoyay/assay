@@ -357,7 +357,7 @@ export function NewRunPage() {
                 {e ? <><span className="num font-mono">{answers}</span> answers</> : 'Each question'}, <span className="num font-mono">{concurrency}</span> at a time
                 {e?.per_call_ms ? <> → about <span className="num font-mono">{duration(Math.round((answers * e.per_call_ms) / 1000 / concurrency))}</span></> : null}
                 {' '}· speed figures: <b className="font-semibold">{reliability.text}</b>
-                {(budget || e?.spend_cap_usd != null) && concurrency > 1 ? <> · up to <span className="num font-mono">{concurrency}</span> more paid answers past the cap</> : null}
+                {(budget || e?.spend_cap_usd != null) && concurrency > 1 ? <> · the first <span className="num font-mono">{concurrency}</span> answers start before their cost is known, so they can pass the cap</> : null}
               </p>
               <QueueViz atOnce={concurrency} />
             </div>

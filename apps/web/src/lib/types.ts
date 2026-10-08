@@ -400,7 +400,7 @@ export interface EvaluatorInfo {
     notes: string
     system_prompt: string
   }
-  calibration?: { n: number; status: string }
+  calibration?: { n: number; sufficient?: boolean; status: string }
 }
 
 export interface ProviderConfig {
@@ -420,7 +420,7 @@ export interface ProviderConfig {
   catalog_id?: string
   used_by_runs?: boolean
   default_for?: string[]
-  calibration?: { n: number; by_dimension: Record<string, number>; status: string }
+  calibration?: { n: number; by_dimension: Record<string, number>; agreement?: number | null; sufficient?: boolean; status: string }
 }
 
 export interface Experiment {

@@ -97,10 +97,37 @@ async def test_runner_cancel_and_budget():
     recs, stop = await run_trials(RunSpec(cases, SlowEcho(), ["must_mention"], concurrency=1), should_stop=should_stop)
     assert stop == "cancelled"
     assert sum(r.status == "cancelled" for r in recs) == 7 and len(recs) == 10  # finished trials kept
-    # Each call costs 0.002 (fictional demo price); a 0.003 budget stops after two calls.
+    # Each call costs 0.002 (fictional demo price); once that is known, a second call would pass 0.003.
     recs, stop = await run_trials(RunSpec(cases, SlowEcho(), ["must_mention"], concurrency=1, budget_usd=0.003,
                                           pricing=PricingRegistry.load()))
+    assert stop == "budget" and sum(r.status != "cancelled" for r in recs) == 1
+
+
+async def test_parallel_answers_share_one_reserved_budget():
+    # 10 at a time, 1.00 per answer, a 2.50 cap: only two may start, not all ten.
+    cases = [make_case(id=f"c{i}") for i in range(10)]
+    a = SlowEcho()
+    recs, stop = await run_trials(RunSpec(cases, a, ["must_mention"], concurrency=10, budget_usd=2.5,
+                                          cost_per_answer_usd=1.0))
     assert stop == "budget" and sum(r.status != "cancelled" for r in recs) == 2
+
+
+def test_stored_records_are_redacted_after_grading():
+    from assay.runner import redact_record
+    from assay.schemas import EvalStatus, EvaluationResult
+
+    r = NormalizedTargetResult.model_validate({
+        "answer": "Done. Key sk-abcdefghijklmnopqrstuv1234 used.", "error": "auth Bearer abc.def.ghijklmnopqrs failed",
+        "tool_calls": [{"name": "lookup", "arguments": {"email": "jo@example.com", "order": "18372"},
+                        "result": {"customer_name": "Jo Tan", "status": "shipped"}}],
+        "metadata": {"email": "jo@example.com"}})
+    sc = EvaluationResult(evaluator_id="x", evaluator_version="1", kind="deterministic", status=EvalStatus.PASS,
+                          explanation="Matched the order", metadata={"email": "jo@example.com"})
+    out, _, scores = redact_record(r, None, [sc], {"email", "customer_name"})
+    stored = out.model_dump_json() + scores[0].model_dump_json()
+    for secret in ("jo@example.com\"", "Jo Tan", "sk-abcdefghijklmnopqrstuv1234", "abc.def.ghijklmnopqrs"):
+        assert secret not in stored, secret
+    assert out.tool_calls[0].arguments["order"] == "18372" and out.answer.startswith("Done.")
 
 
 async def test_demo_agent_is_reproducible_per_seed():

@@ -33,8 +33,13 @@ your organisation allows that data path. A local model avoids external transmiss
 entirely: connect Ollama or LM Studio in Settings > Models & keys.
 
 **Local judges only.** A target can be marked *local grading models only* (on its page). Runs
-and re-grades of that target are then refused with any judge whose address is not on this
-machine, so a confidential bot's answers cannot reach a cloud API by a wrong click. Ollama
+of that target (new, relaunched from saved settings, from the CLI), re-grades, explanations and
+judge bake-offs over its labelled answers are then refused with any judge whose address is not
+on this machine, so a confidential bot's answers cannot reach a cloud API by a wrong click. "On
+this machine" means the URL's host is `localhost`, a loopback address or `host.docker.internal`;
+an Ollama provider with a remote address is remote, and a judge whose settings cannot be read
+is refused. The check sits where every run starts, not only in the screens. Generating test
+cases from documents is not covered: those documents are not tied to a connection. Ollama
 models whose names end in `-cloud` or `:cloud` are reached through the local Ollama but run on
 Ollama's servers; Assay treats them as cloud models and refuses them here too.
 
@@ -74,7 +79,14 @@ Before a raw response is stored, `assay.traces.redact`:
 - also replaces any field names listed in the experiment's `redact_fields` (for example
   `email`, `customer_name`).
 
-Redaction is a safety net, not a guarantee. Review what your target returns.
+Since the stored copy of each answer is graded first, the same masking is then applied to
+what is stored for it: the normalized result (answer, sources, tool arguments and results,
+metadata, errors), the trace and the verdicts. The checks saw the real values, so scores do not
+change. Field names are matched exactly; free text (an email inside an answer) is masked only
+when it looks like a key. The test-question screens show the unmasked reply to you.
+
+Redaction is a safety net, not a guarantee. Review what your target returns, and protect the
+database as you would the data in it.
 
 ## Connecting internal systems
 
@@ -87,4 +99,16 @@ a live run, or grade logged answers through the importer instead of calling the 
 
 Assay is a local, single-user workbench. It has no authentication, no multi-tenancy and
 no role-based access control. Do not expose the API to an untrusted network. Put it behind
-your own authentication if it has to be shared.
+your own, independently reviewed authentication if it has to be shared.
+
+What protects it locally:
+
+- `assay serve` listens on 127.0.0.1; Docker Compose publishes the API and demo agent on
+  127.0.0.1 only and does not publish Postgres. Set `POSTGRES_PASSWORD` for anything but a
+  throwaway demo.
+- The API answers only requests addressed to `localhost` or `127.0.0.1`, so a web page that
+  points its own domain at your machine (DNS rebinding) cannot use it. Add names with
+  `ASSAY_ALLOWED_HOSTS` if you deliberately serve it under another name.
+- A Python connection runs code inside Assay, so it may name only the demo agent or a module
+  listed in `ASSAY_PYTHON_TARGETS` on the machine running Assay; anything else is refused
+  before it is imported, whether it comes from the screens, the API or a config file.

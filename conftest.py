@@ -9,6 +9,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "apps" / "api"))
 sys.path.insert(0, str(ROOT / "apps" / "api" / "tests"))
+os.environ.setdefault("ASSAY_PYTHON_TARGETS", "slow_target")  # the tests' own Python targets
 
 
 @pytest.fixture()

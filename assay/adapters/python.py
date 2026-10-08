@@ -9,17 +9,37 @@ from __future__ import annotations
 import asyncio
 import importlib
 import inspect
+import os
 from collections.abc import Callable
 from typing import Any
 
 from assay.adapters.base import AdapterContext, TargetAdapter, TargetCall, now
 from assay.schemas import NormalizedTargetResult
 
+# Python connections run code in this process, so only trusted modules may be named: the demo
+# agent, plus the modules listed in ASSAY_PYTHON_TARGETS (comma-separated module names or
+# package prefixes). Checked before anything is imported, on every path (API, CLI, saved runs).
+TRUSTED = ("acme_support_agent",)
+
+
+def trusted_modules() -> tuple[str, ...]:
+    extra = [m.strip() for m in os.environ.get("ASSAY_PYTHON_TARGETS", "").split(",") if m.strip()]
+    return (*TRUSTED, *extra)
+
+
+def is_trusted(module_name: str) -> bool:
+    return any(module_name == t or module_name.startswith(t + ".") for t in trusted_modules())
+
 
 def load_callable(ref: str) -> Callable[..., Any]:
     module_name, _, attr = ref.partition(":")
     if not attr:
         raise ValueError(f"Python target must be 'module:function', got {ref!r}")
+    if not is_trusted(module_name):
+        raise ValueError(f"{module_name!r} is not a trusted Python target. Add it to ASSAY_PYTHON_TARGETS "
+                         "on the machine running Assay to allow it.")
+    if attr.startswith("_"):
+        raise ValueError(f"{ref!r}: private names cannot be called")
     module = importlib.import_module(module_name)
     fn = getattr(module, attr, None)
     if not callable(fn):

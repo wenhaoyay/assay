@@ -105,6 +105,8 @@ def missing_inputs(rubric: Rubric, case: TestCase, result: NormalizedTargetResul
         if need == "reference" and not case.expected.answer.reference:
             return "not_applicable", "No reference answer for this case."
         if need == "context" and not context_text(result):
+            if case.expected.refusal_expected:  # declining without looking anything up makes no claim to ground
+                return "not_applicable", "The bot is expected to decline here, so there is nothing to ground."
             return "not_evaluated", "The target reported no retrieved text or tool results to check against."
         if need == "instructions" and not instructions_for(case):
             return "not_applicable", "No instructions configured for this case."

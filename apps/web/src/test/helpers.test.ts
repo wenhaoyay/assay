@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { buildPrompt } from '../components/Golden'
 import { findChatId, quotedLiterals } from '../pages/Connect'
 import { describePattern, plainPattern } from '../lib/trials'
+import { flow } from '../components/run/Sankey'
+import type { ExploreTrial } from '../lib/types'
 
 describe('plain-word rules', () => {
   it('turns words into patterns that do what they say', () => {
@@ -50,5 +52,20 @@ describe('patterns in plain words', () => {
     expect(describePattern(plainPattern('number', ['91']))).toBe('the number 91')
     expect(describePattern('(?i)SSSC')).toBe('"SSSC"')
     expect(describePattern('(?i)(which|what)\s+(site|office)')).toBeNull()
+  })
+})
+
+describe('where the answers went', () => {
+  const trial = (scores: Record<string, { status: string }>, kind: Partial<ExploreTrial>) =>
+    ({ status: 'passed', scores, should_refuse: false, needs_tool: false, needs_documents: false, ...kind }) as unknown as ExploreTrial
+  const targets = (ts: ExploreTrial[]) => {
+    const { nodes, links } = flow(ts)
+    return links.map((l) => nodes[l.target].name)
+  }
+  it('never shows a check that was not measured as a success', () => {
+    expect(targets([trial({}, { needs_documents: true })])).toContain('Not measured')
+    expect(targets([trial({ recall_at_k: { status: 'not_evaluated' } }, { needs_documents: true })])).not.toContain('Search found it')
+    expect(targets([trial({}, { needs_tool: true })])).not.toContain('Right tool')
+    expect(targets([trial({ recall_at_k: { status: 'pass' } }, { needs_documents: true })])).toContain('Search found it')
   })
 })

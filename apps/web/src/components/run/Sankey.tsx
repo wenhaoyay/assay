@@ -11,7 +11,7 @@ import { CaseChip, ChartTip, NothingPasses, useWidth, type TipState } from './bi
 import { decided } from './data'
 
 const KIND = { lookup: 'Look-up questions', decline: 'Should decline', tool: 'Needs a tool', other: 'Other' } as const
-const ORDER = ['Asked', KIND.lookup, KIND.decline, KIND.tool, KIND.other, 'Search found it', 'Search missed', 'Declined', 'Answered anyway', 'Right tool', 'Wrong tool', 'Answered', 'Passed', 'Failed']
+const ORDER = ['Asked', KIND.lookup, KIND.decline, KIND.tool, KIND.other, 'Search found it', 'Search missed', 'Declined', 'Answered anyway', 'Right tool', 'Wrong tool', 'Not measured', 'Answered', 'Passed', 'Failed']
 const BAD = new Set(['Search missed', 'Answered anyway', 'Wrong tool', 'Failed'])
 
 interface N { name: string }
@@ -19,9 +19,13 @@ interface L { source: number; target: number; value: number; key: string }
 type SN = SankeyNode<N, L>
 type SL = SankeyLink<N, L>
 
-const failed = (t: ExploreTrial, check: string) => t.scores[check]?.status === 'fail'
+/** A check's outcome as a node name: only a real pass or fail says which way it went. */
+const outcome = (t: ExploreTrial, check: string, pass: string, fail: string) => {
+  const st = t.scores[check]?.status
+  return st === 'pass' ? pass : st === 'fail' ? fail : 'Not measured'
+}
 
-function flow(trials: ExploreTrial[]) {
+export function flow(trials: ExploreTrial[]) {
   const counts = new Map<string, number>()
   const members = new Map<string, ExploreTrial[]>()
   const add = (a: string, b: string, t: ExploreTrial) => {
@@ -32,9 +36,9 @@ function flow(trials: ExploreTrial[]) {
   for (const t of trials) {
     const kind = t.should_refuse ? KIND.decline : t.needs_tool ? KIND.tool : t.needs_documents ? KIND.lookup : KIND.other
     add('Asked', kind, t)
-    const mid = kind === KIND.lookup ? (failed(t, 'recall_at_k') ? 'Search missed' : 'Search found it')
-      : kind === KIND.decline ? (failed(t, 'refusal_check') ? 'Answered anyway' : 'Declined')
-        : kind === KIND.tool ? (failed(t, 'tool_selection') ? 'Wrong tool' : 'Right tool')
+    const mid = kind === KIND.lookup ? outcome(t, 'recall_at_k', 'Search found it', 'Search missed')
+      : kind === KIND.decline ? outcome(t, 'refusal_check', 'Declined', 'Answered anyway')
+        : kind === KIND.tool ? outcome(t, 'tool_selection', 'Right tool', 'Wrong tool')
           : 'Answered'
     add(kind, mid, t)
     add(mid, t.status === 'passed' ? 'Passed' : 'Failed', t)

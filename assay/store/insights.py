@@ -38,6 +38,9 @@ def comparability(run: m.Run) -> dict[str, Any]:
         "case_filter": cfg.get("case_filter") or None,
         "evaluators": sorted(cfg.get("evaluators") or []),
         "judge": f"{judge.get('provider')}/{judge.get('model')}" if judge else None,
+        # Same names are not enough: a changed check or rubric grades the same answers differently.
+        "checks": sorted(f"{e.get('id')}@{e.get('definition_hash')}" for e in snap.get("evaluators") or []),
+        "judge_setup": {k: judge.get(k) for k in ("kind", "template_version", "temperature")} if judge else None,
     }
     key = hashlib.sha256(json.dumps(parts, sort_keys=True).encode()).hexdigest()[:12]
     n_cases = (run.summary or {}).get("n_cases")
@@ -59,6 +62,16 @@ def comparability_issues(a: m.Run, b: m.Run) -> list[str]:
     if ca["judge"] != cb["judge"]:
         issues.append(f"Graded by different judges ({ca['judge'] or 'none'} vs {cb['judge'] or 'none'}): "
                       "judge-based scores are not comparable.")
+    va = {e.get("id"): e.get("definition_hash") for e in a.snapshot.get("evaluators") or []}
+    vb = {e.get("id"): e.get("definition_hash") for e in b.snapshot.get("evaluators") or []}
+    if changed := sorted(k for k in va.keys() & vb.keys() if va[k] != vb[k]):
+        issues.append(f"Checks changed between the runs ({', '.join(changed)}): the same names grade "
+                      "differently, so their rates are not comparable.")
+    ja, jb = a.snapshot.get("judge") or {}, b.snapshot.get("judge") or {}
+    if ca["judge"] == cb["judge"] and ja and jb and \
+            any(ja.get(k) != jb.get(k) for k in ("kind", "template_version", "temperature")):
+        issues.append("Same judge model with a different prompt template or settings: judge-based scores "
+                      "are not comparable.")
     if ca["evaluators"] != cb["evaluators"]:
         only_a = sorted(set(ca["evaluators"]) - set(cb["evaluators"]))
         only_b = sorted(set(cb["evaluators"]) - set(ca["evaluators"]))
@@ -388,7 +401,30 @@ def is_cloud_model_name(model: str | None) -> bool:
 def is_local_provider(pc: m.ProviderConfig) -> bool:
     if is_cloud_model_name(pc.model):
         return False
-    if pc.provider == "ollama":
+    if not pc.base_url:
+        return pc.provider == "ollama"  # Ollama's default address is http://localhost:11434
+    return is_local_url(pc.base_url)
+
+
+LOCAL_HOSTS = {"localhost", "host.docker.internal"}
+
+
+def is_local_url(url: str) -> bool:
+    """True only when the URL's host is this machine (or the Docker host); malformed means no."""
+    import ipaddress
+    from urllib.parse import urlsplit
+
+    try:
+        parts = urlsplit(url.strip())
+        host = (parts.hostname or "").lower()
+        parts.port  # noqa: B018 - raises on a malformed port
+    except ValueError:
+        return False
+    if parts.scheme not in ("http", "https") or not host:
+        return False
+    if host in LOCAL_HOSTS:
         return True
-    url = (pc.base_url or "").lower()
-    return any(h in url for h in ("localhost", "127.0.0.1", "0.0.0.0", "[::1]", "host.docker.internal"))
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False

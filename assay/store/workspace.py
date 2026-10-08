@@ -80,16 +80,41 @@ def provider_public(s: Session, pc: m.ProviderConfig) -> dict[str, Any]:
 
 def judge_calibration(s: Session, provider: str, model: str) -> dict[str, Any]:
     """How many human labels a judge model has been checked against, per dimension. A new model has none."""
-    rows = s.execute(select(m.HumanAnnotation.dimension, m.Score.metadata_)
+    from assay.evaluators.llm_judge.judge import load_rubric
+
+    rows = s.execute(select(m.HumanAnnotation.dimension, m.HumanAnnotation.label, m.Score.status, m.Score.metadata_)
                      .join(m.Score, (m.Score.trial_id == m.HumanAnnotation.trial_id)
                            & (m.Score.evaluator_id == m.HumanAnnotation.dimension))).all()
+    current: dict[str, str | None] = {}
     counts: dict[str, int] = {}
-    for dim, meta in rows:
+    agree = 0
+    for dim, human, status, meta in rows:
         meta = meta or {}
-        if meta.get("provider") == provider and meta.get("model") == model:
-            counts[dim] = counts.get(dim, 0) + 1
+        if meta.get("provider") != provider or meta.get("model") != model:
+            continue
+        if human not in ("PASS", "FAIL") or status not in ("pass", "fail"):
+            continue
+        if dim not in current:
+            try:
+                # The heuristic judge does not read the rubric's prompt; its rules carry their own version.
+                current[dim] = "heuristic-v1" if provider == "heuristic" else load_rubric(dim).prompt_hash
+            except Exception:
+                current[dim] = None
+        if meta.get("prompt_hash") != current[dim]:  # graded with another rubric: says nothing about this one
+            continue
+        counts[dim] = counts.get(dim, 0) + 1
+        agree += (human == "PASS") == (status == "pass")
     n = sum(counts.values())
-    return {"n": n, "by_dimension": counts, "status": "Uncalibrated" if n == 0 else f"Calibrated on {n} label(s)"}
+    rate = agree / n if n else None
+    enough = n >= MIN_CALIBRATION_LABELS
+    status = ("Uncalibrated" if n == 0 else
+              f"{n} label{'s' if n != 1 else ''}, too few to trust" if not enough else
+              f"Agrees {round(100 * (rate or 0))}% on {n} labels")
+    return {"n": n, "by_dimension": counts, "agreement": rate, "sufficient": enough, "status": status}
+
+
+# Below this, agreement is too noisy to lean on (a 95% interval wider than about +/-20 points).
+MIN_CALIBRATION_LABELS = 20
 
 
 # --------------------------------------------------------------------------------------
@@ -185,6 +210,13 @@ def start_bakeoff(s: Session, dimension: str, judges: list[dict[str, Any]]) -> m
     items = labelled_items(s, dimension)
     if not items:
         raise ValueError(f"No human labels for {dimension} yet. Label some answers in Calibration first.")
+    # The bake-off sends labelled answers to every judge: each answer's connection must allow it.
+    run_targets = {r.id: (r.snapshot or {}).get("target", {}).get("id")
+                   for r in s.scalars(select(m.Run).where(m.Run.id.in_({t.run_id for t, _ in items})))}
+    for j in judges:
+        for tid in {run_targets.get(t.run_id) for t, _ in items}:
+            if tid is not None and (reason := judge_allowed(s, int(tid), j)):
+                raise svc.PolicyError(reason)
     b = m.JudgeBakeoff(dimension=dimension, judges=judges, status="running", progress_total=len(items) * len(judges),
                        progress_done=0)
     s.add(b)
@@ -275,7 +307,9 @@ def judge_allowed(s: Session, target_id: int, judge: dict[str, Any] | None) -> s
     if t is None or not t.local_judges_only or not judge or judge.get("provider") == "heuristic":
         return None
     pc = s.get(m.ProviderConfig, judge.get("provider_config_id"))
-    if pc is not None and not is_local_provider(pc):
+    if pc is None:  # fail closed: an unknown judge is not known to be local
+        return f"'{t.name}' is set to local judges only, and this judge's settings could not be found."
+    if not is_local_provider(pc):
         where = "Ollama's servers (a cloud model, though reached through the local Ollama)"             if is_cloud_model_name(pc.model) else (pc.base_url or pc.provider)
         return (f"'{t.name}' is set to local judges only, and {pc.name} sends answers to "
                 f"{where}. Pick a judge that runs on this machine.")

@@ -303,10 +303,14 @@ to prove that the gate fails when it should.
   itself. Semantic grading needs an LLM judge, and an LLM judge needs calibration.
 - **Small samples.** Fifty-eight cases give intervals of roughly ±13 percentage points.
   Assay reports that rather than hiding it.
-- **Verified locally, not yet in CI.** Development and every test ran on SQLite on Windows.
-  The Docker Compose stack and the GitHub Actions workflows (including the Postgres job) are
-  written but had not been run when this was written: the development machine has no Docker,
-  and the repository had not been pushed.
+- **Docker untested here.** Development ran on SQLite on Windows; the Postgres path is
+  exercised by the GitHub Actions job. The Docker Compose stack is written but has not been
+  run: the development machine has no Docker.
+- **A check a connection cannot measure is left out, not passed.** When a connection does not
+  map a check's telemetry (say, no sources), that check shows as not measured and the pass rate
+  rests on the others; an answer whose required check could not decide is unscored, never
+  passed. The spend cap reserves each answer's expected cost, but the first answers of a run
+  start before any cost is known.
 - **Not implemented:** OpenTelemetry export, multi-turn conversation simulation, parallel
   annotators with inter-annotator agreement in the UI.
 

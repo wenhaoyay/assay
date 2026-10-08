@@ -115,7 +115,7 @@ function ModelCard({ m, settings, onChange }: { m: ProviderConfig; settings?: Se
             {m.api_key_ref ? (
               <Badge tone={m.key_status === 'set' ? 'good' : 'bad'}><Lock className="size-3" />{m.key_status === 'set' ? `${m.key_hint ?? 'key set'} (${m.key_kind === 'keyring' ? 'OS store' : 'environment'})` : `${m.api_key_ref} missing`}</Badge>
             ) : <Badge tone="good">no key needed</Badge>}
-            <Badge tone={m.calibration?.n ? 'good' : 'warn'} title="Agreement with your own labels is measured per model"><Term k="calibrated">{m.calibration?.status ?? 'Uncalibrated'}</Term></Badge>
+            <Badge tone={m.calibration?.sufficient ? 'good' : 'warn'} title="Agreement with your own labels is measured per model"><Term k="calibrated">{m.calibration?.status ?? 'Uncalibrated'}</Term></Badge>
             <span className="text-ink-3">{m.cloud_via_ollama ? "answers go to Ollama's servers (a cloud model)" : m.local ? 'answers stay on this machine' : 'answers are sent to the provider'}</span>
           </div>
         </div>
