@@ -277,6 +277,36 @@ def export(run_id: int, format: str = "json", baseline: int | None = None,
 # --------------------------------------------------------------------------------------
 
 
+@router.get("/runs/{run_id}/explore")
+def run_explore(run_id: int, s: Session = Depends(get_session)) -> dict[str, Any]:
+    """One compact row per try, for the run's flow diagram and the Explore charts: what the question
+    needed, how each check went, the best document's score and the likely cause of a failure."""
+    run = svc.get(s, m.Run, run_id)
+    ctx = cz.Context(s, run)
+    rows = []
+    for t in s.scalars(select(m.Trial).where(m.Trial.run_id == run_id).order_by(m.Trial.id)):
+        case = ctx.cases.get(t.case_key) or {}
+        exp = case.get("expected") or {}
+        docs = (t.result or {}).get("retrieved_documents") or []
+        verdict = ctx.verdict(t) if t.status in ("failed", "error") else None
+        rows.append({
+            "id": t.id, "case_id": t.case_key, "trial_index": t.trial_index, "status": t.status,
+            "title": case.get("title") or "", "question": (case.get("input") or {}).get("message") or "",
+            "category": case.get("category"), "difficulty": case.get("difficulty"),
+            "latency_ms": t.latency_ms, "total_tokens": t.total_tokens, "cost_usd": t.target_cost_usd,
+            "answer_length": len(t.answer or ""),
+            "top_score": max((d.get("score") or 0) for d in docs) if docs else None,
+            "n_documents": len(docs),
+            "needs_documents": bool(exp.get("relevant_documents")),
+            "should_refuse": bool(exp.get("refusal_expected")),
+            "needs_tool": bool(exp.get("required_tools") or exp.get("tool_calls")),
+            "must_mention": (exp.get("answer") or {}).get("must_mention") or [],
+            "scores": {sc.evaluator_id: {"status": sc.status, "score": sc.score, "kind": sc.kind} for sc in t.scores},
+            "cause": {"cause": verdict["cause"], "label": verdict["label"], "kind": verdict["kind"]} if verdict else None,
+        })
+    return {"run_id": run_id, "judge": (run.snapshot or {}).get("judge"), "trials": rows}
+
+
 @router.get("/trials/{trial_id}")
 def get_trial(trial_id: int, s: Session = Depends(get_session)) -> dict[str, Any]:
     t = svc.get(s, m.Trial, trial_id)

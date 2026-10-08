@@ -21,8 +21,8 @@ seed:             ## migrate and load the Acme demo (dataset, targets, gate)
 demo:             ## seed + run baseline and candidate (zero API cost)
 	$(GL) seed --run
 
-demo-fresh:       ## the same on an empty database (stop the server first): a clean slate for a live demo
-	$(GL) seed --run --fresh
+demo-fresh:       ## an empty database with three weeks of demo history (stop the server first): a clean slate for a live demo
+	$(GL) seed --run --history --fresh
 
 serve:            ## API + built web app on http://localhost:8040
 	$(GL) serve --port 8040

@@ -620,7 +620,21 @@ def run_header(s: Session, run: m.Run) -> dict[str, Any]:
         "metrics": summary.get("metrics", {}), "n_cases": summary.get("n_cases"),
         "failed_trials": summary.get("failed_trials"),
         "gate_status": gate.status if gate else None,
+        "overall_ci": [(summary.get("overall") or {}).get("ci_low"), (summary.get("overall") or {}).get("ci_high")],
+        "off_topic": off_topic(s, run),
     }
+
+
+def off_topic(s: Session, run: m.Run) -> str | None:
+    """The chatbot whose questions this run asked, when they were written for a different one.
+    Such a run says nothing about this bot: it is flagged and kept out of trends and home cards."""
+    exp = s.get(m.Experiment, run.experiment_id)
+    ds_id = (run.snapshot or {}).get("dataset", {}).get("id")
+    ds = s.get(m.Dataset, ds_id) if ds_id else None
+    if exp is None or ds is None or ds.project_id == exp.project_id:
+        return None
+    owner = s.get(m.Project, ds.project_id)
+    return owner.name if owner else "another chatbot"
 
 
 # Errors that usually mean "too many at once", not "the bot is broken".

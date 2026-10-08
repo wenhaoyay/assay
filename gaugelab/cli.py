@@ -3,7 +3,7 @@
     gaugelab db upgrade                     apply migrations
     gaugelab serve [--port 8040]            API + built web app
     gaugelab demo-agent [--port 9040]       the fictional Acme agent over HTTP
-    gaugelab seed [--run] [--fresh]         demo project, dataset, targets, gate (and runs)
+    gaugelab seed [--run] [--history] [--fresh]   demo project, dataset, targets, gate (and runs)
     gaugelab validate dataset.yaml          check a dataset file
     gaugelab run experiment.yaml            run an experiment from config
     gaugelab compare <baseline> <candidate> paired comparison of two runs
@@ -278,7 +278,7 @@ def cmd_seed(args) -> int:
 
     if args.fresh:
         _fresh_sqlite()
-    res = seed(run=args.run, trials=args.trials, force_runs=args.force_runs)
+    res = seed(run=args.run, trials=args.trials, force_runs=args.force_runs, history=args.history)
     _out(res)
     return 0
 
@@ -305,6 +305,8 @@ def main(argv: list[str] | None = None) -> int:
     sd.add_argument("--run", action="store_true", help="also run baseline and candidate experiments")
     sd.add_argument("--trials", type=int, default=3)
     sd.add_argument("--force-runs", action="store_true", help="run again even if demo runs exist")
+    sd.add_argument("--history", action="store_true",
+                    help="with --run: three weeks of real demo runs (a weak start, gains, a regression and its fix)")
     sd.add_argument("--fresh", action="store_true",
                     help="start from an empty SQLite database (deletes it first) - a clean demo in one command")
     sd.set_defaults(fn=cmd_seed)

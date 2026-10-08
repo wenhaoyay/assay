@@ -84,9 +84,24 @@ def project_runs(s: Session, project_id: int) -> list[m.Run]:
                           .where(m.Experiment.project_id == project_id).order_by(m.Run.id.desc())))
 
 
+def fingerprint(s: Session, run: m.Run) -> list[dict[str, Any]]:
+    """One entry per question, in dataset order: how many of its tries passed. The run's "fingerprint"."""
+    cells: dict[str, list[int]] = {}
+    for key, status in s.execute(select(m.Trial.case_key, m.Trial.status).where(m.Trial.run_id == run.id)):
+        if status in ("passed", "failed", "error"):
+            c = cells.setdefault(key, [0, 0])
+            c[1] += 1
+            c[0] += status == "passed"
+    dv_id = (run.snapshot or {}).get("dataset", {}).get("version_id")
+    order = [c.id for _, c in svc.version_cases(s, dv_id)] if dv_id else []
+    order += sorted(k for k in cells if k not in set(order))
+    return [{"id": k, "passed": cells[k][0], "total": cells[k][1]} for k in order if k in cells]
+
+
 def project_card(s: Session, p: m.Project) -> dict[str, Any]:
     runs = project_runs(s, p.id)
-    done = [r for r in runs if r.status in DONE]
+    # A run that asked another chatbot's questions says nothing about this one: never the headline.
+    done = [r for r in runs if r.status in DONE and not svc.off_topic(s, r)]
     latest = done[0] if done else None
     prev = None
     if latest:
@@ -121,6 +136,9 @@ def project_card(s: Session, p: m.Project) -> dict[str, Any]:
         "latest_at": latest.finished_at.isoformat() if latest and latest.finished_at else None,
         "gate_status": gate,
         "trend": trend,
+        "latest_variant": (latest.snapshot or {}).get("target", {}).get("variant_label") if latest else None,
+        "fingerprint": fingerprint(s, latest) if latest else [],
+        "off_topic_runs": len([r for r in runs if r.status in DONE and svc.off_topic(s, r)]),
     }
 
 
@@ -137,8 +155,11 @@ def project_home(s: Session, project_id: int) -> dict[str, Any]:
         lin = lineages.setdefault(c["key"], {"key": c["key"], "comparability": c, "run_ids": [], "points": []})
         lin["run_ids"].append(r.id)
         met = (r.summary or {}).get("metrics", {})
+        overall = (r.summary or {}).get("overall") or {}
         lin["points"].append({"run_id": r.id, "target": r.snapshot.get("target", {}).get("name"),
                               "variant": r.snapshot.get("target", {}).get("variant_label"),
+                              "off_topic": svc.off_topic(s, r),
+                              "ci_low": overall.get("ci_low"), "ci_high": overall.get("ci_high"),
                               "pass_rate": met.get("overall_pass_rate"), "p95_latency_ms": met.get("p95_latency_ms"),
                               "cost": met.get("average_cost_usd"),
                               "concurrency": (r.snapshot.get("experiment", {}).get("config") or {}).get("concurrency"),
@@ -147,7 +168,9 @@ def project_home(s: Session, project_id: int) -> dict[str, Any]:
         lin["points"].reverse()  # oldest -> newest for charts
     ordered = sorted(lineages.values(), key=lambda lin: -max(lin["run_ids"]))
 
-    latest = done[0] if done else None
+    on_topic = [r for r in done if not svc.off_topic(s, r)]
+    latest = on_topic[0] if on_topic else None
+    done = on_topic
     verdict = None
     if latest:
         key = comparability(latest)["key"]
