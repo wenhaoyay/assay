@@ -1,0 +1,22 @@
+# Case study: one trial per case on the 30 reference-answer cases, graded by a LOCAL LLM judge
+# (Ollama llama3.1:8b, nothing leaves the machine) for answer correctness, plus every deterministic check.
+# Variant A - baseline: lexical BM25 top-5, simple prompt, no reranking.
+experiment:
+  name: acme-baseline-llm-judge
+  description: Lexical retrieval (BM25, top-5), simple prompt.
+project: Acme Support Demo
+dataset: {path: ../dataset.yaml}
+target:
+  name: Acme agent - baseline
+  adapter: python
+  variant_label: "lexical BM25 top-5 / prompt v1"
+  description: Variant A. Lexical retrieval, simple prompt, no reranking.
+  config: {callable: "acme_support_agent.app:run", options: {variant: baseline}}
+trials: 1
+concurrency: 1
+# A fixed, reduced suite: the 30 knowledge questions (factual, multi-document, retrieval traps).
+case_filter: {categories: [factual, multi_document, retrieval_trap]}
+k: 5
+options: {max_latency_ms: 3000}
+judge: {provider: ollama, model: "llama3.1:8b", name: "Local judge - Ollama llama3.1:8b"}
+evaluators: [must_mention, forbidden_claims, citation_validity, refusal_check, recall_at_k, precision_at_k, mrr, ndcg_at_k, tool_selection, forbidden_tools, tool_arguments, unnecessary_tools, step_count, task_success, tool_result_consistency, error_recovery, latency, correctness]

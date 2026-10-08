@@ -1,0 +1,17 @@
+# Variant A - baseline: lexical BM25 top-5, simple prompt, no reranking.
+experiment:
+  name: acme-baseline
+  description: Lexical retrieval (BM25, top-5), simple prompt.
+project: Acme Support Demo
+dataset: {path: ../dataset.yaml}
+target:
+  name: Acme agent - baseline
+  adapter: python
+  variant_label: "lexical BM25 top-5 / prompt v1"
+  description: Variant A. Lexical retrieval, simple prompt, no reranking.
+  config: {callable: "acme_support_agent.app:run", options: {variant: baseline}}
+trials: 3
+k: 5
+options: {max_latency_ms: 3000}
+judge: {provider: heuristic}
+evaluators: [must_mention, forbidden_claims, citation_validity, refusal_check, recall_at_k, precision_at_k, mrr, ndcg_at_k, tool_selection, forbidden_tools, tool_arguments, unnecessary_tools, step_count, task_success, tool_result_consistency, error_recovery, latency, correctness, groundedness, relevance, appropriate_refusal]

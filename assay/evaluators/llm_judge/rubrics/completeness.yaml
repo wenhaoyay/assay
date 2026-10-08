@@ -1,0 +1,9 @@
+id: completeness
+name: Completeness
+version: "1.0.0"
+needs: [reference]
+question: Does the answer cover every material point of the reference answer?
+labels:
+  PASS: Every material point in the reference answer is present in the answer (wording may differ).
+  FAIL: At least one material point of the reference answer is missing.
+  UNKNOWN: The reference does not make clear which points are material.

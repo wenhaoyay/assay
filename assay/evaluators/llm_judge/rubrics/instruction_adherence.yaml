@@ -1,0 +1,9 @@
+id: instruction_adherence
+name: Instruction adherence
+version: "1.0.0"
+needs: [instructions]
+question: Does the answer follow the case's stated instructions (format, scope, policy)?
+labels:
+  PASS: The answer follows every stated instruction.
+  FAIL: The answer breaks at least one stated instruction.
+  UNKNOWN: The instructions are ambiguous for this answer.

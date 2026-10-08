@@ -1,0 +1,9 @@
+id: relevance
+name: Answer relevance
+version: "1.0.0"
+needs: []
+question: Does the answer address what the user asked?
+labels:
+  PASS: The answer responds to the user's actual question (a justified refusal or clarifying question also counts as addressing it).
+  FAIL: The answer is about something else, ignores the main question, or answers only a side issue.
+  UNKNOWN: The question itself is too unclear to tell.

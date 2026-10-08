@@ -1,0 +1,41 @@
+# docker compose up --build    ->  web + API on http://localhost:8040, demo agent on :9040 (this machine only).
+# Assay has no login: do not publish it beyond localhost without an auth layer in front of it.
+# Set POSTGRES_PASSWORD in .env for anything but a throwaway local demo.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: assay
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-assay}
+      POSTGRES_DB: assay
+    # Not published: the API reaches it on the Compose network. Uncomment for local tools only:
+    # ports: ["127.0.0.1:5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U assay"]
+      interval: 3s
+      retries: 20
+
+  demo-agent:
+    build: .
+    command: ["assay", "demo-agent", "--host", "0.0.0.0", "--port", "9040"]
+    ports: ["127.0.0.1:9040:9040"]
+
+  api:
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://assay:${POSTGRES_PASSWORD:-assay}@db:5432/assay
+      ASSAY_DEMO_AGENT_URL: http://demo-agent:9040
+    # Migrate, load the demo (runs only once), then serve.
+    command: ["sh", "-c", "assay db upgrade && assay seed --run && assay serve --host 0.0.0.0 --port 8040"]
+    ports: ["127.0.0.1:8040:8040"]  # this machine only: Assay has no login
+    depends_on:
+      db: {condition: service_healthy}
+      demo-agent: {condition: service_started}
+    extra_hosts: ["host.docker.internal:host-gateway"]   # reach Ollama on the host: http://host.docker.internal:11434
+
+volumes:
+  pgdata:

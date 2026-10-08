@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local state
+data/
+assay-artifacts/
+regression-artifacts/
+pg-artifacts/
+.env
+.env.*
+!.env.example
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Ignore newly captured, unreviewed screenshots, but retain the 13 owner-approved demo images
+docs/screenshots/*
+!docs/screenshots/calibration.png
+!docs/screenshots/chatbot.png
+!docs/screenshots/compare-dark.png
+!docs/screenshots/compare.png
+!docs/screenshots/connect.png
+!docs/screenshots/dataset-history.png
+!docs/screenshots/explore.png
+!docs/screenshots/failures.png
+!docs/screenshots/home.png
+!docs/screenshots/models.png
+!docs/screenshots/run-summary.png
+!docs/screenshots/trace.png
+!docs/screenshots/trial.png
+*.log
+
+# Private target connectors and imports (never committed - may name internal systems)
+local/*
+!local/README.md
+
+# Web
+node_modules/
+apps/web/dist/
+apps/web/test-results/
+apps/web/playwright-report/
