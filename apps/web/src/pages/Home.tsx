@@ -35,7 +35,7 @@ export function HomePage() {
         <div className="mb-5 space-y-2">
           {h.active_runs.map((r) => (
             <Link key={r.id} to={`/runs/${r.id}`} viewTransition className="block rounded-xl border border-accent/30 bg-accent-wash/50 px-4 py-3 hover:border-accent/60">
-              <div className="mb-1.5 flex items-center gap-2 text-[13px]"><StatusBadge status={r.status} /><span className="font-medium">#{r.id} {r.experiment}</span><span className="num ml-auto text-xs text-ink-3">{r.progress_done}/{r.progress_total} trials</span></div>
+              <div className="mb-1.5 flex items-center gap-2 text-sm"><StatusBadge status={r.status} /><span className="font-medium">#{r.id} {r.experiment}</span><span className="num ml-auto text-xs text-ink-3">{r.progress_done}/{r.progress_total} trials</span></div>
               <ProgressBar value={r.progress_total ? r.progress_done / r.progress_total : 0} />
             </Link>
           ))}
@@ -54,7 +54,7 @@ export function HomePage() {
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" data-tour="projects">
             {h.projects.filter((p) => !(h.settings.hide_demo && p.is_demo)).map((p, i) => <ProjectTile key={p.id} p={p} i={i} />)}
             <Link to="/targets/new" viewTransition
-              className="flex min-h-[200px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong text-[13px] text-ink-3 transition-colors hover:border-accent hover:text-accent-ink">
+              className="flex min-h-[200px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong text-sm text-ink-3 transition-colors hover:border-accent hover:text-accent-ink">
               <Plug className="size-5" />Connect another chatbot
             </Link>
           </div>
@@ -75,7 +75,7 @@ function ProjectTile({ p, i }: { p: ProjectCard; i: number }) {
           <ProjectMark name={p.name} color={p.color} size={36} />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h2 className="truncate text-[15px] font-semibold">{p.name}</h2>
+              <h2 className="truncate text-h font-semibold">{p.name}</h2>
               {p.is_demo && <Badge title="Seeded sample data (Settings > Defaults can hide it)">Demo</Badge>}
               {p.active_runs > 0 && <Badge tone="info">running</Badge>}
             </div>
@@ -88,7 +88,7 @@ function ProjectTile({ p, i }: { p: ProjectCard; i: number }) {
             <div className="mt-4 flex items-end justify-between gap-3">
               <div>
                 <div className="text-xs text-ink-3"><Term k="pass_rate">Pass rate</Term>, run #{p.latest_run_id}</div>
-                <div className="num text-[30px] font-semibold leading-none tracking-tight">{pct(p.latest_pass_rate)}</div>
+                <div className="num text-fig-xl font-semibold leading-none tracking-tight">{pct(p.latest_pass_rate)}</div>
                 {change !== null ? (
                   <div className={clsx('num mt-1 flex items-center gap-0.5 text-xs font-medium', change > 0 ? 'text-good-ink' : change < 0 ? 'text-bad-ink' : 'text-ink-3')}>
                     {Arrow && <Arrow className="size-3.5" />}{change > 0 ? '+' : ''}{(change * 100).toFixed(1)}pp <span className="font-normal text-ink-3">vs #{p.previous_run_id}</span>
@@ -123,7 +123,7 @@ function QuickActions() {
       {items.map(({ to, icon: Icon, title, body }) => (
         <Link key={to} to={to} viewTransition className="group flex gap-3 rounded-xl border border-line bg-surface p-3 transition-colors hover:border-accent/50">
           <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent-wash text-accent-ink transition-transform group-hover:scale-110"><Icon className="size-4" /></span>
-          <span><span className="block text-[13px] font-medium">{title}</span><span className="block text-xs text-ink-3">{body}</span></span>
+          <span><span className="block text-sm font-medium">{title}</span><span className="block text-xs text-ink-3">{body}</span></span>
         </Link>
       ))}
     </div>
@@ -142,9 +142,9 @@ function FirstSteps() {
         {steps.map((s, i) => (
           <motion.div key={s.n} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
             className="rounded-xl border border-line bg-surface p-5 shadow-card">
-            <span className="flex size-8 items-center justify-center rounded-full bg-accent text-sm font-semibold text-on-accent">{s.n}</span>
-            <h2 className="mt-3 text-[15px] font-semibold">{s.title}</h2>
-            <p className="mt-1 text-[13px] text-ink-2">{s.body}</p>
+            <span className="flex size-8 items-center justify-center rounded-full bg-accent text-base font-semibold text-on-accent">{s.n}</span>
+            <h2 className="mt-3 text-h font-semibold">{s.title}</h2>
+            <p className="mt-1 text-sm text-ink-2">{s.body}</p>
             <Link to={s.to} className={clsx(linkButton(i === 0 ? 'primary' : 'secondary'), 'mt-4')}>{s.cta} <ArrowRight className="size-3.5" /></Link>
           </motion.div>
         ))}

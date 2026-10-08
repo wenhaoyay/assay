@@ -89,7 +89,7 @@ interface TestResponse {
 
 /** The mapping as a readable list: "answer ← reply.text". */
 function MappingSummary({ config }: { config: Record<string, unknown> }) {
-  if (config.reply_shape === 'gaugelab') return <p className="text-[13px]"><Badge tone="accent">standard shape</Badge> The bot replies with answer, sources, citations, tool calls and usage - nothing mapped.</p>
+  if (config.reply_shape === 'gaugelab') return <p className="text-sm"><Badge tone="accent">standard shape</Badge> The bot replies with answer, sources, citations, tool calls and usage - nothing mapped.</p>
   const resp = (config.response ?? {}) as Record<string, unknown>
   const rows: [string, string][] = []
   for (const [k, v] of Object.entries(resp)) {
@@ -98,7 +98,7 @@ function MappingSummary({ config }: { config: Record<string, unknown> }) {
     else rows.push([k, Object.entries(v as Record<string, unknown>).map(([a, b]) => `${a}: ${b}`).join(', ')])
   }
   return (
-    <dl className="grid grid-cols-[150px_minmax(0,1fr)] gap-x-3 gap-y-1 text-[13px]">
+    <dl className="grid grid-cols-[150px_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm">
       {rows.map(([k, v]) => <div key={k} className="contents"><dt className="text-ink-3">{k.replace(/_/g, ' ')}</dt><dd className="break-all font-mono text-xs">{v}</dd></div>)}
     </dl>
   )
@@ -159,7 +159,7 @@ export function TargetPage() {
                     <Segmented size="sm" value={view} onChange={setView} options={[{ id: 'seen', label: 'As GaugeLab reads it' }, { id: 'raw', label: 'Raw reply' }]} />
                     {view === 'seen' ? (
                       <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2 text-[13px]">
+                        <div className="space-y-2 text-sm">
                           <div className="rounded-lg border border-line bg-surface-2/50 px-3 py-2">{test.data.normalized.answer}</div>
                           {test.data.normalized.retrieved_documents && <div className="text-xs text-ink-2">Sources: {test.data.normalized.retrieved_documents.map((d) => <code key={d.id} className="mr-1">{d.id}</code>)}</div>}
                           {test.data.normalized.tool_calls && <div className="text-xs text-ink-2">Tools: {test.data.normalized.tool_calls.map((x, i) => <code key={i} className="mr-1">{x.name}</code>)}</div>}
@@ -173,7 +173,7 @@ export function TargetPage() {
             )}
           </Card>
           <Card title="Health" subtitle="From the latest runs of this connection">
-            <div className="grid grid-cols-3 gap-3 text-[13px]">
+            <div className="grid grid-cols-3 gap-3 text-sm">
               <div><div className="text-xs text-ink-3">Last check</div><div>{lc ? (lc.ok ? `ok - ${when(lc.at)}` : 'failed') : 'never'}</div></div>
               <div><div className="text-xs text-ink-3">Typical answer time</div><div className="num">{ms(health.data?.typical_latency_ms)}</div></div>
               <div><div className="text-xs text-ink-3">Pass rate, recent runs</div>{health.data?.runs.length ? <Sparkline values={[...health.data.runs].reverse().map((r) => r.pass_rate)} width={110} height={28} /> : <span className="text-ink-3">no runs</span>}</div>
@@ -203,7 +203,7 @@ export function TargetPage() {
           </Card>
           <Card title={`Configuration - v${v.version}`} actions={<Segmented size="sm" value={cfgView} onChange={setCfgView} options={[{ id: 'summary', label: 'Readable' }, { id: 'json', label: 'JSON' }]} />}>
             {cfgView === 'json' ? <Json value={v.config} maxHeight={420} /> : (
-              <div className="space-y-3 text-[13px]">
+              <div className="space-y-3 text-sm">
                 {'base_url' in v.config && (
                   <div className="font-mono text-xs"><Badge>{String(v.config.method ?? 'POST')}</Badge> {String(v.config.base_url)}{String(v.config.endpoint ?? '')}</div>
                 )}

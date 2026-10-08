@@ -54,7 +54,7 @@ function EvaluatorList() {
                       {e.gating ? <Badge>gating</Badge> : <Badge tone="info">diagnostic</Badge>}
                       {e.calibration && <Badge tone={e.calibration.n ? 'good' : 'warn'}>{e.calibration.status}</Badge>}
                     </div>
-                    {e.rubric && <div className="font-mono text-[11px] text-ink-3">prompt {e.rubric.prompt_hash}</div>}
+                    {e.rubric && <div className="font-mono text-label text-ink-3">prompt {e.rubric.prompt_hash}</div>}
                     {e.rubric && <button type="button" className="text-xs text-accent-ink hover:underline" onClick={() => setOpen(open === e.id ? null : e.id)}>{open === e.id ? 'Hide rubric' : 'Show rubric and prompt'}</button>}
                   </td>
                 </tr>

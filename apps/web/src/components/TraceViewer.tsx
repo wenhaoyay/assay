@@ -30,7 +30,7 @@ export function TraceViewer({ spans, showEvaluators = true }: { spans: Span[]; s
   const tokenSum = root?.usage?.total_tokens ?? modelSpans.reduce((a, s) => a + (s.usage?.total_tokens ?? 0), 0)
   const costs = spans.map((s) => s.cost_usd).filter((c): c is number => c !== null && c !== undefined)
   const totals = { tokens: tokenSum || null, cost: costs.length ? costs.reduce((a, b) => a + b, 0) : null }
-  if (!root) return <p className="text-[13px] text-ink-3">No spans recorded.</p>
+  if (!root) return <p className="text-sm text-ink-3">No spans recorded.</p>
   const t0 = root.start_time
   const total = Math.max(root.duration_ms, ...execution.map((s) => (s.end_time - t0) * 1000), 1)
   const children = execution.filter((s) => s.parent_span_id === root.span_id)
@@ -64,8 +64,8 @@ export function TraceViewer({ spans, showEvaluators = true }: { spans: Span[]; s
                   <Icon className={clsx('mt-0.5 size-3.5 shrink-0', s.status === 'error' ? 'text-bad-ink' : 'text-ink-2')} aria-hidden />
                   <span className="min-w-0">
                     <span className="flex flex-wrap items-center gap-x-2">
-                      <span className="text-[10px] font-medium uppercase tracking-wide text-ink-3">{LABEL[s.type] ?? s.type}</span>
-                      <span className={clsx('break-all text-[13px] font-medium', s.status === 'error' && 'text-bad-ink')}>{s.name}</span>
+                      <span className="text-label font-medium uppercase tracking-wide text-ink-3">{LABEL[s.type] ?? s.type}</span>
+                      <span className={clsx('break-all text-sm font-medium', s.status === 'error' && 'text-bad-ink')}>{s.name}</span>
                       {isSlow && <Badge tone="warn">slowest step</Badge>}
                     </span>
                     {s.output_summary && <span className="line-clamp-2 block text-xs text-ink-3">{s.output_summary}</span>}

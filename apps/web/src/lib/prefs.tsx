@@ -1,4 +1,4 @@
-// Viewer preferences: theme, density, motion and the plain-English "Explain" layer. Stored in
+// Viewer preferences: theme, density and motion. Stored in
 // this browser only (they are conveniences, not data), applied as attributes on <html> so CSS
 // can follow them.
 import { MotionConfig } from 'motion/react'
@@ -12,11 +12,10 @@ export interface Prefs {
   theme: Theme
   density: Density
   motion: Motion
-  explain: boolean
   annotator: string
 }
 
-const DEFAULTS: Prefs = { theme: 'light', density: 'comfortable', motion: 'full', explain: false, annotator: '' }
+const DEFAULTS: Prefs = { theme: 'light', density: 'comfortable', motion: 'full', annotator: '' }
 
 function read<K extends keyof Prefs>(key: K): Prefs[K] {
   try {
@@ -26,7 +25,6 @@ function read<K extends keyof Prefs>(key: K): Prefs[K] {
       if (key === 'annotator') return (localStorage.getItem('gl-reviewer') ?? '') as Prefs[K]
       return DEFAULTS[key]
     }
-    if (typeof DEFAULTS[key] === 'boolean') return (raw === 'true') as Prefs[K]
     return raw as Prefs[K]
   } catch {
     return DEFAULTS[key]
@@ -35,7 +33,7 @@ function read<K extends keyof Prefs>(key: K): Prefs[K] {
 
 interface PrefsApi extends Prefs {
   set: <K extends keyof Prefs>(key: K, value: Prefs[K]) => void
-  toggle: (key: 'theme' | 'density' | 'motion' | 'explain') => void
+  toggle: (key: 'theme' | 'density' | 'motion') => void
 }
 
 const Ctx = createContext<PrefsApi | null>(null)
@@ -45,7 +43,6 @@ export function PrefsProvider({ children }: { children: ReactNode }) {
     theme: (document.documentElement.dataset.theme as Theme) ?? read('theme'),
     density: read('density'),
     motion: read('motion'),
-    explain: read('explain'),
     annotator: read('annotator'),
   }))
 
@@ -65,13 +62,12 @@ export function PrefsProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const toggle = useCallback((key: 'theme' | 'density' | 'motion' | 'explain') => {
+  const toggle = useCallback((key: 'theme' | 'density' | 'motion') => {
     setPrefs((p) => {
       const next =
         key === 'theme' ? (p.theme === 'dark' ? 'light' : 'dark')
         : key === 'density' ? (p.density === 'compact' ? 'comfortable' : 'compact')
-        : key === 'motion' ? (p.motion === 'reduced' ? 'full' : 'reduced')
-        : !p.explain
+        : p.motion === 'reduced' ? 'full' : 'reduced'
       try {
         localStorage.setItem(`gl-${key}`, String(next))
       } catch {

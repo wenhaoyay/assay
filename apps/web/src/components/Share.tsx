@@ -22,7 +22,7 @@ export function ShareMenu({ runId, baselineId }: { runId: number; baselineId?: n
     setCopied(true)
     setTimeout(() => setCopied(false), 1600)
   }
-  const item = 'flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[13px] hover:bg-surface-2'
+  const item = 'flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm hover:bg-surface-2'
   return (
     <div className="relative" ref={ref}>
       <Button onClick={() => setOpen((v) => !v)} aria-expanded={open}><Share2 className="size-3.5" />Share<ChevronDown className="size-3" /></Button>

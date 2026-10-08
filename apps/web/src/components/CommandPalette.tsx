@@ -88,7 +88,6 @@ export function CommandPalette({ open, onClose, onShortcuts, onTour }: { open: b
       { id: 'a-models', group: 'Actions', label: 'Models & keys', hint: 'Grading models, API keys', icon: Sparkles, run: go('/settings?tab=models'), keywords: 'judge openai api key provider settings' },
       { id: 'a-calibrate', group: 'Actions', label: 'Label answers (calibration)', icon: Scale, run: go('/calibration'), keywords: 'judge trust human label' },
       { id: 'a-bakeoff', group: 'Actions', label: 'Judge bake-off', hint: 'Which grading model agrees with you most?', icon: Zap, run: go('/calibration?tab=bakeoff'), keywords: 'judge compare models' },
-      { id: 'a-explain', group: 'Preferences', label: prefs.explain ? 'Hide plain-English explanations' : 'Show plain-English explanations', icon: Lightbulb, run: () => { prefs.toggle('explain'); onClose() }, keywords: 'explain help jargon' },
       { id: 'a-theme', group: 'Preferences', label: prefs.theme === 'dark' ? 'Light mode' : 'Dark mode', icon: Moon, run: () => { prefs.toggle('theme'); onClose() }, keywords: 'theme dark light' },
       { id: 'a-density', group: 'Preferences', label: prefs.density === 'compact' ? 'Comfortable density' : 'Compact density', icon: Rows3, run: () => { prefs.toggle('density'); onClose() }, keywords: 'density compact rows' },
       { id: 'a-motion', group: 'Preferences', label: prefs.motion === 'reduced' ? 'Turn animations on' : 'Reduce motion', icon: Sparkles, run: () => { prefs.toggle('motion'); onClose() }, keywords: 'animation motion' },
@@ -113,7 +112,7 @@ export function CommandPalette({ open, onClose, onShortcuts, onTour }: { open: b
     }
     return out
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, results.data, prefs.explain, prefs.theme, prefs.density, prefs.motion])
+  }, [q, results.data, prefs.theme, prefs.density, prefs.motion])
 
   useEffect(() => setActive(0), [q])
 
@@ -141,20 +140,20 @@ export function CommandPalette({ open, onClose, onShortcuts, onTour }: { open: b
               <Search className="size-4 text-ink-3" aria-hidden />
               <input ref={input} value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKey}
                 placeholder="Search runs, cases, chatbots... or type a command (compare 5 6)"
-                className="h-12 flex-1 bg-transparent text-[14px] outline-none placeholder:text-ink-3" aria-label="Search" />
+                className="h-12 flex-1 bg-transparent text-base outline-none placeholder:text-ink-3" aria-label="Search" />
               <Kbd>Esc</Kbd>
             </div>
             <ul className="scroll-thin max-h-[52vh] overflow-y-auto p-2" role="listbox">
-              {items.length === 0 && <li className="px-3 py-6 text-center text-[13px] text-ink-3">{results.isFetching ? 'Searching...' : 'Nothing matches.'}</li>}
+              {items.length === 0 && <li className="px-3 py-6 text-center text-sm text-ink-3">{results.isFetching ? 'Searching...' : 'Nothing matches.'}</li>}
               {items.map((it, i) => {
                 const header = it.group !== lastGroup ? it.group : null
                 lastGroup = it.group
                 const Icon = it.icon
                 return (
                   <li key={it.id}>
-                    {header && <div className="px-3 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-ink-3">{header}</div>}
+                    {header && <div className="px-3 pb-1 pt-2 text-label font-medium uppercase tracking-wide text-ink-3">{header}</div>}
                     <button type="button" data-cmd-index={i} role="option" aria-selected={i === active} onMouseMove={() => setActive(i)} onClick={it.run}
-                      className={clsx('flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-[13px]', i === active ? 'bg-accent-wash text-ink' : 'text-ink-2')}>
+                      className={clsx('flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm', i === active ? 'bg-accent-wash text-ink' : 'text-ink-2')}>
                       <Icon className={clsx('size-4 shrink-0', i === active ? 'text-accent-ink' : 'text-ink-3')} aria-hidden />
                       <span className="min-w-0 flex-1 truncate">{it.label}</span>
                       {it.hint && <span className="truncate text-xs text-ink-3">{it.hint}</span>}
@@ -164,7 +163,7 @@ export function CommandPalette({ open, onClose, onShortcuts, onTour }: { open: b
                 )
               })}
             </ul>
-            <div className="flex items-center gap-3 border-t border-line px-4 py-2 text-[11px] text-ink-3">
+            <div className="flex items-center gap-3 border-t border-line px-4 py-2 text-label text-ink-3">
               <span className="flex items-center gap-1"><Kbd>↑</Kbd><Kbd>↓</Kbd> move</span>
               <span className="flex items-center gap-1"><Kbd>Enter</Kbd> open</span>
               <span className="ml-auto flex items-center gap-1"><Kbd>?</Kbd> all shortcuts</span>
@@ -179,7 +178,7 @@ export function CommandPalette({ open, onClose, onShortcuts, onTour }: { open: b
 export const SHORTCUTS: { group: string; keys: string[]; label: string }[] = [
   { group: 'Anywhere', keys: ['Ctrl', 'K'], label: 'Search and commands' },
   { group: 'Anywhere', keys: ['?'], label: 'This list' },
-  { group: 'Anywhere', keys: ['E'], label: 'Plain-English explanations on/off' },
+  { group: 'Anywhere', keys: ['?'], label: 'Beside a heading: what it shows and how to use it (hover or click)' },
   { group: 'Anywhere', keys: ['G', 'H'], label: 'Go home' },
   { group: 'Anywhere', keys: ['G', 'R'], label: 'Go to runs' },
   { group: 'Anywhere', keys: ['G', 'C'], label: 'Go to compare' },
@@ -209,14 +208,14 @@ export function ShortcutSheet({ open, onClose }: { open: boolean; onClose: () =>
           <motion.div role="dialog" aria-label="Keyboard shortcuts" onMouseDown={(e) => e.stopPropagation()}
             initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.97 }}
             className="w-full max-w-2xl rounded-2xl border border-line bg-surface p-5 shadow-pop">
-            <div className="mb-4 flex items-center justify-between"><h2 className="text-[15px] font-semibold">Keyboard shortcuts</h2><Kbd>Esc</Kbd></div>
+            <div className="mb-4 flex items-center justify-between"><h2 className="text-h font-semibold">Keyboard shortcuts</h2><Kbd>Esc</Kbd></div>
             <div className="grid gap-x-8 gap-y-4 sm:grid-cols-2">
               {groups.map((g) => (
                 <div key={g}>
-                  <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-ink-3">{g}</div>
+                  <div className="mb-1.5 text-label font-medium uppercase tracking-wide text-ink-3">{g}</div>
                   <ul className="space-y-1">
                     {SHORTCUTS.filter((s) => s.group === g).map((s) => (
-                      <li key={s.label} className="flex items-center justify-between gap-3 text-[13px]">
+                      <li key={s.label} className="flex items-center justify-between gap-3 text-sm">
                         <span className="text-ink-2">{s.label}</span>
                         <span className="flex gap-1">{s.keys.map((k) => <Kbd key={k}>{k}</Kbd>)}</span>
                       </li>

@@ -82,7 +82,7 @@ export function DatasetsPage() {
 function WaysToBuild() {
   return (
     <Card title="Ways to build a set" subtitle="The machine does the typing; you vouch for every case">
-      <ul className="grid gap-2 text-[13px] sm:grid-cols-2">
+      <ul className="grid gap-2 text-sm sm:grid-cols-2">
         <li><b>Approve good answers</b><span className="block text-xs text-ink-3">Open a dataset → <i>Build</i>: mark a bot's answers right or wrong; GaugeLab suggests what a correct answer must mention.</span></li>
         <li><b>Prompt kit</b><span className="block text-xs text-ink-3">Copy a ready prompt into your own ChatGPT or Claude with your documents; the result lands in the review queue.</span></li>
         <li><b>Real questions</b><span className="block text-xs text-ink-3">Upload chat history; similar questions are grouped by how often they were asked.</span></li>
@@ -124,7 +124,7 @@ function DatasetRow({ d, projects }: { d: Dataset; projects: Project[] }) {
       {(confirm || patch.isError || del.isError) && (
         <tr><td colSpan={6} className="bg-surface-2/50">
           {confirm && (
-            <div className="flex flex-wrap items-center gap-2 text-[13px]">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
               <span>Delete <b>{d.name}</b> and its {d.latest?.case_count ?? 0} question(s)? No run used it. This cannot be undone.</span>
               <Button size="sm" variant="bad" loading={del.isPending} onClick={() => del.mutate()}>Delete</Button>
               <Button size="sm" variant="ghost" onClick={() => setConfirm(false)}>Cancel</Button>
@@ -171,8 +171,8 @@ export function DatasetPage() {
             <Select aria-label="Version" value={versionId} onChange={(e) => switchTo(Number(e.target.value))} className="w-72">
               {[...d.versions].reverse().map((v) => <option key={v.id} value={v.id}>v{v.version} - {v.case_count} cases - {v.status === 'frozen' ? `frozen, used by ${v.run_count} run${v.run_count === 1 ? '' : 's'}` : 'draft'}</option>)}
             </Select>
-            <a className="inline-flex h-8 items-center gap-1.5 rounded-md border border-line-strong bg-surface px-3 text-[13px] hover:bg-surface-2" href={`/api/dataset-versions/${versionId}/export?format=yaml`}><Download className="size-3.5" /> YAML</a>
-            <a className="inline-flex h-8 items-center gap-1.5 rounded-md border border-line-strong bg-surface px-3 text-[13px] hover:bg-surface-2" href={`/api/dataset-versions/${versionId}/export?format=json`}><Download className="size-3.5" /> JSON</a>
+            <a className="inline-flex h-8 items-center gap-1.5 rounded-md border border-line-strong bg-surface px-3 text-sm hover:bg-surface-2" href={`/api/dataset-versions/${versionId}/export?format=yaml`}><Download className="size-3.5" /> YAML</a>
+            <a className="inline-flex h-8 items-center gap-1.5 rounded-md border border-line-strong bg-surface px-3 text-sm hover:bg-surface-2" href={`/api/dataset-versions/${versionId}/export?format=json`}><Download className="size-3.5" /> JSON</a>
           </>
         }
       />
@@ -312,7 +312,7 @@ function CasesPanel({ version, onEdited, matrix, focus }: { version: DatasetVers
                 <tr key={c.id} className={clsx('align-top hover:bg-surface-2/60', focus === c.id && 'bg-accent-wash')}>
                   <td className="whitespace-nowrap font-mono text-xs">{c.id}<div className="mt-0.5"><ProvenanceBadge c={c} origin={(c as TestCase & { _origin?: string })._origin} /></div></td>
                   <td className="max-w-xl"><div className="font-medium">{c.title}</div><div className="text-ink-2">{c.input.message}</div></td>
-                  <td><Badge>{c.category}</Badge><div className="mt-0.5 text-[11px] text-ink-3">{c.difficulty}</div></td>
+                  <td><Badge>{c.category}</Badge><div className="mt-0.5 text-label text-ink-3">{c.difficulty}</div></td>
                   <td><div className="flex flex-wrap gap-1">{expectedSummary(c).map((s) => <Badge key={s}>{s}</Badge>)}</div></td>
                   <td><CaseHistory matrix={matrix} caseId={c.id} /></td>
                   <td className="whitespace-nowrap"><Button size="sm" variant="ghost" onClick={() => setEditing(c)}>{version.status === 'frozen' ? 'Edit (new version)' : 'Edit'}</Button><AddVariations versionId={version.id} caseId={c.id} /></td>
@@ -388,8 +388,8 @@ export function CaseEditor({ versionId, initial, onClose, onSaved }: {
               <Select value={difficulty} onChange={(e) => setDifficulty(e.target.value)}>{['easy', 'medium', 'hard'].map((x) => <option key={x}>{x}</option>)}</Select>
             </Field>
           </div>
-          <Field label="User question"><Textarea rows={3} className="font-sans text-[13px]" value={question} onChange={(e) => setQuestion(e.target.value)} /></Field>
-          <Field label="Reference answer" hint="What a correct answer says. Used by correctness/completeness judges."><Textarea rows={3} className="font-sans text-[13px]" value={reference} onChange={(e) => setReference(e.target.value)} /></Field>
+          <Field label="User question"><Textarea rows={3} className="font-sans text-sm" value={question} onChange={(e) => setQuestion(e.target.value)} /></Field>
+          <Field label="Reference answer" hint="What a correct answer says. Used by correctness/completeness judges."><Textarea rows={3} className="font-sans text-sm" value={reference} onChange={(e) => setReference(e.target.value)} /></Field>
         </div>
         <div className="space-y-3">
           <Field label="Must mention (one per line, a|b for alternatives)"><Textarea rows={3} value={mention} onChange={(e) => setMention(e.target.value)} /></Field>
@@ -467,7 +467,7 @@ function GeneratePanel({ datasetId, versionId, onPromoted }: { datasetId: number
         <Card title="1. Reference documents">
           <input type="file" accept=".md,.txt,.json,.pdf" onChange={(e) => e.target.files?.[0] && upload.mutate(e.target.files[0])} className="block text-xs file:mr-3 file:rounded-md file:border file:border-line-strong file:bg-surface file:px-2.5 file:py-1 file:text-xs" aria-label="Upload document" />
           {upload.isError && <div className="mt-2"><ErrorState error={upload.error} /></div>}
-          <ul className="mt-3 max-h-48 space-y-1 overflow-y-auto text-[13px]">
+          <ul className="mt-3 max-h-48 space-y-1 overflow-y-auto text-sm">
             {(docs.data ?? []).map((d) => (
               <li key={d.id}>
                 <label className="flex items-center gap-2">
@@ -511,7 +511,7 @@ function GeneratePanel({ datasetId, versionId, onPromoted }: { datasetId: number
         {promote.isError && <div className="mb-3"><ErrorState error={promote.error} /></div>}
         {!reviewer && <p className="mb-3 text-xs text-warn-ink">Enter your name to approve or reject: every decision records who made it.</p>}
         {cands.isLoading ? <Loading /> : (cands.data ?? []).length === 0 ? (
-          <p className="text-[13px] text-ink-3">Nothing here.</p>
+          <p className="text-sm text-ink-3">Nothing here.</p>
         ) : (
           <ul className="space-y-3">
             {cands.data!.map((c) => (
@@ -524,8 +524,8 @@ function GeneratePanel({ datasetId, versionId, onPromoted }: { datasetId: number
                   <span className="font-mono text-xs text-ink-3">{c.document}</span>
                   {c.reviewer && <span className="text-xs text-ink-3">reviewed by {c.reviewer}</span>}
                 </div>
-                <div className="mt-2 text-[13px] font-medium">{c.case.input.message}</div>
-                <div className="mt-1 text-[13px] text-ink-2"><span className="text-ink-3">Proposed answer: </span>{c.case.expected.answer.reference ?? '-'}</div>
+                <div className="mt-2 text-sm font-medium">{c.case.input.message}</div>
+                <div className="mt-1 text-sm text-ink-2"><span className="text-ink-3">Proposed answer: </span>{c.case.expected.answer.reference ?? '-'}</div>
                 {c.evidence.map((e, i) => (
                   <div key={i} className="mt-2 rounded border-l-2 border-line-strong bg-surface-2 px-2 py-1 text-xs">
                     <span className="text-ink-3">Evidence: </span>{e.quote ? `"${e.quote}"` : '(none - declining is the expected behaviour)'}
@@ -576,7 +576,7 @@ function PlainMatchers({ onAdd }: { onAdd: (pattern: string) => void }) {
         <Input className="w-56" value={text} onChange={(e) => setText(e.target.value)} placeholder={kind === 'any' ? 'EOL, end of life' : kind === 'number' ? '91' : 'backflush'} aria-label="Rule text" onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); make() } }} />
         <Button size="sm" disabled={!text.trim()} onClick={make}>Add rule</Button>
       </div>
-      <p className="mt-1 text-[11px] text-ink-3">GaugeLab writes the pattern (shown below) so "91" does not match "910", and capitals do not matter.</p>
+      <p className="mt-1 text-label text-ink-3">GaugeLab writes the pattern (shown below) so "91" does not match "910", and capitals do not matter.</p>
     </div>
   )
 }

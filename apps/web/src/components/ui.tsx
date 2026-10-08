@@ -16,7 +16,7 @@ import {
 import { createPortal } from 'react-dom'
 import { ApiError } from '../lib/api'
 import { GLOSSARY, type GlossaryKey } from '../lib/glossary'
-import { usePrefs, useMotionOn } from '../lib/prefs'
+import { useMotionOn } from '../lib/prefs'
 
 export function Button({
   variant = 'secondary',
@@ -36,10 +36,10 @@ export function Button({
       {...rest}
       disabled={rest.disabled || loading}
       className={clsx(
-        'inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-[background-color,box-shadow,transform] duration-150 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50',
-        size === 'sm' ? 'h-7 px-2.5 text-xs' : size === 'lg' ? 'h-10 px-4 text-sm' : 'h-8 px-3 text-[13px]',
-        variant === 'primary' && 'bg-accent text-on-accent shadow-sm hover:bg-accent-strong',
-        variant === 'secondary' && 'border border-line-strong bg-surface text-ink hover:bg-surface-2',
+        'inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-[background-color,box-shadow,transform] duration-150 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50',
+        size === 'sm' ? 'h-7 px-2.5 text-xs' : size === 'lg' ? 'h-10 px-4 text-base' : 'h-8 px-3 text-sm',
+        variant === 'primary' && 'bg-accent text-on-accent shadow-[inset_0_-2px_0_rgb(0_0_0/0.2),inset_0_1px_0_rgb(255_255_255/0.22)] hover:bg-accent-strong',
+        variant === 'secondary' && 'border border-line-strong bg-surface text-ink shadow-[inset_0_-1.5px_0_color-mix(in_srgb,var(--ink)_7%,transparent)] hover:bg-surface-2',
         variant === 'ghost' && 'text-ink-2 hover:bg-surface-2 hover:text-ink',
         variant === 'danger' && 'border border-bad/40 bg-surface text-bad-ink hover:bg-bad-wash',
         variant === 'good' && 'bg-good text-white hover:bg-good/85',
@@ -56,34 +56,54 @@ export function Button({
 /** A link styled as a button (for navigation that should look like an action). */
 export const linkButton = (variant: 'primary' | 'secondary' | 'ghost' = 'secondary', size: 'sm' | 'md' = 'md') =>
   clsx(
-    'inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-colors',
-    size === 'sm' ? 'h-7 px-2.5 text-xs' : 'h-8 px-3 text-[13px]',
-    variant === 'primary' && 'bg-accent text-on-accent shadow-sm hover:bg-accent-strong',
-    variant === 'secondary' && 'border border-line-strong bg-surface text-ink hover:bg-surface-2',
+    'inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-colors',
+    size === 'sm' ? 'h-7 px-2.5 text-xs' : 'h-8 px-3 text-sm',
+    variant === 'primary' && 'bg-accent text-on-accent shadow-[inset_0_-2px_0_rgb(0_0_0/0.2),inset_0_1px_0_rgb(255_255_255/0.22)] hover:bg-accent-strong',
+    variant === 'secondary' && 'border border-line-strong bg-surface text-ink shadow-[inset_0_-1.5px_0_color-mix(in_srgb,var(--ink)_7%,transparent)] hover:bg-surface-2',
     variant === 'ghost' && 'text-ink-2 hover:bg-surface-2 hover:text-ink',
   )
 
-export function Card({ title, actions, children, className, padded = true, subtitle, id }: {
+/**
+ * A section: a heading over a rule, no box. What it shows lives behind a circled ? (``help``, or
+ * the older ``subtitle`` prop), never as a grey subtitle: subtitles read as clutter. ``meta`` is
+ * a small figure beside the heading (a count); ``boxed`` keeps a panel for content that needs one
+ * (forms, cards in a grid, side panels).
+ */
+export function Card({ title, actions, children, className, padded = true, subtitle, help, meta, boxed = false, id }: {
   title?: ReactNode
   actions?: ReactNode
   children: ReactNode
   className?: string
   padded?: boolean
   subtitle?: ReactNode
+  help?: ReactNode
+  meta?: ReactNode
+  boxed?: boolean
   id?: string
 }) {
+  const explain = help ?? subtitle
+  const heading = (title || actions) && (
+    <header className={clsx('flex min-h-10 items-center justify-between gap-3 border-b border-line', boxed ? 'px-4 py-2.5' : 'pb-2.5')}>
+      <div className="flex min-w-0 items-center gap-2">
+        {title && <h2 className={clsx('truncate font-semibold tracking-tight', boxed ? 'text-base' : 'text-h')}>{title}</h2>}
+        {explain && <Help title={typeof title === 'string' ? title : 'About this'}>{explain}</Help>}
+        {meta && <span className="num whitespace-nowrap font-mono text-xs text-ink-3">{meta}</span>}
+      </div>
+      <div className="flex shrink-0 items-center gap-2">{actions}</div>
+    </header>
+  )
+  if (boxed) {
+    return (
+      <section id={id} className={clsx('rounded-xl border border-line bg-surface shadow-card', className)}>
+        {heading}
+        <div className={clsx(padded && 'p-[var(--card-p)]')}>{children}</div>
+      </section>
+    )
+  }
   return (
-    <section id={id} className={clsx('rounded-xl border border-line bg-surface shadow-card', className)}>
-      {(title || actions) && (
-        <header className="flex min-h-11 items-center justify-between gap-3 border-b border-line px-4 py-2">
-          <div className="min-w-0">
-            <h2 className="text-[13px] font-semibold tracking-tight">{title}</h2>
-            {subtitle && <div className="text-xs text-ink-3">{subtitle}</div>}
-          </div>
-          <div className="flex shrink-0 items-center gap-2">{actions}</div>
-        </header>
-      )}
-      <div className={clsx(padded && 'p-[var(--card-p)]')}>{children}</div>
+    <section id={id} className={clsx('min-w-0', className)}>
+      {heading}
+      <div className={clsx(padded && heading && 'pt-4')}>{children}</div>
     </section>
   )
 }
@@ -100,7 +120,7 @@ export function Badge({ tone = 'neutral', children, className, title }: {
     <span
       title={title}
       className={clsx(
-        'inline-flex h-5 items-center gap-1 whitespace-nowrap rounded px-1.5 text-[11px] font-medium',
+        'inline-flex h-5 items-center gap-1 whitespace-nowrap rounded-full px-2 text-xs font-medium',
         tone === 'neutral' && 'bg-surface-2 text-ink-2',
         tone === 'good' && 'bg-good-wash text-good-ink',
         tone === 'bad' && 'bg-bad-wash text-bad-ink',
@@ -178,7 +198,7 @@ export function Field({ label, hint, children, error }: { label: ReactNode; hint
 }
 
 const control =
-  'rounded-md border border-line-strong bg-surface px-2.5 text-[13px] text-ink placeholder:text-ink-3/70 placeholder:italic focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20'
+  'rounded-md border border-line-strong bg-surface px-2.5 text-sm text-ink placeholder:text-ink-3/70 placeholder:italic focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20'
 // Full width unless the caller sets a width (Tailwind cannot order two width utilities by class order).
 const width = (className?: string) => (/(^|\s)w-/.test(className ?? '') ? '' : 'w-full')
 
@@ -209,7 +229,7 @@ export function Toggle({ checked, onChange, label, hint }: { checked: boolean; o
           className={clsx('absolute top-0.5 size-4 rounded-full bg-white shadow', checked ? 'right-0.5' : 'left-0.5')} />
       </button>
       <span>
-        <span className="text-[13px] font-medium">{label}</span>
+        <span className="text-sm font-medium">{label}</span>
         {hint && <span className="block text-xs text-ink-3">{hint}</span>}
       </span>
     </div>
@@ -231,7 +251,7 @@ export function Tabs<T extends string>({ tabs, value, onChange }: {
           type="button"
           aria-selected={value === t.id}
           onClick={() => onChange(t.id)}
-          className={clsx('relative whitespace-nowrap px-3 py-2 text-[13px] font-medium transition-colors', value === t.id ? 'text-ink' : 'text-ink-3 hover:text-ink')}
+          className={clsx('relative whitespace-nowrap px-3 py-2 text-sm font-medium transition-colors', value === t.id ? 'text-ink' : 'text-ink-3 hover:text-ink')}
         >
           {t.label}
           {value === t.id && (
@@ -256,7 +276,7 @@ export function Segmented<T extends string>({ options, value, onChange, size = '
     <div className="inline-flex rounded-lg border border-line bg-surface-2 p-0.5" role="group" aria-label={label}>
       {options.map((o) => (
         <button key={o.id} type="button" onClick={() => onChange(o.id)} aria-pressed={value === o.id}
-          className={clsx('relative rounded-md px-2.5 font-medium transition-colors', size === 'sm' ? 'h-6 text-xs' : 'h-7 text-[13px]', value === o.id ? 'text-ink' : 'text-ink-3 hover:text-ink')}>
+          className={clsx('relative rounded-md px-2.5 font-medium transition-colors', size === 'sm' ? 'h-6 text-xs' : 'h-7 text-sm', value === o.id ? 'text-ink' : 'text-ink-3 hover:text-ink')}>
           {value === o.id && <motion.span layoutId={`seg-${group}`} className="absolute inset-0 rounded-md bg-surface shadow-sm" transition={{ type: 'spring', stiffness: 500, damping: 40 }} />}
           <span className="relative">{o.label}</span>
         </button>
@@ -271,7 +291,7 @@ export function Notice({ tone = 'info', title, children, action }: { tone?: 'inf
     <div
       role={tone === 'bad' ? 'alert' : 'status'}
       className={clsx(
-        'flex gap-2.5 rounded-lg border px-3 py-2.5 text-[13px]',
+        'flex gap-2.5 rounded-lg border px-3 py-2.5 text-sm',
         tone === 'info' && 'border-accent/25 bg-info-wash',
         tone === 'warn' && 'border-warn/40 bg-warn-wash',
         tone === 'bad' && 'border-bad/30 bg-bad-wash',
@@ -324,23 +344,33 @@ export function PageSkeleton() {
   )
 }
 
+/** A gauge in line art: the empty-state drawing. */
+export function GaugeArt({ size = 64 }: { size?: number }) {
+  return (
+    <svg width={size} height={size * 0.7} viewBox="0 0 64 44" aria-hidden fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round">
+      <path d="M6 38a26 26 0 0 1 52 0" /><path d="M32 38l-11-15" /><circle cx="32" cy="38" r="2.5" />
+      <path d="M12 30l3 1M52 30l-3 1M32 13v3M19 18l2 2.5M45 18l-2 2.5" />
+    </svg>
+  )
+}
+
 export function Empty({ title, children, action, icon }: { title: string; children?: ReactNode; action?: ReactNode; icon?: ReactNode }) {
   return (
-    <div className="flex flex-col items-start gap-2 rounded-xl border border-dashed border-line-strong bg-surface/50 p-6">
-      {icon && <div className="mb-1 text-accent">{icon}</div>}
-      <div className="text-[14px] font-semibold">{title}</div>
-      {children && <div className="max-w-2xl text-[13px] text-ink-2">{children}</div>}
+    <div className="flex flex-col items-start gap-2 rounded-xl border-[1.5px] border-dashed border-line-strong p-6">
+      <div className="mb-1 text-ink-3">{icon ?? <GaugeArt size={56} />}</div>
+      <div className="text-base font-semibold">{title}</div>
+      {children && <div className="max-w-2xl text-sm text-ink-2">{children}</div>}
       {action && <div className="mt-1">{action}</div>}
     </div>
   )
 }
 
 export function Code({ children }: { children: ReactNode }) {
-  return <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[12px]">{children}</code>
+  return <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-xs">{children}</code>
 }
 
 export function Kbd({ children }: { children: ReactNode }) {
-  return <kbd className="inline-flex h-5 min-w-5 items-center justify-center rounded border border-line-strong bg-surface px-1 font-mono text-[10px] font-medium text-ink-2 shadow-[0_1px_0_var(--line-strong)]">{children}</kbd>
+  return <kbd className="inline-flex h-5 min-w-5 items-center justify-center rounded border border-line-strong bg-surface px-1 font-mono text-label font-medium text-ink-2 shadow-[0_1px_0_var(--line-strong)]">{children}</kbd>
 }
 
 export function Json({ value, maxHeight = 360 }: { value: unknown; maxHeight?: number }) {
@@ -373,7 +403,17 @@ export function CountUp({ value, format }: { value: number | null | undefined; f
   return <motion.span ref={ref} className="num">{text}</motion.span>
 }
 
-export function Stat({ label, value, sub, title, tone, hatched, numeric, format, explain }: {
+/** A row of figures separated by thin rules (no boxes). */
+export function Figs({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <div className={clsx('grid auto-cols-fr grid-flow-col border-y border-line max-lg:grid-flow-row max-lg:grid-cols-2 [&>*:not(:first-child)]:border-l [&>*]:border-line max-lg:[&>*]:border-l-0 max-lg:[&>*]:border-t', className)}>
+      {children}
+    </div>
+  )
+}
+
+/** One figure: a small-caps label, the number in mono, a line under it. Put several in <Figs>. */
+export function Stat({ label, value, sub, title, tone, hatched, numeric, format, explain, help, delta }: {
   label: ReactNode
   value?: ReactNode
   sub?: ReactNode
@@ -383,15 +423,18 @@ export function Stat({ label, value, sub, title, tone, hatched, numeric, format,
   numeric?: number | null
   format?: (v: number | null) => string
   explain?: ReactNode
+  help?: ReactNode
+  delta?: ReactNode
 }) {
+  const h = help ?? explain
   return (
-    <div className={clsx('rounded-xl border border-line bg-surface px-4 py-3 shadow-card', hatched && 'hatched')} title={title}>
-      <div className="text-xs font-medium text-ink-3">{label}</div>
-      <div className={clsx('num mt-1 text-[26px] font-semibold leading-tight tracking-tight', tone === 'good' && 'text-good-ink', tone === 'bad' && 'text-bad-ink')}>
+    <div className={clsx('min-w-0 px-4 py-3.5 first:pl-0 max-lg:first:pl-4', hatched && 'hatched')} title={title}>
+      <div className="t-label flex items-center gap-1">{label}{h && <Help title={typeof label === 'string' ? label : 'About this figure'}>{h}</Help>}</div>
+      <div className={clsx('t-fig mt-2 truncate', tone === 'good' && 'text-good-ink', tone === 'bad' && 'text-bad-ink')}>
         {numeric !== undefined && format ? <CountUp value={numeric} format={format} /> : value}
       </div>
-      {sub && <div className="num mt-0.5 text-xs text-ink-3">{sub}</div>}
-      {explain && <Explain className="mt-1.5">{explain}</Explain>}
+      {delta && <div className="num mt-1.5 font-mono text-xs">{delta}</div>}
+      {sub && <div className="mt-1 text-xs text-ink-3">{sub}</div>}
     </div>
   )
 }
@@ -399,37 +442,38 @@ export function Stat({ label, value, sub, title, tone, hatched, numeric, format,
 export function Table({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <div className={clsx('scroll-thin overflow-x-auto', className)}>
-      <table className="gl-table w-full border-collapse text-[13px] [&_td]:border-t [&_td]:border-line [&_th]:text-left [&_th]:text-xs [&_th]:font-medium [&_th]:text-ink-3">
+      <table className="gl-table w-full border-collapse text-sm [&_td]:border-t [&_td]:border-line [&_th]:text-left [&_th]:text-xs [&_th]:font-medium [&_th]:text-ink-3">
         {children}
       </table>
     </div>
   )
 }
 
-export function PageHeader({ title, description, actions, eyebrow }: { title: ReactNode; description?: ReactNode; actions?: ReactNode; eyebrow?: ReactNode }) {
+/** The page title in the display serif (one per page); what the page is for lives behind a ?. */
+export function PageHeader({ title, description, help, actions, eyebrow, children }: {
+  title: ReactNode
+  description?: ReactNode
+  help?: ReactNode
+  actions?: ReactNode
+  eyebrow?: ReactNode
+  children?: ReactNode
+}) {
+  const h = help ?? description
   return (
-    <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+    <div className="mb-7 flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
-        {eyebrow && <div className="mb-1 text-xs font-medium text-ink-3">{eyebrow}</div>}
-        <h1 className="text-[22px] font-semibold leading-tight tracking-tight">{title}</h1>
-        {description && <div className="mt-1 max-w-3xl text-[13px] text-ink-2">{description}</div>}
+        {eyebrow && <div className="t-label mb-1.5">{eyebrow}</div>}
+        <h1 className="t-title">{title}{h && <span className="ml-3 inline-block align-[0.3em]"><Help title={typeof title === 'string' ? title : 'About this page'} wide>{h}</Help></span>}</h1>
+        {children}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
   )
 }
 
-/** Plain-English text shown only when "Explain" is on (top bar switch, or the E key). */
-export function Explain({ children, className }: { children: ReactNode; className?: string }) {
-  const { explain } = usePrefs()
-  if (!explain) return null
-  return (
-    <motion.div initial={{ opacity: 0, y: -2 }} animate={{ opacity: 1, y: 0 }}
-      className={clsx('flex gap-1.5 text-xs leading-snug text-accent-ink', className)}>
-      <span aria-hidden className="mt-[5px] size-1.5 shrink-0 rounded-full bg-accent" />
-      <span>{children}</span>
-    </motion.div>
-  )
+/** Retired: explanations now live behind a circled ? (``Help``). Renders nothing. */
+export function Explain(_props: { children: ReactNode; className?: string }) {
+  return null
 }
 
 /** A term with its plain meaning on hover (always available). */
@@ -517,52 +561,70 @@ export function ProjectMark({ name, color, size = 28 }: { name: string; color?: 
 }
 
 /**
- * A circled "?" beside a label: click (or Enter) to read a short explanation; Esc or a click
- * elsewhere closes it. A span, not a button, so clicking a <label> around it still reaches the
- * control instead of opening the help.
+ * A circled "?" beside a heading or label: what it shows, how to use it, any caveat. Hover or
+ * focus shows it; a click pins it open; Esc or a click elsewhere closes it. Every subtitle and page
+ * intro lives here (grey subtitles read as clutter). A span, not a button, so clicking a <label>
+ * around it still reaches the control.
  */
-export function Help({ title, children, label = 'What is this?', wide = false }: { title: ReactNode; children: ReactNode; label?: string; wide?: boolean }) {
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
+export function Help({ title, children, label = 'What is this?', wide = false }: { title?: ReactNode; children: ReactNode; label?: string; wide?: boolean }) {
+  const [pos, setPos] = useState<{ x: number; y: number; up: boolean } | null>(null)
+  const [pinned, setPinned] = useState(false)
   const ref = useRef<HTMLSpanElement>(null)
   const pop = useRef<HTMLDivElement>(null)
-  const w = wide ? 420 : 320
-  const toggle = (e: { preventDefault: () => void; stopPropagation: () => void }) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (pos) { setPos(null); return }
+  const timer = useRef<number | undefined>(undefined)
+  const openedAt = useRef(0)
+  const w = wide ? 420 : 340
+  const place = () => {
     const r = ref.current?.getBoundingClientRect()
     if (!r) return
-    const below = r.bottom + 6
-    setPos({ x: Math.max(8, Math.min(r.left - 12, window.innerWidth - w - 8)), y: below })
+    openedAt.current = performance.now()
+    const up = r.bottom + 260 > window.innerHeight && r.top > 280
+    setPos({ x: Math.max(8, Math.min(r.left - 14, window.innerWidth - w - 8)), y: up ? r.top - 8 : r.bottom + 8, up })
+  }
+  const close = () => { window.clearTimeout(timer.current); setPos(null); setPinned(false) }
+  const hoverOpen = () => { window.clearTimeout(timer.current); timer.current = window.setTimeout(place, 120) }
+  const hoverClose = () => { if (pinned) return; window.clearTimeout(timer.current); timer.current = window.setTimeout(() => setPos(null), 180) }
+  const click = (e: { preventDefault: () => void; stopPropagation: () => void }) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (pos && pinned) { close(); return }
+    if (!pos) place()
+    setPinned(true)
   }
   useEffect(() => {
     if (!pos) return
-    const close = (e: MouseEvent | KeyboardEvent) => {
-      if (e instanceof KeyboardEvent) { if (e.key === 'Escape') setPos(null); return }
-      if (!pop.current?.contains(e.target as Node) && !ref.current?.contains(e.target as Node)) setPos(null)
+    const onDoc = (e: MouseEvent | KeyboardEvent) => {
+      if (e instanceof KeyboardEvent) { if (e.key === 'Escape') close(); return }
+      if (!pop.current?.contains(e.target as Node) && !ref.current?.contains(e.target as Node)) close()
     }
-    const away = () => setPos(null)
-    document.addEventListener('mousedown', close)
-    document.addEventListener('keydown', close)
+    const away = () => { if (performance.now() - openedAt.current > 400) close() }
+    document.addEventListener('mousedown', onDoc)
+    document.addEventListener('keydown', onDoc)
     window.addEventListener('scroll', away, true)
-    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', close); window.removeEventListener('scroll', away, true) }
+    return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onDoc); window.removeEventListener('scroll', away, true) }
   }, [pos])
+  useEffect(() => () => window.clearTimeout(timer.current), [])
   return (
     <>
-      <span ref={ref} role="button" tabIndex={0} aria-label={label} aria-expanded={!!pos} onClick={toggle}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggle(e) }}
-        className={clsx('ml-1 inline-flex size-4 cursor-pointer select-none items-center justify-center rounded-full border align-[-2px] text-[10px] font-bold leading-none transition-colors',
-          pos ? 'border-accent bg-accent text-on-accent' : 'border-ink-3/60 text-ink-3 hover:border-accent hover:text-accent-ink')}>
+      <span ref={ref} role="button" tabIndex={0} aria-label={label} aria-expanded={!!pos} onClick={click}
+        onMouseEnter={hoverOpen} onMouseLeave={hoverClose} onFocus={place} onBlur={() => { if (!pinned) setPos(null) }}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') click(e) }}
+        className={clsx('inline-flex size-[18px] shrink-0 cursor-help select-none items-center justify-center rounded-full border-[1.5px] align-middle font-sans text-label font-semibold not-italic leading-none tracking-normal transition-colors',
+          pos ? 'border-accent bg-accent-wash text-accent-ink' : 'border-line-strong text-ink-3 hover:border-accent hover:text-accent-ink')}>
         ?
       </span>
       {pos && createPortal(
-        <motion.div ref={pop} role="dialog" aria-label={typeof title === 'string' ? title : label} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.14 }}
-          className="fixed z-[85] rounded-xl border border-line bg-surface p-3.5 text-[13px] font-normal normal-case leading-relaxed tracking-normal text-ink-2 shadow-pop"
-          style={{ left: pos.x, top: pos.y, width: w, maxWidth: 'calc(100vw - 16px)' }}>
-          <div className="mb-1.5 flex items-start gap-2">
-            <div className="flex-1 font-semibold text-ink">{title}</div>
-            <button type="button" aria-label="Close" onClick={() => setPos(null)} className="text-ink-3 hover:text-ink"><X className="size-3.5" /></button>
-          </div>
+        <motion.div ref={pop} role="tooltip" aria-label={typeof title === 'string' ? title : label}
+          initial={{ opacity: 0, y: pos.up ? 4 : -4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.14 }}
+          onMouseEnter={() => window.clearTimeout(timer.current)} onMouseLeave={hoverClose}
+          className="fixed z-[85] rounded-xl border border-line bg-surface p-3.5 font-sans text-sm font-normal normal-case not-italic leading-relaxed tracking-normal text-ink-2 shadow-pop [&_p+p]:mt-2"
+          style={{ left: pos.x, top: pos.up ? undefined : pos.y, bottom: pos.up ? window.innerHeight - pos.y : undefined, width: w, maxWidth: 'calc(100vw - 16px)' }}>
+          {title && (
+            <div className="mb-1.5 flex items-start gap-2">
+              <div className="flex-1 text-base font-semibold text-ink">{title}</div>
+              {pinned && <button type="button" aria-label="Close" onClick={close} className="text-ink-3 hover:text-ink"><X className="size-3.5" /></button>}
+            </div>
+          )}
           <div className="space-y-2">{children}</div>
         </motion.div>,
         document.body,
@@ -585,7 +647,7 @@ export function Dialog({ open, onClose, title, children, width = 560 }: { open: 
       <motion.div role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined} initial={{ opacity: 0, y: 8, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.16 }}
         className="w-full rounded-2xl border border-line bg-surface shadow-pop" style={{ maxWidth: width }}>
         <div className="flex items-center gap-2 border-b border-line px-4 py-3">
-          <div className="flex-1 text-[15px] font-semibold">{title}</div>
+          <div className="flex-1 text-h font-semibold">{title}</div>
           <button type="button" aria-label="Close" onClick={onClose} className="rounded-md p-1 text-ink-3 hover:bg-surface-2 hover:text-ink"><X className="size-4" /></button>
         </div>
         <div className="p-4">{children}</div>

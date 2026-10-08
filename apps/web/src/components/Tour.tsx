@@ -92,14 +92,14 @@ export function Tour({ open, onClose }: { open: boolean; onClose: () => void }) 
             initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 400, damping: 32 }}
             className="fixed w-[380px] rounded-2xl border border-line bg-surface p-4 shadow-pop" style={{ top: bubbleTop, left: bubbleLeft }}>
             <div className="mb-1 flex items-center justify-between">
-              <span className="text-[11px] font-medium uppercase tracking-wide text-accent-ink">Tour - {i + 1} of {steps.length}</span>
+              <span className="text-label font-medium uppercase tracking-wide text-accent-ink">Tour - {i + 1} of {steps.length}</span>
               <button type="button" onClick={onClose} aria-label="End tour" className="text-ink-3 hover:text-ink"><X className="size-4" /></button>
             </div>
-            <h3 className="text-[15px] font-semibold">{step.title}</h3>
-            <p className="mt-1 text-[13px] text-ink-2">{step.body}</p>
+            <h3 className="text-h font-semibold">{step.title}</h3>
+            <p className="mt-1 text-sm text-ink-2">{step.body}</p>
             <div className="mt-3 flex items-center gap-2">
               <div className="flex gap-1">{steps.map((_, k) => <span key={k} className={k === i ? 'h-1.5 w-4 rounded-full bg-accent' : 'size-1.5 rounded-full bg-line-strong'} />)}</div>
-              <span className="ml-auto flex items-center gap-1 text-[11px] text-ink-3 max-sm:hidden"><Kbd>←</Kbd><Kbd>→</Kbd></span>
+              <span className="ml-auto flex items-center gap-1 text-label text-ink-3 max-sm:hidden"><Kbd>←</Kbd><Kbd>→</Kbd></span>
               <Button size="sm" variant="ghost" disabled={i === 0} onClick={() => setI(i - 1)}><ArrowLeft className="size-3.5" /></Button>
               {i < steps.length - 1
                 ? <Button size="sm" variant="primary" onClick={() => setI(i + 1)}>Next <ArrowRight className="size-3.5" /></Button>

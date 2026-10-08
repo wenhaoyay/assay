@@ -67,13 +67,13 @@ function RunPicker({ runs, value, onChange, side }: { runs: RunHeader[]; value: 
           side === 'baseline' ? 'border-series-1/40' : 'border-series-2/40')}>
         <span className={clsx('size-2.5 shrink-0 rounded-sm', side === 'baseline' ? 'bg-series-1' : 'bg-series-2')} />
         <span className="min-w-0 flex-1">
-          <span className="block text-[11px] font-medium uppercase tracking-wide text-ink-3">{side}</span>
+          <span className="block text-label font-medium uppercase tracking-wide text-ink-3">{side}</span>
           {cur ? (
             <>
-              <span className="block truncate text-[13px] font-medium"><span className="font-mono">#{cur.id}</span> {cur.experiment}</span>
+              <span className="block truncate text-sm font-medium"><span className="font-mono">#{cur.id}</span> {cur.experiment}</span>
               <span className="block truncate text-xs text-ink-3">{cur.target} v{cur.target_version} - {cur.variant_label} - {cur.n_cases} x {cur.trials_per_case} - judge {cur.judge ? (cur.judge.provider === 'heuristic' ? 'heuristic' : cur.judge.model) : 'none'}</span>
             </>
-          ) : <span className="block text-[13px] text-ink-3">Choose a run...</span>}
+          ) : <span className="block text-sm text-ink-3">Choose a run...</span>}
         </span>
         {cur?.gate_status && <StatusBadge status={cur.gate_status} />}
         <ChevronDown className="size-4 text-ink-3" />
@@ -88,7 +88,7 @@ function RunPicker({ runs, value, onChange, side }: { runs: RunHeader[]; value: 
                 <li key={r.id}>
                   <button type="button" onClick={() => { onChange(r.id); setOpen(false) }}
                     className={clsx('w-full rounded-lg px-2.5 py-1.5 text-left hover:bg-surface-2', r.id === value && 'bg-accent-wash')}>
-                    <div className="text-[13px]"><span className="font-mono text-xs">#{r.id}</span> {r.experiment}</div>
+                    <div className="text-sm"><span className="font-mono text-xs">#{r.id}</span> {r.experiment}</div>
                     <div className="text-xs text-ink-3">{r.target} - {r.n_cases} cases - {pct(r.metrics.overall_pass_rate)} - judge {r.judge ? (r.judge.provider === 'heuristic' ? 'heuristic' : r.judge.model) : 'none'}</div>
                   </button>
                 </li>
@@ -181,13 +181,13 @@ function CompareView({ c }: { c: Comparison }) {
         <div className="grid items-center gap-5 p-5 md:grid-cols-[auto_minmax(0,1fr)]">
           <div className="flex flex-col items-center">
             <VerdictNeedle delta={overall?.delta ?? null} low={overall?.ci?.ci_low} high={overall?.ci?.ci_high} label={verdict.text} />
-            <span className="flex w-[168px] justify-between px-2 text-[10px] text-ink-3"><span>worse</span><span>better</span></span>
+            <span className="flex w-[168px] justify-between px-2 text-label text-ink-3"><span>worse</span><span>better</span></span>
             <span className="num mt-1 text-xs text-ink-3">pass rate {pct(overall?.baseline)} → <b className="text-ink">{pct(overall?.candidate)}</b></span>
           </div>
           <div>
             <div className="text-xs font-medium text-ink-3">{c.n_shared_cases} questions in both runs</div>
-            <p className={clsx('mt-1 text-[18px] font-semibold leading-snug', verdict.tone === 'good' && 'text-good-ink', verdict.tone === 'bad' && 'text-bad-ink')} data-testid="verdict">{verdict.text}</p>
-            <p className="mt-2 text-[13px] text-ink-2">
+            <p className={clsx('mt-1 text-h font-semibold leading-snug', verdict.tone === 'good' && 'text-good-ink', verdict.tone === 'bad' && 'text-bad-ink')} data-testid="verdict">{verdict.text}</p>
+            <p className="mt-2 text-sm text-ink-2">
               Of {mc.both_pass + mc.both_fail + mc.only_baseline + mc.only_candidate} questions, {mc.both_pass} pass in both and {mc.both_fail} fail in both;
               {' '}<b className="text-bad-ink">{mc.only_baseline}</b> passed only before and <b className="text-good-ink">{mc.only_candidate}</b> pass only now.
               {' '}<Term k="mcnemar">McNemar</Term> {mc.p_value === null ? 'n/a' : `p = ${mc.p_value.toFixed(3)}`}
@@ -261,7 +261,7 @@ function CompareView({ c }: { c: Comparison }) {
 
 function CaseList({ items, c, kind }: { items: CaseChange[]; c: Comparison; kind: 'regression' | 'improvement' }) {
   const [open, setOpen] = useState<string | null>(null)
-  if (!items.length) return <p className="p-4 text-[13px] text-ink-3">None.</p>
+  if (!items.length) return <p className="p-4 text-sm text-ink-3">None.</p>
   return (
     <ul className="divide-y divide-line">
       {items.map((x) => (
@@ -270,7 +270,7 @@ function CaseList({ items, c, kind }: { items: CaseChange[]; c: Comparison; kind
             className="flex w-full items-start gap-2 px-4 py-2.5 text-left hover:bg-surface-2">
             <ChevronRight className={clsx('mt-0.5 size-4 shrink-0 text-ink-3 transition-transform', open === x.case_id && 'rotate-90')} />
             <span className="min-w-0 flex-1">
-              <span className="flex items-center gap-2 text-[13px]"><span className="font-mono text-xs">{x.case_id}</span><span className="truncate">{x.title}</span><Badge className="ml-auto">{x.category}</Badge></span>
+              <span className="flex items-center gap-2 text-sm"><span className="font-mono text-xs">{x.case_id}</span><span className="truncate">{x.title}</span><Badge className="ml-auto">{x.category}</Badge></span>
               <span className="num mt-0.5 block text-xs text-ink-2">
                 pass rate {pct(x.baseline_pass_rate, 0)} → <span className={kind === 'regression' ? 'text-bad-ink' : 'text-good-ink'}>{pct(x.candidate_pass_rate, 0)}</span>
                 {kind === 'regression' && x.candidate_failure_types.length > 0 && <> - now: {x.candidate_failure_types.map((f) => FAILURE_LABELS[f] ?? f).join(', ')}</>}
@@ -320,7 +320,7 @@ function SideBySide({ caseId, c }: { caseId: string; c: Comparison }) {
           </div>
           {ts[0] ? (
             <>
-              <div className="line-clamp-6 whitespace-pre-wrap text-[13px] leading-relaxed"><HighlightedAnswer text={ts[0].answer} good={[]} bad={[]} /></div>
+              <div className="line-clamp-6 whitespace-pre-wrap text-sm leading-relaxed"><HighlightedAnswer text={ts[0].answer} good={[]} bad={[]} /></div>
               <div className="mt-2 flex flex-wrap gap-1">
                 {ts[0].status === 'passed' ? <Badge tone="good"><Check className="size-3" />all checks passed</Badge> : ts[0].failed_evaluators.map((e) => <Badge key={e} tone="bad"><X className="size-3" />{e}</Badge>)}
               </div>

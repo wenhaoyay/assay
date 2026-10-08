@@ -96,7 +96,7 @@ export function RunPage() {
         tabs={[
           { id: 'summary', label: 'Summary' },
           { id: 'cases', label: 'Cases' },
-          { id: 'failures', label: <>Failures{s ? <span className="ml-1 rounded bg-bad-wash px-1 text-[11px] text-bad-ink">{s.failed_trials}</span> : null}</> },
+          { id: 'failures', label: <>Failures{s ? <span className="ml-1 rounded bg-bad-wash px-1 text-label text-bad-ink">{s.failed_trials}</span> : null}</> },
           { id: 'metrics', label: 'Metrics' },
           { id: 'traces', label: 'Traces' },
           { id: 'config', label: 'Config' },
@@ -142,7 +142,7 @@ function LiveRun({ r }: { r: RunHeader }) {
   const p = r.progress_total ? r.progress_done / r.progress_total : 0
   return (
     <div className="mb-5 rounded-xl border border-accent/30 bg-surface p-4 shadow-card">
-      <div className="mb-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-[13px]">
+      <div className="mb-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm">
         <span className="font-semibold">{r.status === 'queued' ? 'Queued' : 'Running'}</span>
         <span className="num text-ink-2">{r.progress_done} / {r.progress_total} trials</span>
         <span className="num text-good-ink">{passed} passed</span>
@@ -186,7 +186,7 @@ function GateCard({ r }: { r: RunDetail }) {
         <div className="space-y-1.5">
           {latest.results.gates.map((g, i) => (
             <motion.div key={g.gate} initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.25 + i * 0.05 }}
-              className="flex items-center justify-between gap-2 text-[13px]">
+              className="flex items-center justify-between gap-2 text-sm">
               <span className="flex items-center gap-2"><StatusBadge status={g.status} /><code className="text-xs">{g.gate}</code></span>
               <span className="num text-xs text-ink-2">
                 {g.value === null ? (g.reason ?? 'n/a') : g.kind === 'relative'
@@ -197,7 +197,7 @@ function GateCard({ r }: { r: RunDetail }) {
           ))}
           {latest.status === 'INCOMPLETE' && <p className="text-xs text-warn-ink">Some rules could not be evaluated, so this run is not a PASS.</p>}
         </div>
-      ) : <p className="text-[13px] text-ink-3">No gate applied yet.</p>}
+      ) : <p className="text-sm text-ink-3">No gate applied yet.</p>}
       <button type="button" onClick={() => setOpen((v) => !v)} className="mt-3 flex items-center gap-1 text-xs font-medium text-accent-ink">
         <ChevronRight className={clsx('size-3.5 transition-transform', open && 'rotate-90')} />{latest ? 'Check against another gate or baseline' : 'Apply a gate'}
       </button>
@@ -243,11 +243,11 @@ function SummaryTab({ r, s, prev }: { r: RunDetail; s: RunSummary; prev: RunHead
         <GateCard r={r} />
         <Card title="Consistency over repeated tries">
           {s.trials_per_case < 2 ? (
-            <p className="text-[13px] text-ink-3">One try per question. Run 3 or more tries to see whether the bot is consistent.</p>
+            <p className="text-sm text-ink-3">One try per question. Run 3 or more tries to see whether the bot is consistent.</p>
           ) : (
             <>
               {kHi && (
-                <p className="mb-3 text-[13px]">
+                <p className="mb-3 text-sm">
                   Right <b>at least once</b> in {kHi.k} tries: <b className="num">{pct(kHi.pass_at_k)}</b>.
                   Right <b>every time</b>: <b className="num">{pct(kHi.pass_hat_k)}</b>.
                   {kHi.pass_at_k !== null && kHi.pass_hat_k !== null && kHi.pass_at_k - kHi.pass_hat_k > 0.02 && <span className="text-warn-ink"> The gap is flakiness.</span>}
@@ -297,9 +297,9 @@ export function CaseTable({ groups, showChecks = true, keyboard = true, highligh
             className={clsx('cursor-pointer align-top hover:bg-surface-2/60', active === i && 'kb-active', highlight === g.case_id && 'bg-accent-wash')}>
             <td className="whitespace-nowrap">
               <Link className="font-mono text-xs text-accent-ink hover:underline" to={`/trials/${(g.firstFailing ?? g.trials[0]).id}`} onClick={(e) => e.stopPropagation()}>{g.case_id}</Link>
-              {g.category && <div className="text-[11px] text-ink-3">{g.category}</div>}
+              {g.category && <div className="text-label text-ink-3">{g.category}</div>}
             </td>
-            <td className="max-w-md"><div className="line-clamp-2 text-[13px]">{g.question ?? g.title}</div></td>
+            <td className="max-w-md"><div className="line-clamp-2 text-sm">{g.question ?? g.title}</div></td>
             <td className="whitespace-nowrap">
               <div className="flex items-center gap-2"><DotStrip statuses={g.statuses} /><Consistency statuses={g.statuses} /></div>
             </td>
@@ -347,7 +347,7 @@ function CasesTab({ runId }: { runId: number }) {
         {caseId && <Button size="sm" variant="ghost" onClick={() => set('case', '')}>Case {caseId} ×</Button>}
         <span className="ml-auto text-xs text-ink-3">{rows.length} cases, {q.data?.length ?? 0} tries</span>
       </div>
-      <Card padded={false}>{q.isLoading ? <Loading /> : q.isError ? <ErrorState error={q.error} /> : rows.length === 0 ? <p className="p-4 text-[13px] text-ink-3">No case matches.</p> : <CaseTable groups={rows} highlight={caseId || null} causes={causes.data?.by_trial} />}</Card>
+      <Card padded={false}>{q.isLoading ? <Loading /> : q.isError ? <ErrorState error={q.error} /> : rows.length === 0 ? <p className="p-4 text-sm text-ink-3">No case matches.</p> : <CaseTable groups={rows} highlight={caseId || null} causes={causes.data?.by_trial} />}</Card>
     </div>
   )
 }
@@ -421,7 +421,7 @@ function MetricsTab({ s, heuristic }: { s: RunSummary; heuristic: boolean }) {
                     <td>
                       <span className="font-medium">{info[id]?.name ?? id}</span>
                       {!m.gating && <span className="ml-1 text-xs text-ink-3">(<Term k="gating">diagnostic</Term>)</span>}
-                      <span className="ml-1.5 font-mono text-[10px] text-ink-3">v{m.version}</span>
+                      <span className="ml-1.5 font-mono text-label text-ink-3">v{m.version}</span>
                       {info[id]?.calibration && <div className="text-xs text-ink-3">{heur ? 'heuristic judge' : info[id].calibration!.status}</div>}
                     </td>
                     <td className="num text-right">{pct(m.pass_rate)}</td>
@@ -465,13 +465,13 @@ function TracesTab({ runId }: { runId: number }) {
         </ul>
       </Card>
       <Card title={trial.data ? <>Trace - <span className="font-mono">{trial.data.case_id}</span> try {trial.data.trial_index + 1}</> : 'Trace'} actions={pick && <Button size="sm" onClick={() => nav(`/trials/${pick}`, { viewTransition: true })}>Open trial</Button>}>
-        {pick === null ? <p className="text-[13px] text-ink-3">No tries recorded.</p> : trial.isLoading ? <Loading /> : trial.data?.trace ? (
+        {pick === null ? <p className="text-sm text-ink-3">No tries recorded.</p> : trial.isLoading ? <Loading /> : trial.data?.trace ? (
           <div className="space-y-3">
-            <div className="text-[13px]"><span className="text-ink-3">Question: </span>{trial.data.question}</div>
+            <div className="text-sm"><span className="text-ink-3">Question: </span>{trial.data.question}</div>
             <TraceViewer spans={trial.data.trace.spans} />
-            <div className="rounded-lg bg-surface-2/60 p-3 text-[13px]"><span className="text-ink-3">Answer: </span>{trial.data.answer}</div>
+            <div className="rounded-lg bg-surface-2/60 p-3 text-sm"><span className="text-ink-3">Answer: </span>{trial.data.answer}</div>
           </div>
-        ) : <p className="text-[13px] text-ink-3">No trace stored.</p>}
+        ) : <p className="text-sm text-ink-3">No trace stored.</p>}
       </Card>
     </div>
   )
@@ -489,7 +489,7 @@ function ConfigTab({ r }: { r: RunDetail }) {
   return (
     <div className="space-y-4">
       <Card title="Re-grade these answers">
-        <p className="mb-3 text-[13px] text-ink-2">Grade the stored answers again without asking the bot: after changing a rubric, a threshold, or to see what a different grading model says. The result is a new run linked to this one; this run keeps its grades.</p>
+        <p className="mb-3 text-sm text-ink-2">Grade the stored answers again without asking the bot: after changing a rubric, a threshold, or to see what a different grading model says. The result is a new run linked to this one; this run keeps its grades.</p>
         <div className="flex flex-wrap items-end gap-2">
           <Field label="Grading model">
             <Select className="w-72" value={judge} onChange={(e) => setJudge(e.target.value)} aria-label="Re-grade with">

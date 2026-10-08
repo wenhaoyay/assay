@@ -58,7 +58,7 @@ export function ProjectPage() {
                     const max = h.top_failures[0].count
                     return (
                       <li key={f.type}>
-                        <Link to={`/runs/${latest.id}?tab=failures&failure=${f.type}`} viewTransition className="group grid grid-cols-[150px_minmax(0,1fr)_32px] items-center gap-2 text-[13px]">
+                        <Link to={`/runs/${latest.id}?tab=failures&failure=${f.type}`} viewTransition className="group grid grid-cols-[150px_minmax(0,1fr)_32px] items-center gap-2 text-sm">
                           <span className="truncate group-hover:underline">{FAILURE_LABELS[f.type] ?? f.type}</span>
                           <span className="h-2 rounded-full bg-surface-2"><motion.span className="block h-full rounded-full bg-bad/70" initial={{ width: 0 }} animate={{ width: `${(f.count / max) * 100}%` }} transition={{ type: 'spring', stiffness: 120, damping: 20 }} /></span>
                           <span className="num text-right text-xs text-ink-2">{f.count}</span>
@@ -87,7 +87,7 @@ export function ProjectPage() {
                       <Link to={`/targets/${t.id}`} viewTransition className="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-2">
                         <HealthDot check={t.last_check} />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-[13px] font-medium">{t.name} <span className="font-normal text-ink-3">v{t.version}</span></span>
+                          <span className="block truncate text-sm font-medium">{t.name} <span className="font-normal text-ink-3">v{t.version}</span></span>
                           <span className="block truncate text-xs text-ink-3">{t.variant_label || t.adapter}</span>
                         </span>
                         {t.local_judges_only && <Badge tone="accent">local judges only</Badge>}
@@ -100,7 +100,7 @@ export function ProjectPage() {
               <Card title="Datasets" padded={false}>
                 <ul className="divide-y divide-line">
                   {h.datasets.map((d) => (
-                    <li key={d.id}><Link to={`/datasets/${d.id}`} viewTransition className="flex items-center justify-between px-4 py-2.5 text-[13px] hover:bg-surface-2"><span className="font-medium">{d.name}</span><span className="num text-xs text-ink-3">{d.cases} cases - {d.versions} version(s)</span></Link></li>
+                    <li key={d.id}><Link to={`/datasets/${d.id}`} viewTransition className="flex items-center justify-between px-4 py-2.5 text-sm hover:bg-surface-2"><span className="font-medium">{d.name}</span><span className="num text-xs text-ink-3">{d.cases} cases - {d.versions} version(s)</span></Link></li>
                   ))}
                 </ul>
               </Card>
@@ -123,7 +123,7 @@ function VerdictCard({ h }: { h: ProjectHome }) {
   if (!v) {
     return (
       <Card title="Verdict">
-        <p className="text-[13px] text-ink-2">Only one comparable run so far (#{h.latest_run?.id}). Run another version on the same questions, checks and judge to see whether it got better.</p>
+        <p className="text-sm text-ink-2">Only one comparable run so far (#{h.latest_run?.id}). Run another version on the same questions, checks and judge to see whether it got better.</p>
       </Card>
     )
   }
@@ -134,15 +134,15 @@ function VerdictCard({ h }: { h: ProjectHome }) {
       <div className="grid items-center gap-5 p-5 md:grid-cols-[auto_minmax(0,1fr)]">
         <div className="flex flex-col items-center">
           <VerdictNeedle delta={o?.delta ?? null} low={o?.ci?.ci_low} high={o?.ci?.ci_high} label={s.text} />
-          <span className="flex w-[168px] justify-between px-2 text-[10px] text-ink-3"><span>worse</span><span>better</span></span>
+          <span className="flex w-[168px] justify-between px-2 text-label text-ink-3"><span>worse</span><span>better</span></span>
             <span className="num mt-1 text-xs text-ink-3">pass rate {pct(o?.baseline)} → <b className="text-ink">{pct(o?.candidate)}</b></span>
         </div>
         <div className="min-w-0">
           <div className="text-xs font-medium text-ink-3">Latest run <Link className="font-mono text-accent-ink hover:underline" to={`/runs/${v.candidate_run_id}`}>#{v.candidate_run_id}</Link> vs the previous comparable run <Link className="font-mono text-accent-ink hover:underline" to={`/runs/${v.baseline_run_id}`}>#{v.baseline_run_id}</Link>, {v.n_shared_cases} shared cases</div>
-          <p className={clsx('mt-1 text-[17px] font-semibold leading-snug', s.tone === 'good' && 'text-good-ink', s.tone === 'bad' && 'text-bad-ink')}>{s.text}</p>
+          <p className={clsx('mt-1 text-h font-semibold leading-snug', s.tone === 'good' && 'text-good-ink', s.tone === 'bad' && 'text-bad-ink')}>{s.text}</p>
           <Explain className="mt-1">The grey arc on the gauge is the 95% interval of the change. If it covers the middle (no change), the difference could be chance.</Explain>
           <div className="mt-4"><DeltaList rows={v.rows} /></div>
-          <Link to={`/compare?baseline=${v.baseline_run_id}&candidate=${v.candidate_run_id}`} viewTransition className="mt-3 inline-flex items-center gap-1 text-[13px] font-medium text-accent-ink hover:underline">
+          <Link to={`/compare?baseline=${v.baseline_run_id}&candidate=${v.candidate_run_id}`} viewTransition className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-accent-ink hover:underline">
             Every metric, every case <ArrowRight className="size-3.5" />
           </Link>
         </div>

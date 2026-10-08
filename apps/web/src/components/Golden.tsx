@@ -113,7 +113,7 @@ export function BuildPanel({ dataset, version, project, onEdited }: { dataset: D
           <ToolTile icon={Keyboard} title="Expert interview" body="One question at a time: what must a right answer say, and never say? Keyboard only." onClick={() => setTool('interview')} />
           <a href="/api/datasets/template.csv" className="rounded-xl border border-line p-3 text-left transition-colors hover:border-accent/60">
             <Users className="size-4 text-accent-ink" />
-            <div className="mt-1.5 text-[13px] font-semibold">Spreadsheet for colleagues</div>
+            <div className="mt-1.5 text-sm font-semibold">Spreadsheet for colleagues</div>
             <div className="text-xs text-ink-3">A CSV template with examples, filled in Excel; import it on the Datasets page.</div>
           </a>
         </div>
@@ -135,7 +135,7 @@ function ToolTile({ icon: Icon, title, body, onClick }: { icon: typeof Users; ti
   return (
     <button type="button" onClick={onClick} className="rounded-xl border border-line p-3 text-left transition-colors hover:border-accent/60">
       <Icon className="size-4 text-accent-ink" />
-      <div className="mt-1.5 text-[13px] font-semibold">{title}</div>
+      <div className="mt-1.5 text-sm font-semibold">{title}</div>
       <div className="text-xs text-ink-3">{body}</div>
     </button>
   )
@@ -155,7 +155,7 @@ function CoverageCard({ versionId }: { versionId: number }) {
       {!c ? <Loading rows={3} /> : (
         <div className="space-y-2">
           {c.kinds.map((k) => (
-            <div key={k.id} className="grid grid-cols-[minmax(0,1fr)_120px_60px] items-center gap-2 text-[13px]">
+            <div key={k.id} className="grid grid-cols-[minmax(0,1fr)_120px_60px] items-center gap-2 text-sm">
               <span>{k.label}</span>
               <ProgressBar value={Math.min(1, k.count / k.target)} tone={k.count >= k.target ? 'good' : 'accent'} />
               <span className="num text-right text-xs text-ink-3">{k.count}/{k.target}</span>
@@ -181,10 +181,10 @@ export function ChecksCard({ versionId }: { versionId: number }) {
   const issues = lint.data?.issues ?? []
   return (
     <Card title="Checks on this set" subtitle="Weak cases make a set look stricter (or kinder) than it is">
-      {lint.isLoading ? <Loading rows={3} /> : issues.length === 0 ? <p className="text-[13px] text-good-ink"><Check className="mr-1 inline size-4" />No weak cases found.</p> : (
+      {lint.isLoading ? <Loading rows={3} /> : issues.length === 0 ? <p className="text-sm text-good-ink"><Check className="mr-1 inline size-4" />No weak cases found.</p> : (
         <ul className="scroll-thin max-h-64 space-y-1.5 overflow-y-auto">
           {issues.map((i, k) => (
-            <li key={k} className="flex items-start gap-2 text-[13px]">
+            <li key={k} className="flex items-start gap-2 text-sm">
               <Badge tone={i.kind === 'always_fails' || i.kind === 'match_all' || i.kind === 'bad_pattern' ? 'bad' : 'warn'}>{ISSUE_LABEL[i.kind] ?? i.kind}</Badge>
               <span><Link className="font-mono text-xs text-accent-ink underline" to={`?tab=cases&case=${encodeURIComponent(i.case_id)}`}>{i.case_id}</Link> {i.message}</span>
             </li>
@@ -274,9 +274,9 @@ function AnswerReview({ dataset, version, onEdited }: { dataset: Dataset; versio
             <AnimatePresence mode="wait">
               <motion.div key={card.id} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.16 }} className="rounded-xl border border-line bg-surface-2/40 p-4">
                 <div className="text-xs font-medium text-ink-3">Question</div>
-                <div className="text-[14px] font-medium">{card.question}</div>
+                <div className="text-base font-medium">{card.question}</div>
                 <div className="mt-3 text-xs font-medium text-ink-3">The bot answered</div>
-                <div className="scroll-thin max-h-56 overflow-y-auto whitespace-pre-wrap text-[13px] text-ink-2">{card.answer}</div>
+                <div className="scroll-thin max-h-56 overflow-y-auto whitespace-pre-wrap text-sm text-ink-2">{card.answer}</div>
               </motion.div>
             </AnimatePresence>
             {mode === 'judge' && (
@@ -288,7 +288,7 @@ function AnswerReview({ dataset, version, onEdited }: { dataset: Dataset; versio
             )}
             {mode === 'right' && (
               <div className="mt-3 space-y-2">
-                <div className="text-[13px] font-medium">Which phrases must a correct answer contain?</div>
+                <div className="text-sm font-medium">Which phrases must a correct answer contain?</div>
                 <TermChips text={card.answer} picked={chips} onToggle={toggle} />
                 <label className="flex items-center gap-2 text-xs"><input type="checkbox" className="accent-[var(--accent)]" checked={keepRef} onChange={(e) => setKeepRef(e.target.checked)} />Keep this answer as the reference answer</label>
                 <div className="flex gap-2"><Button variant="primary" loading={add.isPending || update.isPending} onClick={save}><Check className="size-3.5" />{existing ? "Save expectations" : "Add case"}</Button><Button variant="ghost" onClick={() => setMode('judge')}>Back</Button></div>
@@ -297,7 +297,7 @@ function AnswerReview({ dataset, version, onEdited }: { dataset: Dataset; versio
             {mode === 'wrong' && (
               <div className="mt-3 space-y-2">
                 <Field label="What should it have said? (one line)" hint="This becomes a case the current bot fails: the most valuable kind.">
-                  <Textarea rows={2} className="font-sans text-[13px]" value={correction} autoFocus onChange={(e) => setCorrection(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && correction.trim()) { e.preventDefault(); save() } }} />
+                  <Textarea rows={2} className="font-sans text-sm" value={correction} autoFocus onChange={(e) => setCorrection(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && correction.trim()) { e.preventDefault(); save() } }} />
                 </Field>
                 <TermChips text={correction} picked={chips} onToggle={toggle} />
                 <div className="flex gap-2"><Button variant="primary" disabled={!correction.trim()} loading={add.isPending || update.isPending} onClick={save}><Check className="size-3.5" />{existing ? "Save expectations" : "Add case"}</Button><Button variant="ghost" onClick={() => setMode('judge')}>Back</Button></div>
@@ -355,7 +355,7 @@ function PromptKit({ dataset, project }: { dataset: Dataset; project?: Project }
   })
   return (
     <div className="space-y-3">
-      <ol className="list-decimal space-y-0.5 pl-5 text-[13px] text-ink-2">
+      <ol className="list-decimal space-y-0.5 pl-5 text-sm text-ink-2">
         <li>Copy the prompt into your own ChatGPT or Claude (one your organisation allows), and attach the documents.</li>
         <li>Save its CSV answer as a file.</li>
         <li>Upload it below: the cases enter the <b>review queue</b> as AI-drafted, and only those you approve join the set.</li>
@@ -402,7 +402,7 @@ function RealQuestions({ version, onEdited }: { version: DatasetVersion; onEdite
   }
   return (
     <div className="space-y-3">
-      <p className="text-[13px] text-ink-2">The questions users actually ask are the best test cases. Upload chat history (JSONL or JSON with a question field, a CSV with a question column, or one question per line); similar questions are grouped and counted.</p>
+      <p className="text-sm text-ink-2">The questions users actually ask are the best test cases. Upload chat history (JSONL or JSON with a question field, a CSV with a question column, or one question per line); similar questions are grouped and counted.</p>
       <input type="file" accept=".jsonl,.ndjson,.json,.csv,.txt" aria-label="Chat history file" onChange={(e) => { const f = e.target.files?.[0]; if (f) group.mutate(f) }} className="block w-full text-xs file:mr-3 file:rounded-md file:border file:border-line-strong file:bg-surface file:px-2.5 file:py-1 file:text-xs" />
       {group.isPending && <Loading rows={3} />}
       {group.isError && <ErrorState error={group.error} />}
@@ -412,7 +412,7 @@ function RealQuestions({ version, onEdited }: { version: DatasetVersion; onEdite
           <ul className="scroll-thin max-h-80 space-y-1 overflow-y-auto rounded-lg border border-line p-2">
             {group.data.groups.map((g) => (
               <li key={g.question}>
-                <label className="flex items-start gap-2 rounded px-1 py-0.5 text-[13px] hover:bg-surface-2">
+                <label className="flex items-start gap-2 rounded px-1 py-0.5 text-sm hover:bg-surface-2">
                   <input type="checkbox" className="mt-0.5 accent-[var(--accent)]" checked={picked.includes(g.question)} onChange={() => setPicked((p) => (p.includes(g.question) ? p.filter((x) => x !== g.question) : [...p, g.question]))} />
                   <span className="flex-1">{g.question}{g.examples.length > 1 && <span className="block text-xs text-ink-3">also: {g.examples.slice(1, 3).join(' · ')}</span>}</span>
                   <Badge tone={g.count > 1 ? 'accent' : 'neutral'}>{g.count}x</Badge>
@@ -451,12 +451,12 @@ function Interview({ version, onEdited }: { version: DatasetVersion; onEdited: (
   }
   return (
     <div className="space-y-3" onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) save() }}>
-      <p className="text-[13px] text-ink-2">For someone who knows the subject: one question at a time, no YAML. <Kbd>Ctrl</Kbd>+<Kbd>Enter</Kbd> saves and starts the next.{count ? <b className="ml-1 text-good-ink">{count} saved</b> : null}</p>
+      <p className="text-sm text-ink-2">For someone who knows the subject: one question at a time, no YAML. <Kbd>Ctrl</Kbd>+<Kbd>Enter</Kbd> saves and starts the next.{count ? <b className="ml-1 text-good-ink">{count} saved</b> : null}</p>
       <Field label="A question users ask"><Input autoFocus value={q} onChange={(e) => setQ(e.target.value)} aria-label="Interview question" /></Field>
       <Field label="What MUST a correct answer say? (comma-separated)"><Input value={must} onChange={(e) => setMust(e.target.value)} aria-label="Must say" placeholder="e.g. ZP17, backflush" /></Field>
       <TermChips text={`${q} ${must}`} picked={chips} onToggle={(t) => setChips((c) => (c.includes(t) ? c.filter((x) => x !== t) : [...c, t]))} exclude={split(must)} />
       <Field label="What must it NEVER say? (optional)"><Input value={never} onChange={(e) => setNever(e.target.value)} aria-label="Never say" placeholder="e.g. ZPP3" /></Field>
-      <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" className="accent-[var(--accent)]" checked={refuse} onChange={(e) => setRefuse(e.target.checked)} />The assistant should decline this one (out of scope)</label>
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[var(--accent)]" checked={refuse} onChange={(e) => setRefuse(e.target.checked)} />The assistant should decline this one (out of scope)</label>
       <Button variant="primary" disabled={!q.trim() || (!must.trim() && !chips.length && !refuse)} loading={add.isPending} onClick={save}><Sparkles className="size-3.5" />Save and next</Button>
       {add.isError && <ErrorState error={add.error} />}
     </div>
@@ -498,8 +498,8 @@ export function AddFailureToDataset({ projectId, question, answer, runId, trialI
           <Notice tone="good" title="Added">{done.branched ? done.notice : `Saved in version ${done.version}.`} Every future run now checks this question.</Notice>
         ) : (
           <div className="space-y-3">
-            <p className="text-[13px] text-ink-2">A question the bot got wrong in real use is the best guard against the same mistake coming back.</p>
-            <div className="rounded-lg border border-line bg-surface-2/40 p-3 text-[13px]"><div className="text-xs text-ink-3">Question</div>{question}<div className="mt-2 text-xs text-ink-3">It answered</div><div className="line-clamp-4 text-ink-2">{answer}</div></div>
+            <p className="text-sm text-ink-2">A question the bot got wrong in real use is the best guard against the same mistake coming back.</p>
+            <div className="rounded-lg border border-line bg-surface-2/40 p-3 text-sm"><div className="text-xs text-ink-3">Question</div>{question}<div className="mt-2 text-xs text-ink-3">It answered</div><div className="line-clamp-4 text-ink-2">{answer}</div></div>
             {own.length === 0 && !datasets.isLoading ? <Notice tone="warn" title="This chatbot has no dataset yet">Create one on the Datasets page first.</Notice> : (
               <Field label="Into which dataset?">
                 <Select value={ds?.id ?? ''} onChange={(e) => setDsId(Number(e.target.value))} aria-label="Dataset for the failure">
@@ -507,7 +507,7 @@ export function AddFailureToDataset({ projectId, question, answer, runId, trialI
                 </Select>
               </Field>
             )}
-            <Field label="What should it have said?"><Textarea rows={2} className="font-sans text-[13px]" value={should} onChange={(e) => setShould(e.target.value)} /></Field>
+            <Field label="What should it have said?"><Textarea rows={2} className="font-sans text-sm" value={should} onChange={(e) => setShould(e.target.value)} /></Field>
             <TermChips text={should} picked={chips} onToggle={(t) => setChips((c) => (c.includes(t) ? c.filter((x) => x !== t) : [...c, t]))} />
             <div className="flex gap-2">
               <Button variant="primary" disabled={!ds?.latest || (!should.trim() && !chips.length)} loading={add.isPending} onClick={() => add.mutate()}><Check className="size-3.5" />Add case</Button>
@@ -536,10 +536,10 @@ export function AddVariations({ versionId, caseId }: { versionId: number; caseId
     <>
       <Button size="sm" variant="ghost" onClick={() => setOpen(true)} title="Ask the same thing differently">Variations</Button>
       <Dialog open={open} onClose={() => { setOpen(false); make.reset() }} title={`Variations of ${caseId}`} width={480}>
-        <p className="mb-3 text-[13px] text-ink-2">Does the bot still get it right when the question is asked differently? Each variation keeps this case's expectations and goes to the review queue (a translation can change what must be mentioned).</p>
+        <p className="mb-3 text-sm text-ink-2">Does the bot still get it right when the question is asked differently? Each variation keeps this case's expectations and goes to the review queue (a translation can change what must be mentioned).</p>
         <div className="space-y-1.5">
           {KINDS.map(([k, label]) => (
-            <label key={k} className="flex items-center gap-2 text-[13px]"><input type="checkbox" className="accent-[var(--accent)]" checked={kinds.includes(k)} onChange={() => setKinds((x) => (x.includes(k) ? x.filter((y) => y !== k) : [...x, k]))} />{label}</label>
+            <label key={k} className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[var(--accent)]" checked={kinds.includes(k)} onChange={() => setKinds((x) => (x.includes(k) ? x.filter((y) => y !== k) : [...x, k]))} />{label}</label>
           ))}
         </div>
         <p className="mt-2 text-xs text-ink-3">Other words and translations use the drafting model from Settings &gt; Defaults.</p>

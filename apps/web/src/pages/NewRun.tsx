@@ -238,7 +238,7 @@ export function NewRunPage() {
               <div className="mt-3" data-testid="other-chatbot-warning">
                 <Notice tone="warn" title={`These questions were written for ${ownerName(otherPicked.project_id)}`}>
                   {tv?.name ?? 'This connection'} belongs to {ownerName(Number(effectiveProject))}: it will answer them off-topic, and each answer may be billed. Their failures say nothing about this bot.
-                  <label className="mt-2 flex items-center gap-2 text-[13px] font-medium text-ink">
+                  <label className="mt-2 flex items-center gap-2 text-sm font-medium text-ink">
                     <input type="checkbox" className="accent-[var(--accent)]" checked={allowOther} onChange={(ev) => setAllowOther(ev.target.checked)} />
                     I mean to use them (say, a successor bot or a shared safety set)
                   </label>
@@ -263,12 +263,12 @@ export function NewRunPage() {
                   className={clsx('relative rounded-xl border p-3 text-left transition-colors', preset === p.id ? 'border-accent bg-accent-wash/60' : 'border-line hover:border-line-strong')}>
                   {preset === p.id && <motion.span layoutId="preset-ring" className="absolute inset-0 rounded-xl ring-2 ring-accent" transition={{ type: 'spring', stiffness: 500, damping: 40 }} />}
                   <p.icon className={clsx('size-4', preset === p.id ? 'text-accent-ink' : 'text-ink-3')} />
-                  <div className="mt-1.5 text-[13px] font-semibold">{p.title}</div>
+                  <div className="mt-1.5 text-sm font-semibold">{p.title}</div>
                   <div className="text-xs text-ink-3">{p.body}</div>
                 </button>
               ))}
             </div>
-            <button type="button" onClick={() => setShowChecks((v) => !v)} className="mt-3 flex items-center gap-1 text-[13px] font-medium text-accent-ink">
+            <button type="button" onClick={() => setShowChecks((v) => !v)} className="mt-3 flex items-center gap-1 text-sm font-medium text-accent-ink">
               <ChevronDown className={clsx('size-4 transition-transform', showChecks && 'rotate-180')} />{showChecks ? 'Hide' : 'Show'} the {effectiveChecks.length} checks
             </button>
             {!judgeBody && needsJudge.length > 0 && <p className="mt-1 text-xs text-warn-ink">{needsJudge.length} meaning check(s) skipped: no grading model chosen.</p>}
@@ -281,7 +281,7 @@ export function NewRunPage() {
                         <legend className="mb-1.5 text-xs font-semibold text-ink-2">{KIND_LABEL[kind]}</legend>
                         <div className="space-y-1">
                           {evaluators.filter((ev) => ev.kind === kind).map((ev) => (
-                            <label key={ev.id} className="flex items-start gap-2 text-[13px]" title={ev.description}>
+                            <label key={ev.id} className="flex items-start gap-2 text-sm" title={ev.description}>
                               <input type="checkbox" className="mt-0.5 accent-[var(--accent)]" checked={checks.includes(ev.id)} onChange={() => toggle(ev.id)} />
                               <span>
                                 {ev.name}
@@ -337,7 +337,7 @@ export function NewRunPage() {
                 <span className="text-xs font-medium text-ink-2">What is this run for?</span>
                 <Segmented size="sm" value={purpose ?? ('' as Purpose)} onChange={(p) => { setPurpose(p); setConcurrency(null) }} options={PURPOSES.map((p) => ({ id: p.id, label: p.label }))} label="Run purpose" />
               </div>
-              <p className={clsx('mt-2 text-[13px]', reliability.tone === 'good' ? 'text-good-ink' : reliability.tone === 'warn' ? 'text-warn-ink' : 'text-bad-ink')} data-testid="parallel-line">
+              <p className={clsx('mt-2 text-sm', reliability.tone === 'good' ? 'text-good-ink' : reliability.tone === 'warn' ? 'text-warn-ink' : 'text-bad-ink')} data-testid="parallel-line">
                 <b className="num">{e ? `${answers} answers` : 'Each question'}, {concurrency} at a time</b>
                 {e?.per_call_ms ? <> → about {duration(Math.round((answers * e.per_call_ms) / 1000 / concurrency))}</> : null}
                 {' '}· speed figures: <b>{reliability.text}</b>
@@ -356,7 +356,7 @@ export function NewRunPage() {
 
         <div className="space-y-5 xl:sticky xl:top-16 xl:self-start">
           <Card title="Before you start">
-            {!targetVersionId || !datasetVersionId ? <p className="text-[13px] text-ink-3">Pick a version and a dataset to see the estimate.</p> : est.isLoading ? <div className="skeleton h-24" /> : e && (
+            {!targetVersionId || !datasetVersionId ? <p className="text-sm text-ink-3">Pick a version and a dataset to see the estimate.</p> : est.isLoading ? <div className="skeleton h-24" /> : e && (
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <EstimateTile icon={Clock} label="Time" value={duration(e.estimated_seconds)} sub={e.per_call_ms ? `${(e.per_call_ms / 1000).toFixed(1)} s per answer` : 'no past runs'} />
@@ -389,8 +389,8 @@ function EstimateTile({ icon: Icon, label, value, sub }: { icon: typeof Clock; l
   return (
     <div className="rounded-lg border border-line bg-surface-2/50 p-2.5">
       <div className="flex items-center gap-1.5 text-xs text-ink-3"><Icon className="size-3.5" />{label}</div>
-      <div className="num mt-0.5 text-lg font-semibold">{value}</div>
-      <div className="text-[11px] text-ink-3">{sub}</div>
+      <div className="num mt-0.5 text-h font-semibold">{value}</div>
+      <div className="text-label text-ink-3">{sub}</div>
     </div>
   )
 }

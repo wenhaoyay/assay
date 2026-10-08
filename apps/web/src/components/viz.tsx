@@ -65,10 +65,10 @@ export function ForestPlot({ rows, isHeuristic, onPick }: { rows: ComparisonRow[
   if (!ranged.length) return null
   return (
     <div className="space-y-1" data-tour="forest">
-      <div className="grid grid-cols-[minmax(0,200px)_minmax(0,1fr)_120px] items-end gap-3 px-1 text-[11px] text-ink-3 max-md:grid-cols-[minmax(0,1fr)_100px]">
+      <div className="grid grid-cols-[minmax(0,200px)_minmax(0,1fr)_120px] items-end gap-3 px-1 text-label text-ink-3 max-md:grid-cols-[minmax(0,1fr)_100px]">
         <span>Metric</span>
         <div className="relative h-4 max-md:hidden" aria-hidden>
-          {ticks.map((t) => <span key={t} className="num absolute -translate-x-1/2 text-[10px]" style={{ left: `${(x(t) / W) * 100}%` }}>{t > 0 ? '+' : ''}{(t * 100).toFixed(0)}pp</span>)}
+          {ticks.map((t) => <span key={t} className="num absolute -translate-x-1/2 text-label" style={{ left: `${(x(t) / W) * 100}%` }}>{t > 0 ? '+' : ''}{(t * 100).toFixed(0)}pp</span>)}
         </div>
         <span className="text-right">Change (95% interval)</span>
       </div>
@@ -82,7 +82,7 @@ export function ForestPlot({ rows, isHeuristic, onPick }: { rows: ComparisonRow[
           <button key={r.metric} type="button" onClick={() => onPick?.(r)}
             className={clsx('grid w-full grid-cols-[minmax(0,200px)_minmax(0,1fr)_120px] items-center gap-3 rounded-md px-1 py-1 text-left hover:bg-surface-2 max-md:grid-cols-[minmax(0,1fr)_100px]', heur && 'hatched')}
             data-testid={`forest-${r.metric}`}>
-            <span className="truncate text-[13px]">{r.label}{heur && <span className="ml-1 text-[11px] text-ink-3">(heuristic)</span>}</span>
+            <span className="truncate text-sm">{r.label}{heur && <span className="ml-1 text-label text-ink-3">(heuristic)</span>}</span>
             <svg viewBox={`0 0 ${W} 22`} className="h-[22px] w-full max-md:hidden" preserveAspectRatio="none" role="img"
               aria-label={`${r.label}: ${fmtDelta(r)}${lo !== null ? `, interval ${(lo * 100).toFixed(1)} to ${((hi ?? 0) * 100).toFixed(1)}` : ''}`}>
               <rect x={x(-max)} y={0} width={x(0) - x(-max)} height={22} fill="var(--bad)" opacity={0.035} />
@@ -96,15 +96,15 @@ export function ForestPlot({ rows, isHeuristic, onPick }: { rows: ComparisonRow[
                 initial={{ cx: x(0), scale: 0.4 }} animate={{ cx: x(r.delta ?? 0), scale: 1 }} transition={{ ...spring, delay: 0.05 * i }} />
             </svg>
             <span className="text-right">
-              <span className={clsx('num text-[13px] font-medium', read.tone === 'good' && 'text-good-ink', read.tone === 'bad' && 'text-bad-ink')}>{fmtDelta(r)}</span>
-              <span className="block text-[11px] text-ink-3">
+              <span className={clsx('num text-sm font-medium', read.tone === 'good' && 'text-good-ink', read.tone === 'bad' && 'text-bad-ink')}>{fmtDelta(r)}</span>
+              <span className="block text-label text-ink-3">
                 {read.text === 'within noise' ? <Term k="within_noise">within noise</Term> : read.text === 'likely better' ? <Term k="likely_better">likely better</Term> : read.text === 'likely worse' ? <Term k="likely_worse">likely worse</Term> : read.text}
               </span>
             </span>
           </button>
         )
       })}
-      <div className="flex justify-between px-1 pt-1 text-[11px] text-ink-3 max-md:hidden">
+      <div className="flex justify-between px-1 pt-1 text-label text-ink-3 max-md:hidden">
         <span className="ml-[calc(200px+0.75rem)] text-bad-ink">← worse</span>
         <span className="mr-[calc(120px+0.75rem)] text-good-ink">better →</span>
       </div>
@@ -125,9 +125,9 @@ export function DeltaList({ rows, caution }: { rows: ComparisonRow[]; caution?: 
         const rel = r.relative ?? 0
         const Arrow = r.delta! > 0 ? ArrowUp : r.delta! < 0 ? ArrowDown : Minus
         return (
-          <div key={r.metric} className={clsx('grid grid-cols-[minmax(0,200px)_minmax(0,1fr)_170px] items-center gap-3 rounded px-1 text-[13px] max-md:grid-cols-[minmax(0,1fr)_150px]', caution?.(r.metric) && 'hatched-light')} data-testid={`metric-${r.metric}`}
+          <div key={r.metric} className={clsx('grid grid-cols-[minmax(0,200px)_minmax(0,1fr)_170px] items-center gap-3 rounded px-1 text-sm max-md:grid-cols-[minmax(0,1fr)_150px]', caution?.(r.metric) && 'hatched-light')} data-testid={`metric-${r.metric}`}
             title={caution?.(r.metric) ? 'Measured at a different number of questions at a time: may be load, not the bot' : undefined}>
-            <span className="truncate">{r.label}{caution?.(r.metric) && <span className="ml-1 text-[11px] text-warn-ink">(different load)</span>}</span>
+            <span className="truncate">{r.label}{caution?.(r.metric) && <span className="ml-1 text-label text-warn-ink">(different load)</span>}</span>
             <div className="relative h-2 rounded-full bg-surface-2 max-md:hidden">
               <span className="absolute inset-y-[-3px] left-1/2 w-px bg-line-strong" />
               <motion.span className={clsx('absolute inset-y-0 rounded-full', d === 'better' ? 'bg-good' : d === 'worse' ? 'bg-bad' : 'bg-ink-3')}
@@ -207,7 +207,7 @@ export function Stamp({ status, runId }: { status: 'PASS' | 'FAIL' | 'INCOMPLETE
   const tone = status === 'PASS' ? 'text-good-ink border-good' : status === 'FAIL' ? 'text-bad-ink border-bad' : 'text-warn-ink border-warn'
   const text = status === 'NOT_EVALUATED' ? 'NOT EVALUATED' : status
   return (
-    <motion.div className={clsx('inline-flex -rotate-6 select-none items-center rounded-md border-[3px] px-3 py-1 font-mono text-xl font-bold tracking-widest', tone)}
+    <motion.div className={clsx('inline-flex -rotate-6 select-none items-center rounded-md border-[3px] px-3 py-1 font-mono text-h font-semibold tracking-widest', tone)}
       style={{ boxShadow: 'inset 0 0 0 2px var(--surface)' }}
       initial={first && motionOn ? { scale: 2.4, opacity: 0, rotate: -18 } : false}
       animate={{ scale: 1, opacity: 1, rotate: -6 }}
@@ -261,7 +261,7 @@ export function Confetti({ fire }: { fire: boolean }) {
 // --------------------------------------------------------------------------------------
 
 export function StagePipeline({ stages, onPick, selected }: { stages: Stage[]; onPick?: (s: Stage) => void; selected?: string | null }) {
-  if (!stages.length) return <p className="text-[13px] text-ink-3">No stage was exercised by the checks in this run.</p>
+  if (!stages.length) return <p className="text-sm text-ink-3">No stage was exercised by the checks in this run.</p>
   const max = Math.max(1, ...stages.map((s) => s.failures))
   return (
     <div className="flex flex-wrap items-stretch gap-1.5" data-tour="stages">
@@ -274,9 +274,9 @@ export function StagePipeline({ stages, onPick, selected }: { stages: Stage[]; o
               selected === s.id ? 'border-accent ring-2 ring-accent/25' : 'border-line hover:border-line-strong')}
             style={{ background: s.failures ? `color-mix(in srgb, var(--bad) ${Math.round(6 + (s.failures / max) * 22)}%, var(--surface))` : 'var(--surface)' }}
             title={Object.entries(s.types).map(([t, n]) => `${FAILURE_LABELS[t] ?? t}: ${n}`).join('\n') || `Checks: ${s.checks.join(', ')}`}>
-            <div className="text-[11px] font-medium text-ink-2">{s.label}</div>
-            <div className={clsx('num text-lg font-semibold leading-tight', s.failures ? 'text-bad-ink' : 'text-good-ink')}>{s.failures}</div>
-            <div className="text-[11px] text-ink-3">{s.failures === 1 ? 'failure' : 'failures'}</div>
+            <div className="text-label font-medium text-ink-2">{s.label}</div>
+            <div className={clsx('num text-h font-semibold leading-tight', s.failures ? 'text-bad-ink' : 'text-good-ink')}>{s.failures}</div>
+            <div className="text-label text-ink-3">{s.failures === 1 ? 'failure' : 'failures'}</div>
           </motion.button>
         </div>
       ))}
@@ -304,15 +304,15 @@ export function CaseMatrixView({ data, filter = 'all', focusCase }: { data: Case
   })
   return (
     <div className="scroll-thin max-h-[70vh] overflow-auto" data-tour="matrix">
-      <table className="border-separate border-spacing-0 text-[12px]">
+      <table className="border-separate border-spacing-0 text-xs">
         <thead className="sticky top-0 z-10 bg-surface">
           <tr>
             <th className="sticky left-0 z-20 min-w-[220px] border-b border-line bg-surface px-3 py-2 text-left text-xs font-medium text-ink-3">Case</th>
             {data.runs.map((r) => (
               <th key={r.id} className="border-b border-line px-1 py-2 align-bottom" title={`${r.name}\n${r.target} - ${r.variant}\njudge: ${r.judge ?? 'none'}`}>
-                <Link to={`/runs/${r.id}`} className="flex flex-col items-center gap-0.5 font-mono text-[11px] text-accent-ink hover:underline">
+                <Link to={`/runs/${r.id}`} className="flex flex-col items-center gap-0.5 font-mono text-label text-accent-ink hover:underline">
                   #{r.id}
-                  <span className="num text-[10px] text-ink-3">{pct(r.pass_rate, 0)}</span>
+                  <span className="num text-label text-ink-3">{pct(r.pass_rate, 0)}</span>
                 </Link>
               </th>
             ))}
@@ -323,10 +323,10 @@ export function CaseMatrixView({ data, filter = 'all', focusCase }: { data: Case
             <tr key={c.id} className={clsx(focusCase === c.id && 'bg-accent-wash')}>
               <td className="sticky left-0 z-[5] max-w-[280px] border-b border-line bg-surface px-3 py-1">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-[11px]">{c.id}</span>
-                  {always.has(c.id) && <span className="rounded bg-bad-wash px-1 text-[10px] text-bad-ink" title="Failed in every run: check the golden answer">always fails</span>}
+                  <span className="font-mono text-label">{c.id}</span>
+                  {always.has(c.id) && <span className="rounded bg-bad-wash px-1 text-label text-bad-ink" title="Failed in every run: check the golden answer">always fails</span>}
                 </div>
-                <div className="truncate text-[11px] text-ink-3">{c.title}</div>
+                <div className="truncate text-label text-ink-3">{c.title}</div>
               </td>
               {data.runs.map((r, ri) => {
                 const v = data.cells[c.id]?.[String(r.id)]
@@ -348,7 +348,7 @@ export function CaseMatrixView({ data, filter = 'all', focusCase }: { data: Case
           ))}
         </tbody>
       </table>
-      {!rows.length && <p className="p-4 text-[13px] text-ink-3">No case matches this filter.</p>}
+      {!rows.length && <p className="p-4 text-sm text-ink-3">No case matches this filter.</p>}
     </div>
   )
 }
@@ -356,7 +356,7 @@ export function CaseMatrixView({ data, filter = 'all', focusCase }: { data: Case
 export function MatrixLegend() {
   const item = (cls: string, label: string) => <span className="flex items-center gap-1.5"><span className={clsx('size-3 rounded-[3px]', cls)} />{label}</span>
   return (
-    <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-ink-3">
+    <div className="flex flex-wrap gap-x-4 gap-y-1 text-label text-ink-3">
       {item('bg-good', 'passed every trial')}{item('bg-flaky', 'flaky')}{item('bg-bad', 'failed every trial')}{item('bg-error', 'error')}
       {item('border border-dashed border-untested', 'not in the run')}{item('bg-good hatched-light', 'run graded by the heuristic judge')}
     </div>

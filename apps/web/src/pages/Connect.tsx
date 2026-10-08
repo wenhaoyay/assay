@@ -189,9 +189,9 @@ function Stepper({ step, onStep }: { step: number; onStep: (i: number) => void }
       {STEPS.map((s, i) => (
         <li key={s} className="flex items-center gap-2">
           <button type="button" onClick={() => onStep(i)} disabled={i > step}
-            className={clsx('flex items-center gap-2 rounded-full border px-3 py-1 text-[13px] transition-colors',
+            className={clsx('flex items-center gap-2 rounded-full border px-3 py-1 text-sm transition-colors',
               i === step ? 'border-accent bg-accent-wash font-medium text-accent-ink' : i < step ? 'border-good/40 text-good-ink' : 'border-line text-ink-3')}>
-            <span className={clsx('flex size-5 items-center justify-center rounded-full text-[11px] font-semibold', i === step ? 'bg-accent text-on-accent' : i < step ? 'bg-good text-white' : 'bg-surface-3 text-ink-3')}>
+            <span className={clsx('flex size-5 items-center justify-center rounded-full text-label font-semibold', i === step ? 'bg-accent text-on-accent' : i < step ? 'bg-good text-white' : 'bg-surface-3 text-ink-3')}>
               {i < step ? <Check className="size-3" /> : i + 1}
             </span>
             {s}
@@ -215,7 +215,7 @@ function StepRoute({ route, onRoute, templates, onTemplate, standard, setStandar
             <button key={r.id} type="button" role="radio" aria-checked={route === r.id} onClick={() => onRoute(r.id)}
               className={clsx('relative rounded-xl border p-4 text-left transition-colors', route === r.id ? 'border-accent bg-accent-wash/50' : 'border-line hover:border-line-strong')}>
               {route === r.id && <motion.span layoutId="route-ring" className="absolute inset-0 rounded-xl ring-2 ring-accent" />}
-              <div className="flex items-center gap-2"><r.icon className={clsx('size-4', route === r.id ? 'text-accent-ink' : 'text-ink-3')} /><span className="text-[13px] font-semibold">{r.title}</span>{r.badge && <Badge tone="accent">{r.badge}</Badge>}</div>
+              <div className="flex items-center gap-2"><r.icon className={clsx('size-4', route === r.id ? 'text-accent-ink' : 'text-ink-3')} /><span className="text-sm font-semibold">{r.title}</span>{r.badge && <Badge tone="accent">{r.badge}</Badge>}</div>
               <p className="mt-1 text-xs text-ink-3">{r.body}</p>
             </button>
           ))}
@@ -232,7 +232,7 @@ function StepRoute({ route, onRoute, templates, onTemplate, standard, setStandar
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {templates.map((t) => (
               <button key={t.id} type="button" onClick={() => onTemplate(t)} className="rounded-lg border border-line p-3 text-left hover:border-accent/50 hover:bg-surface-2">
-                <div className="flex items-center gap-2 text-[13px] font-medium">{t.name}{!t.builtin && <Badge tone="accent">yours</Badge>}</div>
+                <div className="flex items-center gap-2 text-sm font-medium">{t.name}{!t.builtin && <Badge tone="accent">yours</Badge>}</div>
                 <div className="mt-0.5 line-clamp-2 text-xs text-ink-3">{t.description}</div>
               </button>
             ))}
@@ -358,7 +358,7 @@ function SecretRow({ secret, onStored, stored }: { secret: { header: string; pre
   return (
     <div className={clsx('flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2', stored ? 'border-good/40 bg-good-wash/40' : 'border-warn/40 bg-warn-wash/50')}>
       <KeyRound className={clsx('size-4', stored ? 'text-good-ink' : 'text-warn-ink')} />
-      <span className="text-[13px]"><b>{secret.header}</b> looks like a secret ({secret.hint}).</span>
+      <span className="text-sm"><b>{secret.header}</b> looks like a secret ({secret.hint}).</span>
       {stored ? <span className="ml-auto text-xs text-good-ink">Stored in the OS credential store</span> : (
         <>
           <span className="ml-auto text-xs text-ink-3">Save as</span>
@@ -507,12 +507,12 @@ function StepMap(props: {
                 const prevGroup = i > 0 ? ROLES[i - 1].group : null
                 return (
                   <li key={r.id}>
-                    {r.group !== prevGroup && <div className="mt-2 text-[11px] font-medium uppercase tracking-wide text-ink-3">{r.group}</div>}
+                    {r.group !== prevGroup && <div className="mt-2 text-label font-medium uppercase tracking-wide text-ink-3">{r.group}</div>}
                     <div className={clsx('flex items-center gap-2 rounded-md px-2 py-1', picking === r.id && 'bg-accent-wash')}>
                       <span className={clsx('size-1.5 shrink-0 rounded-full', p ? 'bg-good' : 'bg-untested')} />
                       <span className="min-w-0 flex-1">
-                        <span className="text-[13px]">{r.label}</span>
-                        <span className="block truncate font-mono text-[11px] text-ink-3" title={reasons[r.id === 'sources' ? 'retrieved_documents' : r.id === 'tools' ? 'tool_calls' : r.id] ?? ''}>{p ?? (r.hint || 'not mapped')}</span>
+                        <span className="text-sm">{r.label}</span>
+                        <span className="block truncate font-mono text-label text-ink-3" title={reasons[r.id === 'sources' ? 'retrieved_documents' : r.id === 'tools' ? 'tool_calls' : r.id] ?? ''}>{p ?? (r.hint || 'not mapped')}</span>
                       </span>
                       <Button size="sm" variant={picking === r.id ? 'primary' : 'ghost'} onClick={() => setPicking(picking === r.id ? null : r.id)}>{p ? 'Change' : 'Pick'}</Button>
                       {p && r.id !== 'answer' && <button type="button" aria-label={`Clear ${r.label}`} className="text-ink-3 hover:text-bad-ink" onClick={() => setCfg((c) => ({ ...c, response: setRole((c.response ?? {}) as Mapping, r.id, null) }))}><X className="size-3.5" /></button>}
@@ -545,11 +545,11 @@ function StepMap(props: {
 
       {probe?.ok && (
         <Card title="What GaugeLab will see" actions={<Button variant="primary" loading={testing} onClick={runTest}><Check className="size-3.5" />Check the mapping</Button>}>
-          {!test ? <p className="text-[13px] text-ink-3">Run the whole connection (request and mapping) to see the result as GaugeLab reads it.</p> : !test.ok ? (
+          {!test ? <p className="text-sm text-ink-3">Run the whole connection (request and mapping) to see the result as GaugeLab reads it.</p> : !test.ok ? (
             <Notice tone="bad" title={test.explanation ?? test.error ?? 'No answer'}>{test.error}</Notice>
           ) : (
             <div className="grid gap-4 lg:grid-cols-2">
-              <div className="space-y-2 text-[13px]">
+              <div className="space-y-2 text-sm">
                 <div className="text-xs text-ink-3">Answer ({ms(test.elapsed_ms)})</div>
                 <div className="line-clamp-6 rounded-lg border border-line bg-surface-2/50 px-3 py-2">{test.normalized?.answer}</div>
                 {test.normalized?.retrieved_documents && <div className="text-xs text-ink-2">{test.normalized.retrieved_documents.length} source(s): {test.normalized.retrieved_documents.slice(0, 5).map((d) => <code key={d.id} className="mr-1">{d.id}</code>)}</div>}
@@ -570,7 +570,7 @@ export function Capabilities({ caps }: { caps: Capability[] }) {
       <div className="mb-1.5 text-xs font-medium text-ink-3">What you'll get</div>
       <ul className="space-y-1.5">
         {caps.map((c, i) => (
-          <motion.li key={c.field} initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }} className="flex items-start gap-2 text-[13px]">
+          <motion.li key={c.field} initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }} className="flex items-start gap-2 text-sm">
             {c.received ? <Check className="mt-0.5 size-4 shrink-0 text-good-ink" /> : c.mapped ? <CircleAlert className="mt-0.5 size-4 shrink-0 text-warn-ink" /> : <X className="mt-0.5 size-4 shrink-0 text-ink-3" />}
             <span>
               <b className={clsx(!c.received && 'font-medium text-ink-2')}>{c.label}</b>{c.count !== null && c.received ? ` (${c.count})` : ''}
@@ -787,7 +787,7 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved, reply, tes
         {dry.data && src !== 'test' && (
           <div className="mt-3 space-y-2">
             {dry.data.calls.map((c, i) => (
-              <div key={i} className="flex items-start gap-2 text-[13px]">
+              <div key={i} className="flex items-start gap-2 text-sm">
                 {c.ok ? <Check className="mt-0.5 size-4 text-good-ink" /> : <X className="mt-0.5 size-4 text-bad-ink" />}
                 <span className="min-w-0 flex-1"><span className="text-ink-2">{c.question}</span><span className="block truncate text-xs text-ink-3">{c.ok ? c.answer : c.explanation ?? c.error}</span></span>
                 <span className="num text-xs text-ink-3">{ms(c.elapsed_ms)}{c.cleanup && ` - clean-up ${c.cleanup}`}</span>
@@ -835,7 +835,7 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved, reply, tes
           </Field>
           {editing && <Field label="What changed"><Input value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>}
         </div>
-        <label className="mt-3 flex items-center gap-2 text-[13px]"><input type="checkbox" className="accent-[var(--accent)]" checked={asTemplate} onChange={(e) => setAsTemplate(e.target.checked)} />Also save as a template for connecting similar bots</label>
+        <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[var(--accent)]" checked={asTemplate} onChange={(e) => setAsTemplate(e.target.checked)} />Also save as a template for connecting similar bots</label>
         {save.isError && <div className="mt-3"><ErrorState error={save.error} /></div>}
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <Button variant="primary" size="lg" loading={save.isPending} disabled={!!saveWhy} onClick={() => save.mutate()}>
@@ -898,7 +898,7 @@ function LogsImport({ projects, onDone }: { projects: Project[]; onDone: (target
   const ROLE_LIST: [string, string][] = [['case_id', 'Id'], ['message', 'Question'], ['answer', 'Answer'], ['sources', 'Sources (list)'], ['category', 'Category'], ['latency_ms', 'Latency (ms)'], ['latency_s', 'Latency (s)']]
   return (
     <Card title="Import past answers">
-      <label className={clsx('flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-8 text-[13px] transition-colors', file ? 'border-good/50 bg-good-wash/30' : 'border-line-strong hover:border-accent')}
+      <label className={clsx('flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-8 text-sm transition-colors', file ? 'border-good/50 bg-good-wash/30' : 'border-line-strong hover:border-accent')}
         onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) { setFile(f); preview.mutate(f) } }}>
         <FileUp className="size-6 text-ink-3" />
         {file ? <span><b>{file.name}</b> - {Math.round(file.size / 1024)} KB</span> : <span>Drop a <b>.jsonl</b>, <b>.json</b> or <b>.csv</b> file, or click to choose</span>}

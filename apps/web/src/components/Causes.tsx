@@ -90,7 +90,7 @@ export function FixFirst({ runId, targetId, selected, onPick, compact = false }:
       <div className="space-y-4">
         {groups.map((g) => (
           <section key={g.k}>
-            <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-ink-3">{KIND_HEAD[g.k]}</div>
+            <div className="mb-1.5 text-label font-medium uppercase tracking-wide text-ink-3">{KIND_HEAD[g.k]}</div>
             <ul className="space-y-1.5">
               {g.rows.map((c, i) => (
                 <CauseRow key={c.cause} c={c} total={total} delay={i * 0.04} open={open === c.cause} compact={compact}
@@ -116,7 +116,7 @@ function CauseRow({ c, total, delay, open, onToggle, onPick, selected, compact }
       <div className="flex items-center gap-2">
         <button type="button" onClick={onToggle} aria-expanded={open} className="flex min-w-0 flex-1 items-center gap-2 text-left">
           <ChevronRight className={clsx('size-3.5 shrink-0 text-ink-3 transition-transform', open && 'rotate-90')} />
-          <span className="text-[13px] font-medium">{c.label}</span>
+          <span className="text-sm font-medium">{c.label}</span>
           <span className="num text-xs text-ink-3">{c.cases}</span>
           <span className="ml-auto hidden h-1.5 w-28 overflow-hidden rounded-full bg-surface-3 sm:block">
             <motion.span className={clsx('block h-full rounded-full', c.kind === 'bot' ? 'bg-bad' : c.kind === 'content' ? 'bg-warn' : 'bg-ink-3')}
@@ -176,7 +176,7 @@ function ExplainAll({ runId, ids }: { runId: number; ids: number[] }) {
     <div className="mt-4 rounded-lg bg-surface-2/60 p-3">
       <div className="flex flex-wrap items-center gap-2">
         <Wand2 className="size-4 text-accent-ink" />
-        <span className="text-[13px]">{ids.length} failure{ids.length === 1 ? '' : 's'} not placed by the rules.</span>
+        <span className="text-sm">{ids.length} failure{ids.length === 1 ? '' : 's'} not placed by the rules.</span>
         <Button size="sm" className="ml-auto" disabled={!hasJudge} loading={running} onClick={go}>Ask the grading model ({ids.length} call{ids.length === 1 ? '' : 's'})</Button>
       </div>
       {running && <ProgressBar value={done / ids.length} className="mt-2" />}
@@ -202,14 +202,14 @@ export function CauseCard({ t }: { t: TrialDetail }) {
       <div className="space-y-2" data-testid="cause-card">
         <div className="flex flex-wrap items-center gap-1.5">
           <CauseBadge v={v} />
-          <span className="text-[11px] text-ink-3">{v.source === 'you' ? 'set by you' : v.source === 'ai' ? `explained by ${v.model ?? 'a grading model'}${v.confidence ? `, ${v.confidence} confidence` : ''}` : 'found by the rules'}</span>
+          <span className="text-label text-ink-3">{v.source === 'you' ? 'set by you' : v.source === 'ai' ? `explained by ${v.model ?? 'a grading model'}${v.confidence ? `, ${v.confidence} confidence` : ''}` : 'found by the rules'}</span>
         </div>
         {v.evidence.length > 0 && (
-          <ul className="space-y-1 text-[13px]">
+          <ul className="space-y-1 text-sm">
             {v.evidence.map((e, i) => <li key={i} className="flex gap-1.5"><Eye className="mt-0.5 size-3.5 shrink-0 text-ink-3" /><span>{e}</span></li>)}
           </ul>
         )}
-        <div className="rounded-lg bg-surface-2/60 px-3 py-2 text-[13px]"><span className="font-medium">What to change: </span>{v.fix}</div>
+        <div className="rounded-lg bg-surface-2/60 px-3 py-2 text-sm"><span className="font-medium">What to change: </span>{v.fix}</div>
         {ruleSaid === 'cant_tell' && v.source === 'rule' && (
           <Button size="sm" loading={ask.isPending} onClick={() => ask.mutate()}><Sparkles className="size-3.5" />Ask the grading model why (1 call)</Button>
         )}
@@ -236,10 +236,10 @@ export function CauseCard({ t }: { t: TrialDetail }) {
 /** What a change fixed (the old causes of questions that now pass) and broke (the new causes). */
 export function CompareCauses({ fixed, broke, baseline, candidate }: { fixed: CauseCount[]; broke: CauseCount[]; baseline: number; candidate: number }) {
   if (!fixed.length && !broke.length) return null
-  const list = (rows: CauseCount[], tone: 'good' | 'bad', empty: string) => rows.length === 0 ? <p className="text-[13px] text-ink-3">{empty}</p> : (
+  const list = (rows: CauseCount[], tone: 'good' | 'bad', empty: string) => rows.length === 0 ? <p className="text-sm text-ink-3">{empty}</p> : (
     <ul className="space-y-1.5">
       {rows.map((c) => (
-        <li key={c.cause} className="text-[13px]">
+        <li key={c.cause} className="text-sm">
           <div className="flex items-center gap-2"><Badge tone={tone}>{c.cases}</Badge><span className="font-medium">{c.label}</span></div>
           <div className="mt-0.5 pl-1 text-xs text-ink-3">{c.examples.map((e, i) => <span key={e.trial_id}>{i > 0 && ', '}<Link className="font-mono hover:underline" to={`/trials/${e.trial_id}`}>{e.case_id}</Link></span>)}</div>
         </li>
@@ -274,7 +274,7 @@ export function NotesCard({ projectId }: { projectId: number }) {
       subtitle={n ? `${n} note${n === 1 ? '' : 's'} across this chatbot's runs` : undefined}>
       <div data-testid="notes-card">
       {notes.isLoading ? <div className="skeleton h-12" /> : n === 0 ? (
-        <p className="text-[13px] text-ink-3">No notes yet. On a failed answer's page, use <b>Kind of failure &gt; Change &gt; Why</b> to write one line about what went wrong. Twenty or thirty notes are enough to group.</p>
+        <p className="text-sm text-ink-3">No notes yet. On a failed answer's page, use <b>Kind of failure &gt; Change &gt; Why</b> to write one line about what went wrong. Twenty or thirty notes are enough to group.</p>
       ) : (
         <>
           <div className="flex flex-wrap items-end gap-2">
@@ -291,7 +291,7 @@ export function NotesCard({ projectId }: { projectId: number }) {
             <ul className="mt-3 space-y-2">
               {group.data.themes.map((th, i) => (
                 <motion.li key={th.name + i} initial={{ opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }} className="rounded-lg border border-line px-3 py-2">
-                  <div className="flex items-center gap-2"><span className="text-[13px] font-medium">{th.name}</span><Badge>{th.items.length}</Badge><span className="num ml-auto text-xs text-ink-3">{pct(th.items.length / group.data!.notes, 0)}</span></div>
+                  <div className="flex items-center gap-2"><span className="text-sm font-medium">{th.name}</span><Badge>{th.items.length}</Badge><span className="num ml-auto text-xs text-ink-3">{pct(th.items.length / group.data!.notes, 0)}</span></div>
                   <ul className="mt-1 space-y-0.5">
                     {th.items.slice(0, 4).map((it) => <li key={it.trial_id} className="text-xs text-ink-2"><Link className="font-mono text-accent-ink hover:underline" to={`/trials/${it.trial_id}`}>{it.case_id}</Link> {it.note}</li>)}
                     {th.items.length > 4 && <li className="text-xs text-ink-3">and {th.items.length - 4} more</li>}
@@ -337,7 +337,7 @@ export function ReadingCard({ targetId }: { targetId: number }) {
       subtitle={d.updated_at ? `Changed ${when(d.updated_at)}` : 'What GaugeLab takes from each reply'}>
       {q.isLoading ? <div className="skeleton h-16" /> : (
         <div className="space-y-4">
-          {d.standard ? <p className="text-[13px] text-ink-2">The bot replies in the GaugeLab shape: everything it sends is read.</p> : (
+          {d.standard ? <p className="text-sm text-ink-2">The bot replies in the GaugeLab shape: everything it sends is read.</p> : (
             <div className="grid gap-4 md:grid-cols-2">
               <div><div className="mb-1 text-xs font-medium text-ink-3">Now</div><Capabilities caps={d.current_caps ?? []} /></div>
               {d.suggestion && !d.same && gained.length > 0 && (
@@ -356,7 +356,7 @@ export function ReadingCard({ targetId }: { targetId: number }) {
               <div className="mb-1 text-xs font-medium text-ink-3">Read past runs again with the current reading</div>
               <ul className="space-y-1">
                 {d.runs!.map((r) => (
-                  <li key={r.id} className="flex items-center gap-2 text-[13px]">
+                  <li key={r.id} className="flex items-center gap-2 text-sm">
                     <Link className="font-mono text-xs text-accent-ink hover:underline" to={`/runs/${r.id}`}>#{r.id}</Link>
                     <span className="min-w-0 flex-1 truncate">{r.name}{r.source === 'reevaluated' && <span className="text-ink-3"> (re-graded)</span>}</span>
                     <span className="num text-xs text-ink-3">{pct(r.pass_rate, 0)}</span>

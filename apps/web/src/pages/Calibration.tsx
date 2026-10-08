@@ -24,7 +24,7 @@ export function ConfusionMatrix({ a }: { a: Agreement }) {
   const cols = LABELS.filter((j) => rows.some((h) => (a.confusion[h]?.[j] ?? 0) > 0) || j !== 'UNKNOWN')
   const max = Math.max(1, ...rows.flatMap((h) => cols.map((j) => a.confusion[h]?.[j] ?? 0)))
   return (
-    <table className="text-[13px]" aria-label="Confusion matrix (rows: you, columns: judge)">
+    <table className="text-sm" aria-label="Confusion matrix (rows: you, columns: judge)">
       <thead>
         <tr><th className="p-2 text-left text-xs font-normal text-ink-3">You \ Judge</th>{cols.map((j) => <th key={j} className="p-2 text-xs font-medium text-ink-2">{j}</th>)}</tr>
       </thead>
@@ -79,7 +79,7 @@ function KappaMeter({ kappa, n }: { kappa: number | null; n: number }) {
       <div className="relative h-2.5 overflow-hidden rounded-full" style={{ background: 'linear-gradient(90deg, var(--bad-wash), var(--warn-wash) 45%, var(--good-wash))' }}>
         <motion.div className="absolute inset-y-0 left-0 rounded-full bg-accent/70" initial={{ width: 0 }} animate={{ width: `${pos}%` }} transition={{ type: 'spring', stiffness: 90, damping: 18 }} />
       </div>
-      <div className="mt-0.5 flex justify-between text-[9px] text-ink-3"><span>poor</span><span>moderate 0.4</span><span>substantial 0.6</span><span>1.0</span></div>
+      <div className="mt-0.5 flex justify-between text-label text-ink-3"><span>poor</span><span>moderate 0.4</span><span>substantial 0.6</span><span>1.0</span></div>
     </div>
   )
 }
@@ -156,7 +156,7 @@ function LabelTab({ dimension, stats }: { dimension: string; stats?: Calibration
   if (editingName) {
     return (
       <Card className="max-w-lg" title="Who is labelling?">
-        <p className="mb-3 text-[13px] text-ink-2">Labels are stored per person, so two people's judgements can be compared later. You only enter this once.</p>
+        <p className="mb-3 text-sm text-ink-2">Labels are stored per person, so two people's judgements can be compared later. You only enter this once.</p>
         <div className="flex gap-2">
           <Input value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} placeholder="Your name" aria-label="Your name" autoFocus onKeyDown={(e) => { if (e.key === 'Enter' && nameDraft.trim()) { prefs.set('annotator', nameDraft.trim()); setEditingName(false) } }} />
           <Button variant="primary" disabled={!nameDraft.trim()} onClick={() => { prefs.set('annotator', nameDraft.trim()); setEditingName(false) }}>Start labelling</Button>
@@ -191,12 +191,12 @@ function LabelTab({ dimension, stats }: { dimension: string; stats?: Calibration
                   <span>Case <span className="font-mono">{current.case_id}</span> - run <Link className="underline" to={`/runs/${current.run_id}`}>#{current.run_id}</Link> - try {current.trial_index + 1}</span>
                   <span>{queue.length} left</span>
                 </div>
-                <div className="space-y-4 text-[13px]">
-                  <div><div className="text-xs font-medium text-ink-3">Question</div><div className="mt-0.5 text-[15px]">{current.question}</div></div>
+                <div className="space-y-4 text-sm">
+                  <div><div className="text-xs font-medium text-ink-3">Question</div><div className="mt-0.5 text-h">{current.question}</div></div>
                   {current.reference && <div><div className="text-xs font-medium text-ink-3">Reference answer</div><div className="mt-0.5 rounded-lg bg-good-wash/40 px-3 py-2">{current.reference}</div></div>}
                   <div>
                     <div className="text-xs font-medium text-ink-3">Answer to grade - is it {dimension.replace(/_/g, ' ')}?</div>
-                    <div className="mt-0.5 whitespace-pre-wrap rounded-lg border border-line bg-surface-2/50 px-3 py-2.5 text-[14px] leading-relaxed"><HighlightedAnswer text={current.answer} good={[]} bad={[]} /></div>
+                    <div className="mt-0.5 whitespace-pre-wrap rounded-lg border border-line bg-surface-2/50 px-3 py-2.5 text-base leading-relaxed"><HighlightedAnswer text={current.answer} good={[]} bad={[]} /></div>
                   </div>
                   {current.context.length > 0 && (
                     <details className="group"><summary className="flex cursor-pointer items-center gap-1 text-xs font-medium text-accent-ink"><ChevronRight className="size-3.5 transition-transform group-open:rotate-90" />Retrieved context ({current.context.length})</summary>
@@ -220,7 +220,7 @@ function LabelTab({ dimension, stats }: { dimension: string; stats?: Calibration
       </div>
       <div className="space-y-4">
         <Card title="Progress">
-          <div className="mb-1 flex items-baseline justify-between text-[13px]"><span>{dimension.replace(/_/g, ' ')}</span><span className="num font-semibold">{Math.min(total, SAMPLE)} / {SAMPLE}</span></div>
+          <div className="mb-1 flex items-baseline justify-between text-sm"><span>{dimension.replace(/_/g, ' ')}</span><span className="num font-semibold">{Math.min(total, SAMPLE)} / {SAMPLE}</span></div>
           <ProgressBar value={total / SAMPLE} tone={total >= SAMPLE ? 'good' : 'accent'} />
           <p className="mt-1.5 text-xs text-ink-3">{total >= SAMPLE ? 'A useful sample: the agreement figures mean something now.' : `${SAMPLE - total} more for a sample worth reading.`}</p>
           <div className="mt-4"><KappaMeter kappa={stats?.agreement.kappa ?? null} n={stats?.agreement.n ?? 0} /></div>
@@ -228,7 +228,7 @@ function LabelTab({ dimension, stats }: { dimension: string; stats?: Calibration
         <AnimatePresence>
           {reveal && revealed?.judge && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-              className={clsx('rounded-xl border p-3 text-[13px]', revealed.judge.label === reveal.human ? 'border-good/40 bg-good-wash' : 'border-warn/40 bg-warn-wash')}>
+              className={clsx('rounded-xl border p-3 text-sm', revealed.judge.label === reveal.human ? 'border-good/40 bg-good-wash' : 'border-warn/40 bg-warn-wash')}>
               <div className="font-medium">{revealed.judge.label === reveal.human ? 'The judge agreed with you' : `The judge said ${revealed.judge.label}`}</div>
               <div className="mt-0.5 line-clamp-3 text-xs text-ink-2">{revealed.judge.reason}</div>
             </motion.div>
@@ -245,10 +245,10 @@ function AgreementTab({ s }: { s: CalibrationStats }) {
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_480px]">
       <Card title={`You vs the judge - ${s.dimension.replace(/_/g, ' ')}${s.judge_filter ? ` - ${s.judge_filter}` : ''}`}><AgreementPanel s={s} /></Card>
       <Card title="Where you and the judge disagree" padded={false}>
-        {s.disagreements.length === 0 ? <p className="p-4 text-[13px] text-ink-3">No disagreements yet.</p> : (
+        {s.disagreements.length === 0 ? <p className="p-4 text-sm text-ink-3">No disagreements yet.</p> : (
           <ul className="divide-y divide-line">
             {s.disagreements.map((d) => (
-              <li key={d.trial_id} className="px-4 py-3 text-[13px]">
+              <li key={d.trial_id} className="px-4 py-3 text-sm">
                 <div className="flex items-center gap-2"><Link className="font-mono text-xs text-accent-ink hover:underline" to={`/trials/${d.trial_id}`}>{d.case_id}</Link><Badge tone={d.human === 'PASS' ? 'good' : 'bad'}>you: {d.human}</Badge><Badge tone={d.judge === 'PASS' ? 'good' : 'bad'}>judge: {d.judge}</Badge></div>
                 <div className="mt-1 text-xs text-ink-2">Judge: {d.judge_reason}</div>
                 {d.note && <div className="text-xs text-ink-3">You: {d.note}</div>}
@@ -289,7 +289,7 @@ function BakeoffTab({ dimension }: { dimension: string }) {
             <div className="flex flex-wrap gap-2">
               {[{ id: 'heuristic', name: 'Heuristic (word overlap)', local: true }, ...(models.data ?? []).map((m) => ({ id: String(m.id), name: m.name, local: !!m.local, where: whereLabel(m) }))].map((m) => (
                 <button key={m.id} type="button" onClick={() => toggle(m.id)} aria-pressed={picked.includes(m.id)}
-                  className={clsx('flex items-center gap-2 rounded-lg border px-3 py-2 text-[13px] transition-colors', picked.includes(m.id) ? 'border-accent bg-accent-wash text-accent-ink' : 'border-line hover:bg-surface-2')}>
+                  className={clsx('flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors', picked.includes(m.id) ? 'border-accent bg-accent-wash text-accent-ink' : 'border-line hover:bg-surface-2')}>
                   {picked.includes(m.id) ? <Check className="size-3.5" /> : <span className="size-3.5" />}{m.name}<Badge>{'where' in m ? m.where : 'local'}</Badge>
                 </button>
               ))}

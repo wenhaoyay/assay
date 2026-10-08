@@ -64,7 +64,7 @@ export function CountBars({ data, onSelect, selected }: {
       {data.map((d, i) => (
         <li key={d.key}>
           <button type="button" onClick={() => onSelect?.(d.key)} aria-pressed={selected === d.key}
-            className={clsx('grid w-full grid-cols-[minmax(0,150px)_minmax(0,1fr)_36px] items-center gap-2 rounded-md px-1.5 py-1 text-left text-[13px] transition-colors hover:bg-surface-2',
+            className={clsx('grid w-full grid-cols-[minmax(0,150px)_minmax(0,1fr)_36px] items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm transition-colors hover:bg-surface-2',
               selected === d.key && 'bg-bad-wash', selected && selected !== d.key && 'opacity-50')}>
             <span className="truncate">{d.label}</span>
             <span className="h-2.5 overflow-hidden rounded-full bg-surface-2">
@@ -91,7 +91,7 @@ export function IntervalBar({ value, low, high, axis: showAxis = false }: { valu
         )}
         <div className="absolute -top-0.5 h-3 w-0.5 rounded bg-accent" style={{ left: `calc(${value * 100}% - 1px)` }} />
       </div>
-      {showAxis && <div className="mt-0.5 flex justify-between text-[9px] leading-none text-ink-3"><span>0</span><span>50%</span><span>100</span></div>}
+      {showAxis && <div className="mt-0.5 flex justify-between text-label leading-none text-ink-3"><span>0</span><span>50%</span><span>100</span></div>}
     </div>
   )
 }

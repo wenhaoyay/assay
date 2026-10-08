@@ -8,7 +8,6 @@ import {
   GitCompareArrows,
   Keyboard,
   LayoutDashboard,
-  Lightbulb,
   Moon,
   Play,
   Scale,
@@ -27,6 +26,7 @@ import { usePrefs } from '../lib/prefs'
 import type { Project } from '../lib/types'
 import { CommandPalette, ShortcutSheet } from './CommandPalette'
 import { Tour } from './Tour'
+import { useLinkedHighlight } from './instrument'
 import { Kbd, ProjectMark, linkButton } from './ui'
 
 const GROUPS = [
@@ -66,7 +66,7 @@ export function Logo({ live }: { live: boolean }) {
         </g>
         <circle cx="16" cy="21" r="2" className="fill-surface" />
       </svg>
-      <span className="text-[15px] font-semibold tracking-tight max-md:hidden">GaugeLab</span>
+      <span className="text-h font-semibold tracking-tight max-md:hidden">GaugeLab</span>
       {live && <span className="relative ml-auto flex size-2 max-md:hidden" title="A run is in progress"><span className="absolute inline-flex size-full animate-ping rounded-full bg-accent opacity-60" /><span className="relative inline-flex size-2 rounded-full bg-accent" /></span>}
     </Link>
   )
@@ -75,7 +75,7 @@ export function Logo({ live }: { live: boolean }) {
 function NavItem({ to, label, icon: Icon, end }: { to: string; label: string; icon: typeof Target; end?: boolean }) {
   return (
     <NavLink to={to} end={end} title={label} viewTransition
-      className={({ isActive }) => clsx('group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-[13px] transition-colors',
+      className={({ isActive }) => clsx('group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm transition-colors',
         isActive ? 'bg-accent-wash font-medium text-accent-ink' : 'text-ink-2 hover:bg-surface-2 hover:text-ink')}>
       {({ isActive }) => (
         <>
@@ -97,7 +97,7 @@ function Sidebar({ live }: { live: boolean }) {
       <nav className="scroll-thin flex-1 space-y-4 overflow-y-auto px-2 pb-3" aria-label="Main">
         {GROUPS.map((g, gi) => (
           <div key={g.label}>
-            <div className="mb-1 px-3 text-[11px] font-medium uppercase tracking-wide text-ink-3 max-md:hidden">{g.label}</div>
+            <div className="mb-1 px-3 text-label font-medium uppercase tracking-wide text-ink-3 max-md:hidden">{g.label}</div>
             <div className="space-y-0.5">
               {g.items.map((it) => <NavItem key={it.to} {...it} />)}
             </div>
@@ -105,7 +105,7 @@ function Sidebar({ live }: { live: boolean }) {
               <div className="mt-2 space-y-0.5 max-md:hidden">
                 {projects.data!.map((p) => (
                   <NavLink key={p.id} to={`/p/${p.id}`} viewTransition
-                    className={({ isActive }) => clsx('flex items-center gap-2 rounded-md px-3 py-1 text-[13px]', isActive ? 'bg-surface-2 font-medium text-ink' : 'text-ink-2 hover:bg-surface-2')}>
+                    className={({ isActive }) => clsx('flex items-center gap-2 rounded-md px-3 py-1 text-sm', isActive ? 'bg-surface-2 font-medium text-ink' : 'text-ink-2 hover:bg-surface-2')}>
                     <ProjectMark name={p.name} color={p.color} size={18} /><span className="truncate">{p.name}</span>
                   </NavLink>
                 ))}
@@ -117,7 +117,7 @@ function Sidebar({ live }: { live: boolean }) {
       <div className="space-y-0.5 border-t border-line p-2">
         <NavItem to="/settings" label="Settings" icon={Settings} />
         <button type="button" onClick={() => prefs.toggle('theme')}
-          className="flex w-full items-center gap-2.5 rounded-md px-3 py-1.5 text-[13px] text-ink-2 hover:bg-surface-2 hover:text-ink">
+          className="flex w-full items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-ink-2 hover:bg-surface-2 hover:text-ink">
           {prefs.theme === 'dark' ? <Sun className="size-4" aria-hidden /> : <Moon className="size-4" aria-hidden />}
           <span className="max-md:hidden">{prefs.theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
         </button>
@@ -128,10 +128,9 @@ function Sidebar({ live }: { live: boolean }) {
 
 function TopBar({ onPalette, onShortcuts }: { onPalette: () => void; onShortcuts: () => void }) {
   const crumbs = useCrumbsValue()
-  const prefs = usePrefs()
   return (
     <div data-topbar className="sticky top-0 z-30 flex h-12 items-center gap-3 border-b border-line bg-page/85 px-6 backdrop-blur max-sm:px-4">
-      <nav aria-label="Breadcrumb" className="flex min-w-0 flex-1 items-center gap-1 text-[13px]">
+      <nav aria-label="Breadcrumb" className="flex min-w-0 flex-1 items-center gap-1 text-sm">
         {crumbs.map((c, i) => (
           <Fragment key={i}>
             {i > 0 && <ChevronRight className="size-3.5 shrink-0 text-ink-3" aria-hidden />}
@@ -144,15 +143,9 @@ function TopBar({ onPalette, onShortcuts }: { onPalette: () => void; onShortcuts
         ))}
       </nav>
       <button type="button" onClick={onPalette} data-tour="palette"
-        className="flex h-8 w-64 items-center gap-2 rounded-lg border border-line bg-surface px-2.5 text-[13px] text-ink-3 shadow-sm hover:border-line-strong max-lg:w-auto">
+        className="flex h-8 w-64 items-center gap-2 rounded-lg border border-line bg-surface px-2.5 text-sm text-ink-3 shadow-sm hover:border-line-strong max-lg:w-auto">
         <Search className="size-3.5" aria-hidden /><span className="flex-1 truncate whitespace-nowrap text-left max-lg:hidden">Search or command</span>
         <span className="flex gap-0.5 max-lg:hidden"><Kbd>Ctrl</Kbd><Kbd>K</Kbd></span>
-      </button>
-      <button type="button" onClick={() => prefs.toggle('explain')} aria-pressed={prefs.explain} data-tour="explain"
-        title="Plain-English explanations (E)"
-        className={clsx('flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[13px] transition-colors',
-          prefs.explain ? 'border-accent/40 bg-accent-wash text-accent-ink' : 'border-line bg-surface text-ink-2 hover:text-ink')}>
-        <Lightbulb className="size-3.5" aria-hidden /><span className="max-sm:hidden">Explain</span>
       </button>
       <button type="button" onClick={onShortcuts} title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts"
         className="flex size-8 items-center justify-center rounded-lg text-ink-3 hover:bg-surface-2 hover:text-ink max-sm:hidden">
@@ -166,7 +159,6 @@ function TopBar({ onPalette, onShortcuts }: { onPalette: () => void; onShortcuts
 export function Layout() {
   const nav = useNavigate()
   const loc = useLocation()
-  const prefs = usePrefs()
   const [palette, setPalette] = useState(false)
   const [shortcuts, setShortcuts] = useState(false)
   const [tour, setTour] = useState(false)
@@ -177,11 +169,11 @@ export function Layout() {
   })
   const live = (activity.data?.active_runs.length ?? 0) > 0
   const go = (to: string) => nav(to, { viewTransition: true })
+  useLinkedHighlight()
 
   useHotkey('mod+k', () => setPalette((v) => !v))
   useHotkey('?', () => setShortcuts((v) => !v))
   useHotkey('escape', () => { setShortcuts(false) }, shortcuts)
-  useHotkey('e', () => prefs.toggle('explain'))
   useHotkey('n', () => go('/runs/new'), !loc.pathname.startsWith('/runs/new'))
   useHotkey('g h', () => go('/'))
   useHotkey('g r', () => go('/runs'))

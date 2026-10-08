@@ -82,7 +82,7 @@ export function RunsPage() {
           <motion.div initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 80, opacity: 0 }} transition={{ type: 'spring', stiffness: 400, damping: 32 }}
             style={{ x: '-50%' }}
             className="fixed bottom-6 left-1/2 z-40 flex items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-2.5 shadow-pop">
-            <span className="text-[13px]">
+            <span className="text-sm">
               {pair.length === 1 ? <>Run <b>#{pair[0].id}</b> picked - tick one more</> : <>Compare <b>#{a.id}</b> (baseline) with <b>#{b.id}</b></>}
             </span>
             {pair.length === 2 && !comparable && <span className="flex items-center gap-1 text-xs text-warn-ink"><AlertTriangle className="size-3.5" />different setups</span>}

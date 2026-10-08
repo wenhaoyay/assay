@@ -25,7 +25,7 @@ interface Pull { model: string; status: string; completed: number; total: number
 /** The third-party notice, shown before the first download and in the guide. */
 export function ThirdPartyNotice() {
   return (
-    <div className="space-y-1.5 text-[13px] text-ink-2">
+    <div className="space-y-1.5 text-sm text-ink-2">
       <p><b>Ollama and the models it downloads are third-party software.</b> They are not made, endorsed, reviewed or supported by GaugeLab. The install link opens an external website.</p>
       <ul className="list-disc space-y-1 pl-4">
         <li>You download and install them <b>at your own risk</b>. Check each model's licence and terms, and your organisation's rules on installing software and on data (IT approval may be required).</li>
@@ -87,7 +87,7 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
       <ol className="mb-4 flex flex-wrap gap-2">
         {steps.map((s, i) => (
           <li key={s.label} className={clsx('flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs', s.done ? 'border-good/40 text-good-ink' : 'border-line text-ink-3')}>
-            <span className={clsx('flex size-4 items-center justify-center rounded-full text-[10px] font-semibold', s.done ? 'bg-good text-white' : 'bg-surface-3')}>{s.done ? <Check className="size-2.5" /> : i + 1}</span>{s.label}
+            <span className={clsx('flex size-4 items-center justify-center rounded-full text-label font-semibold', s.done ? 'bg-good text-white' : 'bg-surface-3')}>{s.done ? <Check className="size-2.5" /> : i + 1}</span>{s.label}
           </li>
         ))}
       </ol>
@@ -98,7 +98,7 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
             action={<Button size="sm" onClick={() => status.refetch()} loading={status.isFetching}><RefreshCw className="size-3.5" />Check again</Button>}>
             1. Install it from the Ollama website (an external, third-party site). 2. Open the Ollama app; it then runs in the background. This page notices within a few seconds.
           </Notice>
-          <a href={OLLAMA_URL} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1.5 text-[13px] font-medium text-accent-ink underline">
+          <a href={OLLAMA_URL} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1.5 text-sm font-medium text-accent-ink underline">
             ollama.com/download <ExternalLink className="size-3.5" /><span className="text-xs font-normal text-ink-3">(opens an external site)</span>
           </a>
         </div>
@@ -117,7 +117,7 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
               {a.suggestions.map((s) => (
                 <tr key={s.model} className={clsx(!s.fits && !installed.has(s.model) && 'opacity-55')}>
                   <td>
-                    <code className="text-[12px]">{s.model}</code>{s.model === a.recommended && <Badge tone="accent" className="ml-1.5">suggested</Badge>}
+                    <code className="text-xs">{s.model}</code>{s.model === a.recommended && <Badge tone="accent" className="ml-1.5">suggested</Badge>}
                     <div className="text-xs text-ink-3">{s.note}{!s.fits && (installed.has(s.model) ? ' Installed: free memory is tight now, so it may run slower.' : ' Needs more free memory than this PC has now.')}</div>
                   </td>
                   <td className="num text-right">~{s.size_gb} GB</td>
@@ -162,16 +162,16 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
 
       {st?.running && !acked && (
         <div className="mt-4 rounded-xl border border-warn/40 bg-warn-wash/40 p-3">
-          <div className="mb-2 text-[13px] font-semibold">Before the first download</div>
+          <div className="mb-2 text-sm font-semibold">Before the first download</div>
           <ThirdPartyNotice />
-          <label className="mt-3 flex items-center gap-2 text-[13px]"><input type="checkbox" className="accent-[var(--accent)]" checked={ticked} onChange={(e) => setTicked(e.target.checked)} />I have read this notice and accept it</label>
+          <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[var(--accent)]" checked={ticked} onChange={(e) => setTicked(e.target.checked)} />I have read this notice and accept it</label>
           <Button className="mt-2" size="sm" variant="primary" disabled={!ticked} loading={ack.isPending} onClick={() => ack.mutate()}>Continue to downloads</Button>
         </div>
       )}
       {acked && <p className="mt-3 text-xs text-ink-3">Third-party notice accepted {new Date(settings.data!.values.ollama_notice_ack!).toLocaleDateString()}. <button type="button" className="underline" onClick={() => setGuide(true)}>Read it again</button></p>}
 
       {connected.size > 0 && (
-        <div className="mt-4"><Notice title="Calibrate before you trust it" action={<Link to="/calibration" className="text-[13px] font-medium text-accent-ink underline">Calibration</Link>}>
+        <div className="mt-4"><Notice title="Calibrate before you trust it" action={<Link to="/calibration" className="text-sm font-medium text-accent-ink underline">Calibration</Link>}>
           A new grading model is unvalidated. Label about 30 answers yourself and GaugeLab measures how often it agrees with you; small local models disagree more often than large cloud ones.
         </Notice></div>
       )}
@@ -186,7 +186,7 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
 
 function LocalGuide() {
   return (
-    <div className="space-y-4 text-[13px] leading-relaxed text-ink-2">
+    <div className="space-y-4 text-sm leading-relaxed text-ink-2">
       <section>
         <h3 className="mb-1 font-semibold text-ink">Is it free?</h3>
         <p>The software is free and there is no bill per grading call. You pay in other ways: memory and disk (an 8-billion-parameter model needs about 5–8 GB of memory and a 5 GB download), time (without a graphics card, tens of seconds per call), and grading quality (small models agree with people less often: calibrate). Models have their own licences, and installing software at work may need IT approval.</p>

@@ -57,7 +57,7 @@ function ModelsTab() {
     <div className="space-y-6" data-tour="models">
       <Explain>A grading model ("judge") reads an answer and decides whether it is correct, grounded, relevant... Objective checks never need one. Keys are stored in your operating system's credential store and never shown again.</Explain>
       <section>
-        <h2 className="mb-3 text-[15px] font-semibold">Your grading models</h2>
+        <h2 className="mb-3 text-h font-semibold">Your grading models</h2>
         {models.isLoading ? <Loading /> : (models.data ?? []).length === 0 ? (
           <Empty title="No grading model yet" icon={<KeyRound className="size-6" />}>Connect OpenAI below (or a local model) to enable meaning checks and the judge bake-off.</Empty>
         ) : (
@@ -68,15 +68,15 @@ function ModelsTab() {
       </section>
       <LocalModelsCard models={models.data ?? []} onChange={refresh} />
       <section>
-        <h2 className="mb-1 text-[15px] font-semibold">Connect a provider</h2>
-        <p className="mb-3 text-[13px] text-ink-3">Model lists come from the provider itself, so they are never out of date.</p>
+        <h2 className="mb-1 text-h font-semibold">Connect a provider</h2>
+        <p className="mb-3 text-sm text-ink-3">Model lists come from the provider itself, so they are never out of date.</p>
         {!settings.data?.keyring_available && <div className="mb-3"><Notice tone="warn" title="No OS credential store here">Keys can still be used from the server environment: set them in <code>.env</code> and use the "environment variable" option.</Notice></div>}
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {(catalog.data ?? []).map((c, i) => (
             <motion.button key={c.id} type="button" onClick={() => setConnecting(c)} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
               className={clsx('rounded-xl border p-4 text-left transition-colors hover:border-accent/60', connecting?.id === c.id ? 'border-accent ring-2 ring-accent/20' : 'border-line', i === 0 && 'bg-accent-wash/40')}>
               <div className="flex items-center gap-2">
-                <span className="text-[14px] font-semibold">{c.label}</span>
+                <span className="text-base font-semibold">{c.label}</span>
                 {c.local ? <Badge tone="good"><Cpu className="size-3" />local</Badge> : <Badge><Cloud className="size-3" />cloud</Badge>}
                 {byCatalog(c.id).length > 0 && <Badge tone="accent">{byCatalog(c.id).length} connected</Badge>}
               </div>
@@ -106,7 +106,7 @@ function ModelCard({ m, settings, onChange }: { m: ProviderConfig; settings?: Se
         <span className={clsx('flex size-9 shrink-0 items-center justify-center rounded-lg', m.local ? 'bg-good-wash text-good-ink' : 'bg-accent-wash text-accent-ink')}>{m.local ? <Cpu className="size-4" /> : <Cloud className="size-4" />}</span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[14px] font-semibold">{m.name}</span>
+            <span className="text-base font-semibold">{m.name}</span>
             {isJudge && <Badge tone="accent"><Star className="size-3" />default judge</Badge>}
             {isGen && <Badge tone="accent"><Star className="size-3" />default generator</Badge>}
           </div>
@@ -148,9 +148,9 @@ function ModelCard({ m, settings, onChange }: { m: ProviderConfig; settings?: Se
 function CheckTile({ label, value, sub, tone }: { label: string; value: string; sub: string; tone?: 'good' | 'warn' }) {
   return (
     <div className="rounded-lg border border-line bg-surface-2/50 p-2">
-      <div className="text-[11px] text-ink-3">{label}</div>
-      <div className={clsx('num text-[15px] font-semibold', tone === 'good' && 'text-good-ink', tone === 'warn' && 'text-warn-ink')}>{value}</div>
-      <div className="text-[11px] text-ink-3">{sub}</div>
+      <div className="text-label text-ink-3">{label}</div>
+      <div className={clsx('num text-h font-semibold', tone === 'good' && 'text-good-ink', tone === 'warn' && 'text-warn-ink')}>{value}</div>
+      <div className="text-label text-ink-3">{sub}</div>
     </div>
   )
 }
@@ -180,7 +180,7 @@ function ConnectProvider({ entry, keyring, onClose, onDone }: { entry: CatalogEn
       <Card title={`Connect ${entry.label}`} actions={<Button size="sm" variant="ghost" onClick={onClose} aria-label="Close"><X className="size-4" /></Button>}>
         <ol className="space-y-5">
           <li>
-            <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold"><span className="flex size-5 items-center justify-center rounded-full bg-accent text-[11px] text-on-accent">1</span>Where it is{entry.needs_key ? ' and the key' : ''}</div>
+            <div className="mb-2 flex items-center gap-2 text-sm font-semibold"><span className="flex size-5 items-center justify-center rounded-full bg-accent text-label text-on-accent">1</span>Where it is{entry.needs_key ? ' and the key' : ''}</div>
             <div className="grid gap-3 md:grid-cols-2">
               <Field label="Base URL" hint={entry.local ? 'On this machine' : undefined}><Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} /></Field>
               {entry.needs_key && (
@@ -193,7 +193,7 @@ function ConnectProvider({ entry, keyring, onClose, onDone }: { entry: CatalogEn
                       <Button variant="primary" loading={storeKey.isPending} disabled={key.length < 8} onClick={() => storeKey.mutate()}><Lock className="size-3.5" />Store</Button>
                     </div>
                   )}
-                  {keyMode === 'stored' && <p className="flex items-center gap-1.5 text-[13px] text-good-ink"><Check className="size-4" />Stored as <code>{keyRef}</code> in the OS credential store.</p>}
+                  {keyMode === 'stored' && <p className="flex items-center gap-1.5 text-sm text-good-ink"><Check className="size-4" />Stored as <code>{keyRef}</code> in the OS credential store.</p>}
                   {keyMode === 'env' && (
                     <div className="flex gap-2">
                       <Input value={keyName} onChange={(e) => setKeyName(e.target.value)} aria-label="Environment variable name" />
@@ -207,7 +207,7 @@ function ConnectProvider({ entry, keyring, onClose, onDone }: { entry: CatalogEn
             </div>
           </li>
           <li className={clsx(!keyReady && 'pointer-events-none opacity-40')}>
-            <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold"><span className="flex size-5 items-center justify-center rounded-full bg-accent text-[11px] text-on-accent">2</span>Pick a model</div>
+            <div className="mb-2 flex items-center gap-2 text-sm font-semibold"><span className="flex size-5 items-center justify-center rounded-full bg-accent text-label text-on-accent">2</span>Pick a model</div>
             <div className="flex flex-wrap items-end gap-2">
               <Button loading={list.isPending} onClick={() => list.mutate()}><RefreshCw className="size-3.5" />Load models from {entry.label}</Button>
               {list.data?.ok && (
@@ -223,10 +223,10 @@ function ConnectProvider({ entry, keyring, onClose, onDone }: { entry: CatalogEn
             <Explain className="mt-2">For grading, a small fast model is usually enough; check its agreement with your labels in the bake-off before trusting it.</Explain>
           </li>
           <li className={clsx(!model && 'pointer-events-none opacity-40')}>
-            <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold"><span className="flex size-5 items-center justify-center rounded-full bg-accent text-[11px] text-on-accent">3</span>Name and save</div>
+            <div className="mb-2 flex items-center gap-2 text-sm font-semibold"><span className="flex size-5 items-center justify-center rounded-full bg-accent text-label text-on-accent">3</span>Name and save</div>
             <div className="flex flex-wrap items-end gap-3">
               <Field label="Name"><Input className="w-72" value={name} onChange={(e) => setName(e.target.value)} placeholder={`${entry.label} - ${model || 'model'}`} /></Field>
-              <label className="flex items-center gap-2 pb-1.5 text-[13px]"><input type="checkbox" className="accent-[var(--accent)]" checked={makeDefault} onChange={(e) => setMakeDefault(e.target.checked)} />Make it the default judge</label>
+              <label className="flex items-center gap-2 pb-1.5 text-sm"><input type="checkbox" className="accent-[var(--accent)]" checked={makeDefault} onChange={(e) => setMakeDefault(e.target.checked)} />Make it the default judge</label>
               <Button variant="primary" loading={add.isPending} disabled={!model || !keyReady} onClick={() => add.mutate()}><Check className="size-3.5" />Save</Button>
             </div>
             {add.isError && <div className="mt-2"><ErrorState error={add.error} /></div>}
@@ -290,14 +290,13 @@ function AppearanceTab() {
     <div className="grid max-w-2xl gap-5">
       <Card title="Look">
         <div className="space-y-4">
-          <div className="flex items-center justify-between"><span className="text-[13px] font-medium">Theme</span><Segmented value={p.theme} onChange={(v) => p.set('theme', v)} options={[{ id: 'light', label: 'Light' }, { id: 'dark', label: 'Dark' }]} /></div>
-          <div className="flex items-center justify-between"><span className="text-[13px] font-medium">Density</span><Segmented value={p.density} onChange={(v) => p.set('density', v)} options={[{ id: 'comfortable', label: 'Comfortable' }, { id: 'compact', label: 'Compact' }]} /></div>
+          <div className="flex items-center justify-between"><span className="text-sm font-medium">Theme</span><Segmented value={p.theme} onChange={(v) => p.set('theme', v)} options={[{ id: 'light', label: 'Light' }, { id: 'dark', label: 'Dark' }]} /></div>
+          <div className="flex items-center justify-between"><span className="text-sm font-medium">Density</span><Segmented value={p.density} onChange={(v) => p.set('density', v)} options={[{ id: 'comfortable', label: 'Comfortable' }, { id: 'compact', label: 'Compact' }]} /></div>
         </div>
       </Card>
-      <Card title="Motion and help">
+      <Card title="Motion" help="Explanations live behind the circled ? beside every heading: hover it, or click to keep it open.">
         <div className="space-y-4">
           <Toggle checked={p.motion === 'full'} onChange={(v) => p.set('motion', v ? 'full' : 'reduced')} label="Animations" hint="Off: everything appears instantly. Your system's reduce-motion setting is always respected." />
-          <Toggle checked={p.explain} onChange={(v) => p.set('explain', v)} label="Plain-English explanations" hint="Adds a short line under statistics and jargon. Press E anywhere to switch." />
         </div>
       </Card>
     </div>
@@ -309,7 +308,7 @@ function ServerTab() {
   const health = useQuery({ queryKey: ['health'], queryFn: () => api.get<{ status: string }>('/api/health'), refetchInterval: 15_000 })
   return (
     <Card title="GaugeLab server" className="max-w-2xl">
-      <dl className="grid grid-cols-[160px_minmax(0,1fr)] gap-y-2 text-[13px]">
+      <dl className="grid grid-cols-[160px_minmax(0,1fr)] gap-y-2 text-sm">
         <dt className="text-ink-3">Status</dt><dd className="flex items-center gap-2"><span className={clsx('size-2 rounded-full', health.isSuccess ? 'bg-good' : 'bg-bad')} />{health.isSuccess ? 'running' : 'unreachable'}</dd>
         <dt className="text-ink-3">Version</dt><dd className="num">{s.data?.server.version}</dd>
         <dt className="text-ink-3">Database</dt><dd>{s.data?.server.database} <span className="font-mono text-xs text-ink-3">{s.data?.server.database_url}</span></dd>
@@ -386,7 +385,7 @@ function ShapeTab() {
   return (
     <div className="grid gap-5 xl:grid-cols-2">
       <Card title="The GaugeLab reply shape" subtitle="A bot that answers like this connects without any mapping">
-        <ul className="mb-3 space-y-1 text-[13px]">
+        <ul className="mb-3 space-y-1 text-sm">
           <li><code>answer</code> - the text the user sees (required)</li>
           <li><code>sources</code> - retrieved documents: <code>id</code>, <code>title</code>, <code>text</code>, <code>score</code></li>
           <li><code>citations</code> - ids of the sources the answer cites</li>

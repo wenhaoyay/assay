@@ -135,7 +135,7 @@ export function GatesPage() {
             <Card key={g.id} title={<span className="flex items-center gap-2"><ShieldCheck className="size-4 text-accent" />{g.name}</span>} subtitle={projects.all.find((p) => p.id === g.project_id)?.name}
               actions={<Button size="sm" variant="ghost" onClick={() => start(g)}>Edit</Button>}>
               <ul className="space-y-1.5">
-                {gateToRules(g.config).map((r, i) => <li key={i} className="flex items-center gap-2 text-[13px]"><Badge tone={r.kind === 'drop' ? 'info' : 'neutral'}>{r.kind === 'drop' ? 'vs baseline' : 'absolute'}</Badge>{describe(r)}</li>)}
+                {gateToRules(g.config).map((r, i) => <li key={i} className="flex items-center gap-2 text-sm"><Badge tone={r.kind === 'drop' ? 'info' : 'neutral'}>{r.kind === 'drop' ? 'vs baseline' : 'absolute'}</Badge>{describe(r)}</li>)}
               </ul>
             </Card>
           ))}

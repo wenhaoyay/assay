@@ -17,7 +17,7 @@ export function QueueViz({ atOnce }: { atOnce: number }) {
     <figure className="mt-2" aria-label={caption}>
       <svg key={n} width="100%" viewBox={`0 0 ${W} 46`} className="max-w-[300px]" role="img" aria-hidden>
         <rect x={door} y={6} width={86} height={34} rx={8} className="fill-surface-2 stroke-line-strong" />
-        <text x={door + 43} y={17} textAnchor="middle" className="fill-ink-3 text-[9px]">bot</text>
+        <text x={door + 43} y={17} textAnchor="middle" className="fill-ink-3 text-label">bot</text>
         {Array.from({ length: n }, (_, i) => {
           const inside = i < SERVE
           const rank = i - SERVE // 0.. for waiting dots
@@ -35,7 +35,7 @@ export function QueueViz({ atOnce }: { atOnce: number }) {
           )
         })}
       </svg>
-      <figcaption className="text-[11px] text-ink-3">{caption}</figcaption>
+      <figcaption className="text-label text-ink-3">{caption}</figcaption>
     </figure>
   )
 }

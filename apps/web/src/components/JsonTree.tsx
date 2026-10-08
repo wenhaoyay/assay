@@ -11,7 +11,7 @@ export function JsonTree({ data, onPick, marks = {}, picking = false }: {
   picking?: boolean
 }) {
   return (
-    <div className={clsx('scroll-thin max-h-[480px] overflow-auto rounded-lg border bg-surface-2/40 p-2 font-mono text-[12px] leading-relaxed', picking ? 'border-accent ring-2 ring-accent/20' : 'border-line')}>
+    <div className={clsx('scroll-thin max-h-[480px] overflow-auto rounded-lg border bg-surface-2/40 p-2 font-mono text-xs leading-relaxed', picking ? 'border-accent ring-2 ring-accent/20' : 'border-line')}>
       <Node k={null} v={data} path="" depth={0} onPick={onPick} marks={marks} picking={picking} />
     </div>
   )
@@ -40,7 +40,7 @@ function Node({ k, v, path, depth, onPick, marks, picking }: {
       {k}
     </button>
   )
-  const tag = mark && <span className="ml-1.5 rounded bg-accent px-1 font-sans text-[10px] font-medium text-on-accent">{mark}</span>
+  const tag = mark && <span className="ml-1.5 rounded bg-accent px-1 font-sans text-label font-medium text-on-accent">{mark}</span>
   if (!isObj) {
     return (
       <div className="flex items-start gap-1" style={{ paddingLeft: depth * 14 }}>

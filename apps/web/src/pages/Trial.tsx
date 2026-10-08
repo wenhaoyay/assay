@@ -45,7 +45,7 @@ export function HighlightedAnswer({ text, good, bad }: { text: string; good: str
         <mark key={i} className={clsx('rounded px-0.5',
           p.kind === 'good' && 'bg-good-wash text-good-ink underline decoration-good/60 decoration-2 underline-offset-2',
           p.kind === 'bad' && 'bg-bad-wash text-bad-ink line-through decoration-bad/70',
-          p.kind === 'cite' && 'bg-accent-wash font-mono text-[12px] text-accent-ink')}>{p.chunk}</mark>
+          p.kind === 'cite' && 'bg-accent-wash font-mono text-xs text-accent-ink')}>{p.chunk}</mark>
       ))}
     </>
   )
@@ -112,8 +112,8 @@ export function TrialPage() {
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-xs font-medium text-ink-3">{c?.category}{c?.difficulty ? `, ${c.difficulty}` : ''}</div>
-          <h1 className="flex flex-wrap items-center gap-2 text-[22px] font-semibold tracking-tight" style={{ viewTransitionName: `case-${tr.case_id}` }}>
-            <span className="font-mono text-[19px]">{tr.case_id}</span><span className="font-normal text-ink-2">{c?.title}</span>
+          <h1 className="flex flex-wrap items-center gap-2 text-title font-semibold tracking-tight" style={{ viewTransitionName: `case-${tr.case_id}` }}>
+            <span className="font-mono text-h">{tr.case_id}</span><span className="font-normal text-ink-2">{c?.title}</span>
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -131,7 +131,7 @@ export function TrialPage() {
               ))}
             </div>
           )}
-          <span className="flex items-center gap-1 text-[11px] text-ink-3 max-lg:hidden"><Kbd>[</Kbd><Kbd>]</Kbd> tries <Kbd>Shift</Kbd><Kbd>J</Kbd> next failing case{failIdx >= 0 && ` (${failIdx + 1}/${failingCases.length})`}</span>
+          <span className="flex items-center gap-1 text-label text-ink-3 max-lg:hidden"><Kbd>[</Kbd><Kbd>]</Kbd> tries <Kbd>Shift</Kbd><Kbd>J</Kbd> next failing case{failIdx >= 0 && ` (${failIdx + 1}/${failingCases.length})`}</span>
         </div>
       </div>
 
@@ -141,11 +141,11 @@ export function TrialPage() {
       <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_400px]">
         <div className="space-y-5">
           <Card title="Question, answer and what was expected">
-            <div className="mb-3 text-[13px]"><span className="text-xs font-medium text-ink-3">Question</span><div className="mt-0.5 text-[14px]">{c?.input.message ?? tr.question}</div></div>
+            <div className="mb-3 text-sm"><span className="text-xs font-medium text-ink-3">Question</span><div className="mt-0.5 text-base">{c?.input.message ?? tr.question}</div></div>
             <div className="grid gap-4 lg:grid-cols-2">
               <div>
                 <div className="mb-1 flex items-center gap-2 text-xs font-medium text-ink-3">Answer {r?.provider?.model && <span className="font-normal">({r.provider.model})</span>}</div>
-                <div className={clsx('whitespace-pre-wrap rounded-lg border px-3 py-2.5 text-[13px] leading-relaxed',
+                <div className={clsx('whitespace-pre-wrap rounded-lg border px-3 py-2.5 text-sm leading-relaxed',
                   tr.status === 'passed' ? 'border-good/30 bg-good-wash/30' : answerFailed ? 'border-bad/40 bg-bad-wash/40' : 'border-line bg-surface-2/50')}>
                   {tr.answer ? <HighlightedAnswer text={tr.answer} good={mustMention} bad={mustNot} /> : <span className="text-ink-3">(empty)</span>}
                 </div>
@@ -154,7 +154,7 @@ export function TrialPage() {
                 )}
                 {missing.length > 0 && <p className="mt-1 text-xs text-bad-ink">Missing required: {missing.map((m) => <code key={m} className="mx-0.5 rounded bg-bad-wash px-1">{m}</code>)}</p>}
                 {r?.error && <div className="mt-1 text-xs text-bad-ink">Bot error: {r.error}</div>}
-                <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-ink-3">
+                <div className="mt-2 flex flex-wrap gap-3 text-label text-ink-3">
                   <span className="flex items-center gap-1"><mark className="rounded bg-good-wash px-1 text-good-ink">phrase</mark> required, present</span>
                   <span className="flex items-center gap-1"><mark className="rounded bg-bad-wash px-1 text-bad-ink line-through">phrase</mark> must not claim</span>
                   <span className="flex items-center gap-1"><mark className="rounded bg-accent-wash px-1 font-mono text-accent-ink">[doc]</mark> citation</span>
@@ -172,7 +172,7 @@ export function TrialPage() {
             </ul>
             {passed.length > 0 && (
               <div className="mt-3">
-                <button type="button" onClick={() => setShowPassed((v) => !v)} className="flex items-center gap-1 text-[13px] font-medium text-good-ink">
+                <button type="button" onClick={() => setShowPassed((v) => !v)} className="flex items-center gap-1 text-sm font-medium text-good-ink">
                   <ChevronRight className={clsx('size-4 transition-transform', showPassed && 'rotate-90')} />{passed.length} check(s) passed
                 </button>
                 {!showPassed && <div className="mt-1.5 flex flex-wrap gap-1">{passed.map((s) => <Badge key={s.evaluator_id} tone="good" className={clsx(heuristic && s.kind === 'llm_judge' && 'hatched')}><Check className="size-3" />{s.evaluator_id}</Badge>)}</div>}
@@ -186,12 +186,12 @@ export function TrialPage() {
               </div>
             )}
           </Card>
-          <Card title="Execution trace">{tr.trace ? <TraceViewer spans={tr.trace.spans} /> : <p className="text-[13px] text-ink-3">No trace stored.</p>}</Card>
+          <Card title="Execution trace">{tr.trace ? <TraceViewer spans={tr.trace.spans} /> : <p className="text-sm text-ink-3">No trace stored.</p>}</Card>
         </div>
 
         <div className="space-y-5">
           <Card title="Telemetry">
-            <dl className="grid grid-cols-2 gap-y-1 text-[13px]">
+            <dl className="grid grid-cols-2 gap-y-1 text-sm">
               <dt className="text-ink-3">Latency</dt><dd className="num text-right">{ms(tr.latency_ms)}</dd>
               <dt className="text-ink-3">Tokens</dt><dd className="num text-right">{num(tr.total_tokens)}</dd>
               <dt className="text-ink-3">Bot cost (est.)</dt><dd className="num text-right">{usd(tr.target_cost_usd)}</dd>
@@ -200,7 +200,7 @@ export function TrialPage() {
             </dl>
           </Card>
           <Card title={`Retrieved documents${r?.retrieved_documents ? ` (${r.retrieved_documents.length})` : ''}`} padded={!r?.retrieved_documents?.length}>
-            {r?.retrieved_documents == null ? <p className="text-[13px] text-ink-3">Not reported by the bot.</p> : r.retrieved_documents.length === 0 ? <p className="text-[13px] text-ink-3">None.</p> : (
+            {r?.retrieved_documents == null ? <p className="text-sm text-ink-3">Not reported by the bot.</p> : r.retrieved_documents.length === 0 ? <p className="text-sm text-ink-3">None.</p> : (
               <Table>
                 <thead><tr><th>#</th><th>Source</th><th className="text-right">Score</th><th></th></tr></thead>
                 <tbody>
@@ -214,7 +214,7 @@ export function TrialPage() {
             )}
           </Card>
           <Card title={`Tool calls${r?.tool_calls ? ` (${r.tool_calls.length})` : ''}`}>
-            {r?.tool_calls == null ? <p className="text-[13px] text-ink-3">Not reported by the bot.</p> : r.tool_calls.length === 0 ? <p className="text-[13px] text-ink-3">No tools called.</p> : (
+            {r?.tool_calls == null ? <p className="text-sm text-ink-3">Not reported by the bot.</p> : r.tool_calls.length === 0 ? <p className="text-sm text-ink-3">No tools called.</p> : (
               <ol className="space-y-2">
                 {r.tool_calls.map((tc, i) => (
                   <li key={i} className="rounded-md border border-line p-2 text-xs">
@@ -241,7 +241,7 @@ function Verdict({ t, failing }: { t: TrialDetail; failing: Score[] }) {
   if (t.status === 'passed') {
     return (
       <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3 rounded-xl border border-good/30 bg-good-wash px-4 py-3">
-        <Check className="size-5 text-good-ink" /><div className="text-[14px] font-medium text-good-ink">Passed every gating check.</div>
+        <Check className="size-5 text-good-ink" /><div className="text-base font-medium text-good-ink">Passed every gating check.</div>
       </motion.div>
     )
   }
@@ -250,17 +250,17 @@ function Verdict({ t, failing }: { t: TrialDetail; failing: Score[] }) {
       <div className="flex items-start gap-3">
         <CircleAlert className="mt-0.5 size-5 shrink-0 text-bad-ink" />
         <div className="min-w-0 space-y-1.5">
-          <div className="text-[14px] font-semibold text-bad-ink">
+          <div className="text-base font-semibold text-bad-ink">
             {t.status === 'error' ? 'The bot did not answer.' : `Failed ${failing.length} check${failing.length === 1 ? '' : 's'}${t.failure_types.length ? `: ${t.failure_types.map((f) => FAILURE_LABELS[f] ?? f).join(', ').toLowerCase()}` : ''}.`}
           </div>
           {failing.map((s) => (
-            <div key={s.evaluator_id} className="text-[13px] text-ink">
+            <div key={s.evaluator_id} className="text-sm text-ink">
               <span className="font-mono text-xs font-medium">{s.evaluator_id}</span> - {s.explanation}
             </div>
           ))}
-          {t.result?.error && <div className="text-[13px]">{t.result.error}</div>}
+          {t.result?.error && <div className="text-sm">{t.result.error}</div>}
           {t.cause && (
-            <div className="flex flex-wrap items-center gap-1.5 pt-0.5 text-[13px]">
+            <div className="flex flex-wrap items-center gap-1.5 pt-0.5 text-sm">
               <span className="text-ink-2">Likely cause:</span><CauseBadge v={t.cause} />
               {t.cause.evidence[0] && <span className="text-ink-2">{t.cause.evidence[0]}</span>}
             </div>
@@ -291,7 +291,7 @@ function Expectations({ c }: { c: NonNullable<TrialDetail['case']> }) {
     <div>
       <div className="mb-1 text-xs font-medium text-ink-3">Expected (written or approved by a person)</div>
       {!rows.length ? <p className="text-xs text-ink-3">No expected outcomes: only black-box checks apply.</p> : (
-        <dl className="space-y-2 rounded-lg border border-line px-3 py-2.5 text-[13px]">
+        <dl className="space-y-2 rounded-lg border border-line px-3 py-2.5 text-sm">
           {rows.map(([k, v]) => <div key={k}><dt className="text-xs text-ink-3">{k}</dt><dd>{v}</dd></div>)}
         </dl>
       )}
@@ -307,7 +307,7 @@ function PatternList({ patterns, tone }: { patterns: string[]; tone: 'good' | 'b
         return (
           <li key={p}>
             {plain ? <span>{plain}</span> : null}
-            <code className={clsx('block break-all rounded px-1 font-mono text-[11px]', plain ? 'text-ink-3' : tone === 'good' ? 'bg-good-wash text-good-ink' : 'bg-bad-wash text-bad-ink')}>{p}</code>
+            <code className={clsx('block break-all rounded px-1 font-mono text-label', plain ? 'text-ink-3' : tone === 'good' ? 'bg-good-wash text-good-ink' : 'bg-bad-wash text-bad-ink')}>{p}</code>
           </li>
         )
       })}
@@ -329,7 +329,7 @@ function SourceRow({ d, i, expected, cited }: { d: Source; i: number; expected: 
             {d.text && <ChevronRight className={clsx('mt-0.5 size-3.5 shrink-0 text-ink-3 transition-transform', open && 'rotate-90')} />}
             <span className="min-w-0">
               <span className="block text-xs font-medium">{d.title ?? d.id}</span>
-              <span className="block font-mono text-[11px] text-ink-3">{where ? `${where} - ` : ''}{d.id}{d.date ? ` - ${d.date}` : ''}</span>
+              <span className="block font-mono text-label text-ink-3">{where ? `${where} - ` : ''}{d.id}{d.date ? ` - ${d.date}` : ''}</span>
             </span>
           </div>
         </td>
@@ -348,16 +348,16 @@ function ScoreRow({ s, heuristic }: { s: Score; heuristic: boolean }) {
     <li className={clsx('rounded-lg border px-3 py-2', bad ? (s.gating ? 'border-bad/40 bg-bad-wash/30' : 'border-warn/40') : 'border-line', heuristic && judge && 'hatched')}>
       <div className="flex flex-wrap items-center gap-2">
         <StatusBadge status={s.status} />
-        <span className="text-[13px] font-medium">{s.evaluator_id}</span>
+        <span className="text-sm font-medium">{s.evaluator_id}</span>
         <Badge>{s.kind === 'llm_judge' ? (heuristic ? 'heuristic judge' : 'grading model') : s.kind}</Badge>
         {!s.gating && <span className="text-xs text-ink-3"><Term k="gating">diagnostic</Term></span>}
         {s.failure_type && bad && <Badge tone="bad">{FAILURE_LABELS[s.failure_type] ?? s.failure_type}</Badge>}
         {s.score != null && <span className="num ml-auto text-xs text-ink-3">{judge ? 'confidence' : 'score'} {s.score.toFixed(2)}{s.threshold != null && ` / needs ${s.threshold}`}</span>}
       </div>
-      <p className="mt-1 text-[13px] text-ink-2">{s.explanation}</p>
+      <p className="mt-1 text-sm text-ink-2">{s.explanation}</p>
       {s.evidence.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{s.evidence.slice(0, 8).map((e, i) => <code key={i} className="rounded bg-surface-2 px-1 text-xs">{e}</code>)}</div>}
       {judge && s.metadata?.model != null && (
-        <div className="mt-1 font-mono text-[11px] text-ink-3">
+        <div className="mt-1 font-mono text-label text-ink-3">
           {String(s.metadata.provider)}/{String(s.metadata.model)} - rubric v{String(s.metadata.rubric_version)} - prompt {String(s.metadata.prompt_hash)}{s.judge_cost_usd != null && ` - ${usd(s.judge_cost_usd)}`}
         </div>
       )}
@@ -386,7 +386,7 @@ function FailureAnnotation({ t }: { t: TrialDetail }) {
     <Card title="Kind of failure" actions={<>{t.failure_override ? <Badge tone="info">set by you</Badge> : <Badge>automatic</Badge>}{!editing && <Button size="sm" variant="ghost" onClick={() => setEditing(true)}><Pencil className="size-3.5" />Change</Button>}</>}>
       {!editing ? (
         <div className="space-y-1.5">
-          {t.failure_types.length ? <div className="flex flex-wrap gap-1">{t.failure_types.map((f) => <Badge key={f} tone="bad">{FAILURE_LABELS[f] ?? f}</Badge>)}</div> : <p className="text-[13px] text-ink-3">None.</p>}
+          {t.failure_types.length ? <div className="flex flex-wrap gap-1">{t.failure_types.map((f) => <Badge key={f} tone="bad">{FAILURE_LABELS[f] ?? f}</Badge>)}</div> : <p className="text-sm text-ink-3">None.</p>}
           {t.failure_note && <p className="text-xs text-ink-2">Your note: {t.failure_note}</p>}
           <Explain>Classified automatically from the failing checks. Change it when you know better - run summaries count your classification.</Explain>
         </div>
@@ -394,7 +394,7 @@ function FailureAnnotation({ t }: { t: TrialDetail }) {
         <div className="space-y-3">
           {GROUPS.map((g) => (
             <fieldset key={g.label}>
-              <legend className="mb-1 text-[11px] font-medium uppercase tracking-wide text-ink-3">{g.label}</legend>
+              <legend className="mb-1 text-label font-medium uppercase tracking-wide text-ink-3">{g.label}</legend>
               <div className="flex flex-wrap gap-1">
                 {g.types.map((ft) => (
                   <button key={ft} type="button" aria-pressed={sel.includes(ft)} onClick={() => setSel((s) => (s.includes(ft) ? s.filter((x) => x !== ft) : [...s, ft]))}
