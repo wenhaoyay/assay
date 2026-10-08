@@ -36,7 +36,7 @@ export function Tour({ open, onClose }: { open: boolean; onClose: () => void }) 
       { path: '/calibration', target: 'flashcard', title: 'Can you trust the judge?', body: 'Label answers yourself with P / F / U. GaugeLab measures how often each grading model agrees with you; a new model starts uncalibrated. The bake-off pits models against your labels.' },
       { path: '/settings?tab=models', target: 'models', title: 'Bring a better grading model', body: 'Connect OpenAI (or any compatible API) with a key stored in the operating system\'s credential store, check its speed, JSON reliability and cost, and make it the default.' },
       { path: '/targets/new', target: 'connect', title: 'Connect any chatbot', body: 'Paste a curl command, send a test question, and click the reply to say where the answer and sources are. Bots that reply in the GaugeLab shape need no mapping at all.' },
-      { path: '/', target: 'palette', title: 'Everything is a keystroke away', body: 'Ctrl+K searches runs, cases and chatbots and runs commands ("compare 5 6"). Press E for plain-English explanations, ? for all shortcuts.' },
+      { path: '/', target: 'palette', title: 'Everything is a keystroke away', body: 'Ctrl+K searches runs, cases and chatbots and runs commands ("compare 5 6"). Every heading has a circled ? that says what it shows and how to use it; press ? for all shortcuts.' },
     ]
   }, [home.data])
 
@@ -92,14 +92,14 @@ export function Tour({ open, onClose }: { open: boolean; onClose: () => void }) 
             initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 400, damping: 32 }}
             className="fixed w-[380px] rounded-2xl border border-line bg-surface p-4 shadow-pop" style={{ top: bubbleTop, left: bubbleLeft }}>
             <div className="mb-1 flex items-center justify-between">
-              <span className="text-label font-medium uppercase tracking-wide text-accent-ink">Tour - {i + 1} of {steps.length}</span>
+              <span className="t-label text-accent-ink">Tour · <span className="font-mono">{i + 1}</span> of <span className="font-mono">{steps.length}</span></span>
               <button type="button" onClick={onClose} aria-label="End tour" className="text-ink-3 hover:text-ink"><X className="size-4" /></button>
             </div>
             <h3 className="text-h font-semibold">{step.title}</h3>
             <p className="mt-1 text-sm text-ink-2">{step.body}</p>
             <div className="mt-3 flex items-center gap-2">
               <div className="flex gap-1">{steps.map((_, k) => <span key={k} className={k === i ? 'h-1.5 w-4 rounded-full bg-accent' : 'size-1.5 rounded-full bg-line-strong'} />)}</div>
-              <span className="ml-auto flex items-center gap-1 text-label text-ink-3 max-sm:hidden"><Kbd>←</Kbd><Kbd>→</Kbd></span>
+              <span className="ml-auto flex items-center gap-1 text-ink-3 max-sm:hidden"><Kbd>←</Kbd><Kbd>→</Kbd></span>
               <Button size="sm" variant="ghost" disabled={i === 0} onClick={() => setI(i - 1)}><ArrowLeft className="size-3.5" /></Button>
               {i < steps.length - 1
                 ? <Button size="sm" variant="primary" onClick={() => setI(i + 1)}>Next <ArrowRight className="size-3.5" /></Button>

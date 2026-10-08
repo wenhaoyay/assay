@@ -77,15 +77,17 @@ pasting a curl command into the connect wizard and clicking the reply.
 | | |
 |---|---|
 | ![A chatbot's home](docs/screenshots/chatbot.png) | ![Run summary with the gate stamp](docs/screenshots/run-summary.png) |
-| **A chatbot's home.** The verdict in one sentence, the trend of comparable runs, where failures start. | **Run summary.** Rates with intervals and N, the release gate, consistency over repeated tries (plain-English layer on). |
+| **A chatbot's home.** Three weeks in one sentence, the timeline of comparable runs with what changed, every question across every run. | **Run summary.** The run's fingerprint, figures against the baseline, where the answers went, what to fix first. |
+| ![Explore: linked charts](docs/screenshots/explore.png) | ![Today's reading](docs/screenshots/home.png) |
+| **Explore.** Linked charts you filter by dragging, any measure against any, and "what if the bot declined below a score?". | **Today's reading.** Each chatbot's latest run on a gauge, its fingerprint, what happened and what is worth a look. |
 | ![Failures grouped by case](docs/screenshots/failures.png) | ![Why a trial failed](docs/screenshots/trial.png) |
-| **Failures.** By kind of failure and by case, consistent vs flaky; J/K and Enter to triage. | **A failed trial.** The failing checks first, required phrases and citations marked in the answer, the reference beside it. |
+| **Failures.** One row per question, tinted by its likely cause; J/K and Enter to triage. | **A failed trial.** The verdict once, citations linked to the passages the bot read, a replay of what it did. |
 | ![Execution trace](docs/screenshots/trace.png) | ![Every case in every run](docs/screenshots/dataset-history.png) |
 | **Trace.** Request, retrieval, model and tool calls with timings; the slowest step called out; the checks that graded it. | **Results across runs.** A case red in every run is often a wrong golden answer, not a bad bot. |
 | ![Connect wizard](docs/screenshots/connect.png) | ![Models and keys](docs/screenshots/models.png) |
 | **Connect a chatbot.** Paste curl, send a question, click the reply; GaugeLab guesses, you confirm. | **Models & keys.** Bring a better grading model; keys live in the OS credential store. |
 | ![Calibration flashcards](docs/screenshots/calibration.png) | ![Compare in dark mode](docs/screenshots/compare-dark.png) |
-| **Calibration.** Label blind with P / F / U; agreement with the judge fills in as you go. | **Dark mode**, designed rather than inverted. |
+| **Calibration.** Label blind with P / F / U; agreement with the judge fills in as you go. | **Dark mode**, designed rather than inverted: warm blacks, figures that glow. |
 
 ## Architecture
 

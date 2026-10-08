@@ -18,7 +18,7 @@ const LABEL: Record<string, string> = {
   post_processing: 'post-processing', evaluator: 'check', error: 'error',
 }
 const BAR: Record<string, string> = {
-  retrieval: 'bg-series-1', model_call: 'bg-accent', tool_call: 'bg-series-2', tool_result: 'bg-series-2/70', post_processing: 'bg-ink-3', target_request: 'bg-line-strong',
+  retrieval: 'bg-series-1', model_call: 'bg-accent', tool_call: 'bg-series-2', tool_result: 'bg-series-2/70', post_processing: 'bg-error', target_request: 'bg-line-strong',
 }
 
 export function TraceViewer({ spans, showEvaluators = true }: { spans: Span[]; showEvaluators?: boolean }) {
@@ -39,16 +39,16 @@ export function TraceViewer({ spans, showEvaluators = true }: { spans: Span[]; s
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-ink-2">
-        <span>Total <b className="num text-ink">{ms(root.duration_ms)}</b></span>
-        <span>Tokens <b className="num text-ink">{num(totals.tokens)}</b>
+        <span>Total <b className="num font-mono font-medium text-ink">{ms(root.duration_ms)}</b></span>
+        <span>Tokens <b className="num font-mono font-medium text-ink">{num(totals.tokens)}</b>
           {root.usage?.input_tokens != null && <span className="num text-ink-3"> ({num(root.usage.input_tokens)} in / {num(root.usage.output_tokens)} out)</span>}
         </span>
-        <span>Est. cost <b className="num text-ink">{usd(totals.cost)}</b></span>
+        <span>Est. cost <b className="num font-mono font-medium text-ink">{usd(totals.cost)}</b></span>
         {Array.isArray(root.metadata?.missing_telemetry) && (root.metadata.missing_telemetry as string[]).length > 0 && (
           <span className="text-ink-3">Not reported by the bot: {(root.metadata.missing_telemetry as string[]).join(', ')}</span>
         )}
       </div>
-      <div className="overflow-hidden rounded-lg border border-line">
+      <div className="divide-y divide-line border-y border-line">
         {[root, ...children].map((s, i) => {
           const Icon = ICON[s.type] ?? Gauge
           const left = ((s.start_time - t0) * 1000 / total) * 100
@@ -56,7 +56,7 @@ export function TraceViewer({ spans, showEvaluators = true }: { spans: Span[]; s
           const expanded = open === s.span_id
           const isSlow = i > 0 && slowest?.span_id === s.span_id && s.duration_ms > total * 0.3
           return (
-            <div key={s.span_id} className={clsx(i > 0 && 'border-t border-line')}>
+            <div key={s.span_id}>
               <button type="button" onClick={() => setOpen(expanded ? null : s.span_id)} aria-expanded={expanded}
                 className="grid w-full grid-cols-[minmax(0,1fr)_minmax(80px,180px)_64px] items-center gap-3 px-3 py-2 text-left hover:bg-surface-2 max-md:grid-cols-[minmax(0,1fr)_64px]">
                 <span className="flex min-w-0 items-start gap-2" style={{ paddingLeft: i === 0 ? 0 : 16 }}>
@@ -64,7 +64,7 @@ export function TraceViewer({ spans, showEvaluators = true }: { spans: Span[]; s
                   <Icon className={clsx('mt-0.5 size-3.5 shrink-0', s.status === 'error' ? 'text-bad-ink' : 'text-ink-2')} aria-hidden />
                   <span className="min-w-0">
                     <span className="flex flex-wrap items-center gap-x-2">
-                      <span className="text-label font-medium uppercase tracking-wide text-ink-3">{LABEL[s.type] ?? s.type}</span>
+                      <span className="t-label">{LABEL[s.type] ?? s.type}</span>
                       <span className={clsx('break-all text-sm font-medium', s.status === 'error' && 'text-bad-ink')}>{s.name}</span>
                       {isSlow && <Badge tone="warn">slowest step</Badge>}
                     </span>
@@ -76,7 +76,7 @@ export function TraceViewer({ spans, showEvaluators = true }: { spans: Span[]; s
                     initial={{ width: 0 }} animate={{ width: `${Math.min(width, 100 - Math.min(left, 99))}%` }} transition={{ delay: 0.04 * i, type: 'spring', stiffness: 160, damping: 24 }}
                     style={{ left: `${Math.min(left, 99)}%` }} />
                 </span>
-                <span className="num text-right text-xs text-ink-2">{s.duration_ms ? ms(s.duration_ms) : '-'}</span>
+                <span className="num text-right font-mono text-xs text-ink-2">{s.duration_ms ? ms(s.duration_ms) : '-'}</span>
               </button>
               <AnimatePresence initial={false}>
                 {expanded && (
@@ -91,7 +91,7 @@ export function TraceViewer({ spans, showEvaluators = true }: { spans: Span[]; s
       </div>
       {showEvaluators && checks.length > 0 && (
         <div>
-          <div className="mb-1.5 text-xs font-medium text-ink-3">Checks that graded this answer</div>
+          <div className="t-label mb-1.5">Checks that graded this answer</div>
           <div className="flex flex-wrap gap-1.5">
             {checks.map((c) => {
               const pass = (c.output_summary ?? '').startsWith('pass')

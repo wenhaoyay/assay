@@ -6,7 +6,8 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { DatasetAdd } from '../components/DatasetAdd'
 import { AddVariations, BuildPanel, ProvenanceBadge, TermChips } from '../components/Golden'
 import { CaseMatrixView, MatrixLegend } from '../components/viz'
-import { Badge, Button, Card, Empty, ErrorState, Explain, Field, Input, Json, Loading, Notice, PageHeader, Segmented, Select, StatusBadge, Table, Tabs, Textarea } from '../components/ui'
+import { Badge, Button, Card, Code, Empty, ErrorState, Field, Input, Json, Loading, Notice, PageHeader, Segmented, Select, StatusBadge, Table, Tabs, Textarea, Help, linkButton } from '../components/ui'
+import { LabelHelp } from '../components/LabelHelp'
 import { api } from '../lib/api'
 import { useCrumbs } from '../lib/crumbs'
 import { when } from '../lib/format'
@@ -21,22 +22,14 @@ export function VersionBadge({ v }: { v: Pick<DatasetVersion, 'version' | 'statu
       <Badge tone="info" className="font-mono">v{v.version}</Badge>
       <StatusBadge status={v.status} />
       {v.status === 'frozen' && (
-        <span className="inline-flex items-center gap-1 text-xs text-ink-3" title="Used by a run. It can no longer change; edits create a new version.">
-          <Lock className="size-3" aria-hidden /> used by {v.run_count} run{v.run_count === 1 ? '' : 's'}
+        <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs text-ink-2" title="Used by a run. It can no longer change; edits create a new version.">
+          <Lock className="size-3" aria-hidden /> used by <span className="font-mono">{v.run_count}</span> run{v.run_count === 1 ? '' : 's'}
         </span>
       )}
     </span>
   )
 }
 
-function GroundTruthNote() {
-  return (
-    <Notice tone="info" title="Who decides what is correct?">
-      You do. GaugeLab cannot infer ground truth: every expected outcome in a dataset was written, imported or
-      approved by a person. AI-generated cases stay in a review queue until someone approves them.
-    </Notice>
-  )
-}
 
 export function DatasetsPage() {
   useCrumbs([{ label: 'Setup' }, { label: 'Datasets' }], 'datasets')
@@ -51,23 +44,23 @@ export function DatasetsPage() {
 
   return (
     <>
-      <PageHeader title="Datasets" description="Versioned golden datasets: test cases with the outcomes a person expects. A version used by a run is frozen for good." />
-      <div className="mb-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
-        <div className="space-y-5">
-          <GroundTruthNote />
-          <WaysToBuild />
-        </div>
-        <Card title="Add questions">
+      <PageHeader title="Datasets" help={<>
+        <p>Versioned golden datasets: test cases with the outcomes a person expects. A version used by a run is frozen for good; editing it makes a new version.</p>
+        <p><span className="font-semibold">Who decides what is correct? You do.</span> GaugeLab cannot infer ground truth: every expected outcome in a dataset was written, imported or approved by a person. AI-generated cases stay in a review queue until someone approves them.</p>
+      </>} />
+      <div className="mb-10 grid gap-10 lg:grid-cols-[minmax(0,1fr)_400px]">
+        <WaysToBuild />
+        <Card title="Add questions" boxed help={<p>Type or paste questions, or upload a file, into a new or existing dataset. You add the expected answers afterwards, or approve good answers on the Build tab.</p>}>
           <DatasetAdd key={fromProject} defaultProjectId={fromProject} />
         </Card>
       </div>
       {datasets.isLoading ? <Loading /> : datasets.isError ? <ErrorState error={datasets.error} /> : all.length === 0 ? (
-        <Empty title="No datasets yet">Add questions above, or run <code>gaugelab seed</code> for the 58-case Acme golden set.</Empty>
+        <Empty title="No datasets yet. A gauge with nothing to read.">Add questions above, or run <Code>gaugelab seed</Code> for the 58-case Acme golden set.</Empty>
       ) : (
-        <Card padded={false} title={<span className="flex items-center gap-2">{shown.length} dataset{shown.length === 1 ? '' : 's'}</span>}
+        <Card padded={false} title="Your datasets" meta={`${shown.length}`} help={<p>Each dataset belongs to one chatbot; change it here. A set that runs have used can only be archived (its questions stay with those runs); an unused one can be deleted.</p>}
           actions={archivedCount > 0 && <Button size="sm" variant="ghost" onClick={() => setShowArchived((v) => !v)}>{showArchived ? 'Hide' : 'Show'} {archivedCount} archived</Button>}>
           <Table>
-            <thead><tr><th>Dataset</th><th>Chatbot</th><th>Latest version</th><th className="text-right">Cases</th><th>Review queue</th><th className="w-40" /></tr></thead>
+            <thead><tr className="whitespace-nowrap"><th className="t-label">Dataset</th><th className="t-label">Chatbot</th><th className="t-label">Latest version</th><th className="t-label text-right">Cases</th><th className="t-label">Review queue</th><th className="w-40" /></tr></thead>
             <tbody>
               {shown.map((d) => <DatasetRow key={d.id} d={d} projects={projects.all} />)}
             </tbody>
@@ -81,12 +74,12 @@ export function DatasetsPage() {
 /** Where golden questions can come from, each one click away. */
 function WaysToBuild() {
   return (
-    <Card title="Ways to build a set" subtitle="The machine does the typing; you vouch for every case">
-      <ul className="grid gap-2 text-sm sm:grid-cols-2">
-        <li><b>Approve good answers</b><span className="block text-xs text-ink-3">Open a dataset → <i>Build</i>: mark a bot's answers right or wrong; GaugeLab suggests what a correct answer must mention.</span></li>
-        <li><b>Prompt kit</b><span className="block text-xs text-ink-3">Copy a ready prompt into your own ChatGPT or Claude with your documents; the result lands in the review queue.</span></li>
-        <li><b>Real questions</b><span className="block text-xs text-ink-3">Upload chat history; similar questions are grouped by how often they were asked.</span></li>
-        <li><b>Colleagues</b><span className="block text-xs text-ink-3">Send the <a className="text-accent-ink underline" href="/api/datasets/template.csv">spreadsheet template</a> or use expert interview mode.</span></li>
+    <Card title="Ways to build a set" help={<p>The machine does the typing; you vouch for every case. Each way ends in the same place: cases a person has approved.</p>}>
+      <ul className="grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
+        <li><span className="font-semibold text-ink">Approve good answers</span><span className="mt-0.5 block text-sm text-ink-2">Open a dataset → <i>Build</i>: mark a bot's answers right or wrong; GaugeLab suggests what a correct answer must mention.</span></li>
+        <li><span className="font-semibold text-ink">Prompt kit</span><span className="mt-0.5 block text-sm text-ink-2">Copy a ready prompt into your own ChatGPT or Claude with your documents; the result lands in the review queue.</span></li>
+        <li><span className="font-semibold text-ink">Real questions</span><span className="mt-0.5 block text-sm text-ink-2">Upload chat history; similar questions are grouped by how often they were asked.</span></li>
+        <li><span className="font-semibold text-ink">Colleagues</span><span className="mt-0.5 block text-sm text-ink-2">Send the <a className="text-accent-ink underline" href="/api/datasets/template.csv">spreadsheet template</a> or use expert interview mode.</span></li>
       </ul>
     </Card>
   )
@@ -105,7 +98,7 @@ function DatasetRow({ d, projects }: { d: Dataset; projects: Project[] }) {
         <td>
           <Link to={`/datasets/${d.id}`} className="font-medium hover:underline">{d.name}</Link>
           {d.archived && <Badge className="ml-2">archived</Badge>}
-          <div className="max-w-md truncate text-xs text-ink-3">{d.description || d.latest?.change_summary}</div>
+          <div className="max-w-md truncate text-xs text-ink-2">{d.description || d.latest?.change_summary}</div>
         </td>
         <td>
           <Select className="w-64" value={d.project_id} aria-label={`Chatbot of ${d.name}`} onChange={(e) => patch.mutate({ project_id: Number(e.target.value) })}>
@@ -113,7 +106,7 @@ function DatasetRow({ d, projects }: { d: Dataset; projects: Project[] }) {
           </Select>
         </td>
         <td>{d.latest && <VersionBadge v={d.latest} />}</td>
-        <td className="num text-right">{d.latest?.case_count ?? 0}</td>
+        <td className="num text-right font-mono">{d.latest?.case_count ?? 0}</td>
         <td>{d.unreviewed_candidates > 0 ? <Badge tone="warn">{d.unreviewed_candidates} unreviewed</Badge> : <span className="text-xs text-ink-3">-</span>}</td>
         <td className="text-right">
           {d.archived ? <Button size="sm" variant="ghost" onClick={() => patch.mutate({ archived: false })}><ArchiveRestore className="size-3.5" />Restore</Button>
@@ -125,7 +118,7 @@ function DatasetRow({ d, projects }: { d: Dataset; projects: Project[] }) {
         <tr><td colSpan={6} className="bg-surface-2/50">
           {confirm && (
             <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span>Delete <b>{d.name}</b> and its {d.latest?.case_count ?? 0} question(s)? No run used it. This cannot be undone.</span>
+              <span>Delete <span className="font-semibold">{d.name}</span> and its <span className="font-mono">{d.latest?.case_count ?? 0}</span> question(s)? No run used it. This cannot be undone.</span>
               <Button size="sm" variant="bad" loading={del.isPending} onClick={() => del.mutate()}>Delete</Button>
               <Button size="sm" variant="ghost" onClick={() => setConfirm(false)}>Cancel</Button>
             </div>
@@ -165,14 +158,18 @@ export function DatasetPage() {
     <>
       <PageHeader
         title={d.name}
-        description={d.description}
+        help={<>
+          {d.description && <p>{d.description}</p>}
+          <p>Cases lists the questions of the chosen version and what a right answer needs. Build turns a bot's answers into golden cases. Results across runs shows every case in every run. Generate drafts candidates from documents for your review.</p>
+          <p>A version a run used is frozen: editing a case saves to a new draft version.</p>
+        </>}
         actions={
           <>
             <Select aria-label="Version" value={versionId} onChange={(e) => switchTo(Number(e.target.value))} className="w-72">
-              {[...d.versions].reverse().map((v) => <option key={v.id} value={v.id}>v{v.version} - {v.case_count} cases - {v.status === 'frozen' ? `frozen, used by ${v.run_count} run${v.run_count === 1 ? '' : 's'}` : 'draft'}</option>)}
+              {[...d.versions].reverse().map((v) => <option key={v.id} value={v.id}>v{v.version} · {v.case_count} cases · {v.status === 'frozen' ? `frozen, used by ${v.run_count} run${v.run_count === 1 ? '' : 's'}` : 'draft'}</option>)}
             </Select>
-            <a className="inline-flex h-8 items-center gap-1.5 rounded-md border border-line-strong bg-surface px-3 text-sm hover:bg-surface-2" href={`/api/dataset-versions/${versionId}/export?format=yaml`}><Download className="size-3.5" /> YAML</a>
-            <a className="inline-flex h-8 items-center gap-1.5 rounded-md border border-line-strong bg-surface px-3 text-sm hover:bg-surface-2" href={`/api/dataset-versions/${versionId}/export?format=json`}><Download className="size-3.5" /> JSON</a>
+            <a className={linkButton()} href={`/api/dataset-versions/${versionId}/export?format=yaml`}><Download className="size-3.5" /> YAML</a>
+            <a className={linkButton()} href={`/api/dataset-versions/${versionId}/export?format=json`}><Download className="size-3.5" /> JSON</a>
           </>
         }
       />
@@ -188,7 +185,7 @@ export function DatasetPage() {
         value={tab}
         onChange={setTab}
       />
-      <div className="mt-4">
+      <div className="mt-6">
         {tab === 'cases' && (version.isLoading ? <Loading /> : version.isError ? <ErrorState error={version.error} /> : version.data && (
           <CasesPanel
             version={version.data}
@@ -203,16 +200,16 @@ export function DatasetPage() {
         {tab === 'history' && <HistoryPanel matrix={matrix.data} loading={matrix.isLoading} focus={params.get('case')} />}
         {tab === 'generate' && versionId && <GeneratePanel datasetId={d.id} versionId={versionId} onPromoted={(r) => { if (r.branched) setNotice(r.notice ?? null); switchTo(r.id); setTab('cases') }} />}
         {tab === 'versions' && (
-          <Card padded={false}>
+          <Card padded={false} title="Versions" meta={`${d.versions.length}`} help={<p>Every saved version of this dataset, newest first. Click one to open its cases. The hash identifies the exact content a run used.</p>}>
             <Table>
-              <thead><tr><th>Version</th><th>Status</th><th className="text-right">Cases</th><th>Parent</th><th>Change summary</th><th>Hash</th><th>Created</th></tr></thead>
+              <thead><tr className="whitespace-nowrap"><th className="t-label">Version</th><th className="t-label">Status</th><th className="t-label text-right">Cases</th><th className="t-label">Parent</th><th className="t-label">Change summary</th><th className="t-label">Hash</th><th className="t-label">Created</th></tr></thead>
               <tbody>
                 {[...d.versions].reverse().map((v) => (
                   <tr key={v.id} className={clsx('cursor-pointer hover:bg-surface-2/60', v.id === versionId && 'bg-surface-2/60')} onClick={() => { switchTo(v.id); setTab('cases') }}>
                     <td className="num font-mono">v{v.version}</td>
                     <td><StatusBadge status={v.status} /></td>
-                    <td className="num text-right">{v.case_count}</td>
-                    <td className="num text-ink-3">{d.versions.find((p) => p.id === v.parent_version_id)?.version ? `v${d.versions.find((p) => p.id === v.parent_version_id)!.version}` : '-'}</td>
+                    <td className="num text-right font-mono">{v.case_count}</td>
+                    <td className="num font-mono text-ink-3">{d.versions.find((p) => p.id === v.parent_version_id)?.version ? `v${d.versions.find((p) => p.id === v.parent_version_id)!.version}` : '-'}</td>
                     <td className="max-w-md text-ink-2">{v.change_summary}</td>
                     <td className="font-mono text-xs text-ink-3">{v.content_hash}</td>
                     <td className="text-xs text-ink-3">{when(v.created_at)}</td>
@@ -261,11 +258,14 @@ function CaseHistory({ matrix, caseId }: { matrix?: CaseMatrix; caseId: string }
 function HistoryPanel({ matrix, loading, focus }: { matrix?: CaseMatrix; loading: boolean; focus: string | null }) {
   const [filter, setFilter] = useState<'all' | 'changed' | 'always_fail' | 'flaky'>('all')
   if (loading || !matrix) return <Loading />
-  if (!matrix.runs.length) return <Empty title="No runs on this dataset yet">Each completed run adds a column here.</Empty>
+  if (!matrix.runs.length) return <Empty title="No runs on this dataset yet. Nothing has been measured against it.">Each completed run adds a column here.</Empty>
   return (
-    <Card padded={false} title="Every case in every run" subtitle={`${matrix.cases.length} cases x ${matrix.runs.length} runs (oldest on the left)`}
+    <Card padded={false} title="Every case in every run" meta={`${matrix.cases.length} × ${matrix.runs.length}`} help={<>
+      <p>{matrix.cases.length} cases (rows) by {matrix.runs.length} runs (columns, oldest on the left). Each cell is how many tries of that case passed in that run; hatched cells were graded by the heuristic judge.</p>
+      <p>A case that fails in every run, whatever the version, is often a wrong or outdated golden answer rather than a bad bot.</p>
+    </>}
       actions={<Segmented size="sm" value={filter} onChange={setFilter} options={[{ id: 'all', label: 'All' }, { id: 'changed', label: 'Changed' }, { id: 'flaky', label: 'Flaky' }, { id: 'always_fail', label: `Always failing ${matrix.always_fail.length}` }]} />}>
-      <div className="border-b border-line px-4 py-2"><MatrixLegend /><Explain className="mt-1">A case that fails in every run, whatever the version, is often a wrong or outdated golden answer rather than a bad bot.</Explain></div>
+      <div className="border-b border-line py-2"><MatrixLegend /></div>
       <CaseMatrixView data={matrix} filter={filter} focusCase={focus} />
     </Card>
   )
@@ -298,21 +298,21 @@ function CasesPanel({ version, onEdited, matrix, focus }: { version: DatasetVers
           <option value="">All categories</option>
           {categories.map((c) => <option key={c}>{c}</option>)}
         </Select>
-        <span className="text-xs text-ink-3">{shown.length} of {cases.length}</span>
+        <span className="text-xs text-ink-2"><span className="font-mono">{shown.length}</span> of <span className="font-mono">{cases.length}</span></span>
         <Button className="ml-auto" variant="primary" onClick={() => setEditing('new')}><Plus className="size-3.5" /> Add case</Button>
       </div>
       {cases.length === 0 ? (
-        <Empty title="No cases in this version">Add one manually, import a file, or generate candidates from your documents (they will need your review).</Empty>
+        <Empty title="No cases in this version. An empty exam is easy to pass.">Add one manually, import a file, or generate candidates from your documents (they will need your review).</Empty>
       ) : (
         <Card padded={false}>
           <Table>
-            <thead><tr><th>Id</th><th>Question</th><th>Category</th><th>What a right answer needs</th><th>Recent runs</th><th></th></tr></thead>
+            <thead><tr className="whitespace-nowrap"><th className="t-label">Id</th><th className="t-label">Question</th><th className="t-label">Category</th><th className="t-label">What a right answer needs</th><th className="t-label">Recent runs</th><th></th></tr></thead>
             <tbody>
               {shown.map((c) => (
-                <tr key={c.id} className={clsx('align-top hover:bg-surface-2/60', focus === c.id && 'bg-accent-wash')}>
+                <tr key={c.id} data-case={c.id} className={clsx('align-top hover:bg-surface-2/60', focus === c.id && 'bg-accent-wash')}>
                   <td className="whitespace-nowrap font-mono text-xs">{c.id}<div className="mt-0.5"><ProvenanceBadge c={c} origin={(c as TestCase & { _origin?: string })._origin} /></div></td>
-                  <td className="max-w-xl"><div className="font-medium">{c.title}</div><div className="text-ink-2">{c.input.message}</div></td>
-                  <td><Badge>{c.category}</Badge><div className="mt-0.5 text-label text-ink-3">{c.difficulty}</div></td>
+                  <td className="max-w-xl"><div className="font-medium text-ink">{c.title}</div><div className="text-ink-2">{c.input.message}</div></td>
+                  <td><Badge>{c.category}</Badge><div className="mt-0.5 text-xs text-ink-3">{c.difficulty}</div></td>
                   <td><div className="flex flex-wrap gap-1">{expectedSummary(c).map((s) => <Badge key={s}>{s}</Badge>)}</div></td>
                   <td><CaseHistory matrix={matrix} caseId={c.id} /></td>
                   <td className="whitespace-nowrap"><Button size="sm" variant="ghost" onClick={() => setEditing(c)}>{version.status === 'frozen' ? 'Edit (new version)' : 'Edit'}</Button><AddVariations versionId={version.id} caseId={c.id} /></td>
@@ -377,7 +377,7 @@ export function CaseEditor({ versionId, initial, onClose, onSaved }: {
   })
 
   return (
-    <Card title={initial ? `Edit ${initial.id}` : 'New case'} actions={<Button size="sm" variant="ghost" onClick={onClose}>Close</Button>}>
+    <Card boxed title={initial ? `Edit ${initial.id}` : 'New case'} actions={<Button size="sm" variant="ghost" onClick={onClose}>Close</Button>}>
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
@@ -389,15 +389,15 @@ export function CaseEditor({ versionId, initial, onClose, onSaved }: {
             </Field>
           </div>
           <Field label="User question"><Textarea rows={3} className="font-sans text-sm" value={question} onChange={(e) => setQuestion(e.target.value)} /></Field>
-          <Field label="Reference answer" hint="What a correct answer says. Used by correctness/completeness judges."><Textarea rows={3} className="font-sans text-sm" value={reference} onChange={(e) => setReference(e.target.value)} /></Field>
+          <Field label={<LabelHelp label="Reference answer"><p>What a correct answer says. Used by the correctness and completeness judges.</p></LabelHelp>}><Textarea rows={3} className="font-sans text-sm" value={reference} onChange={(e) => setReference(e.target.value)} /></Field>
         </div>
         <div className="space-y-3">
-          <Field label="Must mention (one per line, a|b for alternatives)"><Textarea rows={3} value={mention} onChange={(e) => setMention(e.target.value)} /></Field>
+          <Field label={<LabelHelp label="Must mention" title="Must mention"><p>One phrase per line; every line must appear in the answer (whole words, capitals do not matter). Write a|b for alternatives.</p><p>Click words from the reference answer below to add them.</p></LabelHelp>}><Textarea rows={3} value={mention} onChange={(e) => setMention(e.target.value)} /></Field>
           <TermChips text={reference} picked={lines(mention)} exclude={[]}
             onToggle={(t) => setMention((m) => (lines(m).includes(t) ? lines(m).filter((x) => x !== t) : [...lines(m), t]).join(NL))} />
           <PlainMatchers onAdd={(p) => setPatterns((x) => [...x, p])} />
           {patterns.length > 0 && <div className="flex flex-wrap gap-1">{patterns.map((p) => <Badge key={p} className="font-mono">{p}<button type="button" aria-label="Remove pattern" className="ml-1" onClick={() => setPatterns((x) => x.filter((y) => y !== p))}>×</button></Badge>)}</div>}
-          <Field label="Must not claim (one per line)"><Textarea rows={2} value={forbid} onChange={(e) => setForbid(e.target.value)} /></Field>
+          <Field label={<LabelHelp label="Must not claim"><p>One phrase per line; the answer fails if any appears.</p></LabelHelp>}><Textarea rows={2} value={forbid} onChange={(e) => setForbid(e.target.value)} /></Field>
           <Field label="Should the assistant decline?">
             <Select value={refusal} onChange={(e) => setRefusal(e.target.value)}>
               <option value="">Not specified</option><option value="false">No - it should answer</option><option value="true">Yes - it should decline</option>
@@ -407,7 +407,7 @@ export function CaseEditor({ versionId, initial, onClose, onSaved }: {
             {advanced ? 'Hide advanced' : 'Advanced: relevant documents, tools and arguments, outcome, schema, evaluator config'}
           </button>
           {advanced && (
-            <Field label="Advanced (JSON)" error={jsonError ?? undefined} hint="Fields of expected: relevant_documents, required_tools, tool_calls [{name, arguments, symmetric}], forbidden_tools, tool_policy, expected_outcome, max_extra_tool_calls, required_citations, min_citations, answer.regex, answer.json_schema...">
+            <Field label={<LabelHelp label="Advanced (JSON)" title="Fields of expected"><p>relevant_documents, required_tools, tool_calls [{'{'}name, arguments, symmetric{'}'}], forbidden_tools, tool_policy, expected_outcome, max_extra_tool_calls, required_citations, min_citations, answer.regex, answer.json_schema...</p></LabelHelp>} error={jsonError ?? undefined}>
               <Textarea rows={14} value={advancedText} onChange={(e) => { setAdvancedText(e.target.value); setJsonError(null) }} spellCheck={false} />
             </Field>
           )}
@@ -460,11 +460,11 @@ function GeneratePanel({ datasetId, versionId, onPromoted }: { datasetId: number
   return (
     <div className="space-y-4">
       <Notice tone="warn" title="Generated cases are candidates, not ground truth">
-        A model drafts questions and answers from your documents. Each one stays <b>unreviewed</b> until a person approves,
+        A model drafts questions and answers from your documents. Each one stays <span className="font-semibold">unreviewed</span> until a person approves,
         edits or rejects it; only approved cases can be added to a dataset version. Check the evidence quote: GaugeLab flags quotes it cannot find in the document.
       </Notice>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <Card title="1. Reference documents">
+        <Card boxed title="1. Reference documents" help={<p>Upload Markdown, TXT, JSON or PDF, then tick the documents to draft questions from.</p>}>
           <input type="file" accept=".md,.txt,.json,.pdf" onChange={(e) => e.target.files?.[0] && upload.mutate(e.target.files[0])} className="block text-xs file:mr-3 file:rounded-md file:border file:border-line-strong file:bg-surface file:px-2.5 file:py-1 file:text-xs" aria-label="Upload document" />
           {upload.isError && <div className="mt-2"><ErrorState error={upload.error} /></div>}
           <ul className="mt-3 max-h-48 space-y-1 overflow-y-auto text-sm">
@@ -472,16 +472,16 @@ function GeneratePanel({ datasetId, versionId, onPromoted }: { datasetId: number
               <li key={d.id}>
                 <label className="flex items-center gap-2">
                   <input type="checkbox" checked={selected.includes(d.id)} onChange={(e) => setSelected((s) => (e.target.checked ? [...s, d.id] : s.filter((x) => x !== d.id)))} />
-                  <span className="font-mono text-xs">{d.filename}</span><span className="text-xs text-ink-3">{d.chars} chars</span>
+                  <span className="font-mono text-xs">{d.filename}</span><span className="text-xs text-ink-3"><span className="font-mono">{d.chars}</span> chars</span>
                 </label>
               </li>
             ))}
-            {docs.data?.length === 0 && <li className="text-ink-3">No documents uploaded yet (Markdown, TXT, JSON or PDF).</li>}
+            {docs.data?.length === 0 && <li className="text-ink-2">No documents uploaded yet (Markdown, TXT, JSON or PDF).</li>}
           </ul>
         </Card>
-        <Card title="2. Generate">
+        <Card boxed title="2. Generate">
           <div className="space-y-3">
-            <Field label="Generator model" hint={providers.data?.length ? 'Your documents are sent to this provider. A local Ollama model keeps them on this machine.' : undefined}>
+            <Field label={<LabelHelp label="Generator model"><p>Your documents are sent to this provider. A local Ollama model keeps them on this machine.</p></LabelHelp>}>
               <Select value={provider} onChange={(e) => setProvider(e.target.value ? Number(e.target.value) : '')}>
                 {(providers.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </Select>
@@ -498,6 +498,7 @@ function GeneratePanel({ datasetId, versionId, onPromoted }: { datasetId: number
 
       <Card
         title="3. Review queue"
+        help={<p>Approve, edit or reject each candidate; every decision records who made it. Check the evidence quote: GaugeLab flags quotes it cannot find in the document. Add approved to dataset puts the approved ones into a version.</p>}
         actions={
           <>
             <Input className="h-7 w-40 text-xs" placeholder="Your name (reviewer)" value={reviewer} onChange={(e) => setReviewer(e.target.value)} aria-label="Reviewer" />
@@ -511,7 +512,7 @@ function GeneratePanel({ datasetId, versionId, onPromoted }: { datasetId: number
         {promote.isError && <div className="mb-3"><ErrorState error={promote.error} /></div>}
         {!reviewer && <p className="mb-3 text-xs text-warn-ink">Enter your name to approve or reject: every decision records who made it.</p>}
         {cands.isLoading ? <Loading /> : (cands.data ?? []).length === 0 ? (
-          <p className="text-sm text-ink-3">Nothing here.</p>
+          <Empty title="Nothing in this queue." />
         ) : (
           <ul className="space-y-3">
             {cands.data!.map((c) => (
@@ -522,7 +523,7 @@ function GeneratePanel({ datasetId, versionId, onPromoted }: { datasetId: number
                   {c.edited && <Badge tone="info">edited</Badge>}
                   {c.approved_in_version_id && <Badge tone="good">in dataset</Badge>}
                   <span className="font-mono text-xs text-ink-3">{c.document}</span>
-                  {c.reviewer && <span className="text-xs text-ink-3">reviewed by {c.reviewer}</span>}
+                  {c.reviewer && <span className="text-xs text-ink-2">reviewed by {c.reviewer}</span>}
                 </div>
                 <div className="mt-2 text-sm font-medium">{c.case.input.message}</div>
                 <div className="mt-1 text-sm text-ink-2"><span className="text-ink-3">Proposed answer: </span>{c.case.expected.answer.reference ?? '-'}</div>
@@ -568,7 +569,7 @@ function PlainMatchers({ onAdd }: { onAdd: (pattern: string) => void }) {
   }
   return (
     <div className="rounded-lg border border-line p-2">
-      <div className="mb-1 text-xs font-medium text-ink-2">Or a rule in plain words</div>
+      <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-ink-2">Or a rule in plain words<Help title="Rules in plain words"><p>GaugeLab writes the pattern (shown below the rule) so "91" does not match "910", and capitals do not matter.</p></Help></div>
       <div className="flex flex-wrap gap-2">
         <Select className="w-48" value={kind} onChange={(e) => setKind(e.target.value as typeof kind)} aria-label="Rule kind">
           <option value="any">contains any of</option><option value="word">contains the whole word</option><option value="number">contains the exact number</option>
@@ -576,7 +577,7 @@ function PlainMatchers({ onAdd }: { onAdd: (pattern: string) => void }) {
         <Input className="w-56" value={text} onChange={(e) => setText(e.target.value)} placeholder={kind === 'any' ? 'EOL, end of life' : kind === 'number' ? '91' : 'backflush'} aria-label="Rule text" onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); make() } }} />
         <Button size="sm" disabled={!text.trim()} onClick={make}>Add rule</Button>
       </div>
-      <p className="mt-1 text-label text-ink-3">GaugeLab writes the pattern (shown below) so "91" does not match "910", and capitals do not matter.</p>
+
     </div>
   )
 }

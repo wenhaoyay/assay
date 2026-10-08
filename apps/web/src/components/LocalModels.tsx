@@ -8,7 +8,7 @@ import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useSettings } from '../lib/projects'
 import type { ProviderConfig } from '../lib/types'
-import { Badge, Button, Card, Dialog, ErrorState, Notice, ProgressBar, Table } from './ui'
+import { Badge, Button, Card, Dialog, ErrorState, Help, Notice, ProgressBar, Table } from './ui'
 
 const OLLAMA_URL = 'https://ollama.com/download'
 
@@ -26,14 +26,14 @@ interface Pull { model: string; status: string; completed: number; total: number
 export function ThirdPartyNotice() {
   return (
     <div className="space-y-1.5 text-sm text-ink-2">
-      <p><b>Ollama and the models it downloads are third-party software.</b> They are not made, endorsed, reviewed or supported by GaugeLab. The install link opens an external website.</p>
+      <p><b className="font-semibold">Ollama and the models it downloads are third-party software.</b> They are not made, endorsed, reviewed or supported by GaugeLab. The install link opens an external website.</p>
       <ul className="list-disc space-y-1 pl-4">
-        <li>You download and install them <b>at your own risk</b>. Check each model's licence and terms, and your organisation's rules on installing software and on data (IT approval may be required).</li>
-        <li>GaugeLab gives <b>no warranty</b> for the availability, accuracy, safety or performance of third-party models, and is not responsible for their output.</li>
+        <li>You download and install them <b className="font-semibold">at your own risk</b>. Check each model's licence and terms, and your organisation's rules on installing software and on data (IT approval may be required).</li>
+        <li>GaugeLab gives <b className="font-semibold">no warranty</b> for the availability, accuracy, safety or performance of third-party models, and is not responsible for their output.</li>
         <li>Downloads are large (1–10 GB) and running a model uses this PC's memory, disk and power.</li>
-        <li>Models whose names end in <code>-cloud</code> or <code>:cloud</code> <b>run on the provider's servers</b>: questions and answers leave this PC, even though they are reached through the local Ollama.</li>
+        <li>Models whose names end in <code>-cloud</code> or <code>:cloud</code> <b className="font-semibold">run on the provider's servers</b>: questions and answers leave this PC, even though they are reached through the local Ollama.</li>
       </ul>
-      <p className="text-xs text-ink-3">This notice is information, not legal advice. Have your organisation review it if GaugeLab is used beyond your own PC.</p>
+      <p className="text-xs text-ink-2">This notice is information, not legal advice. Have your organisation review it if GaugeLab is used beyond your own PC.</p>
     </div>
   )
 }
@@ -82,12 +82,15 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
 
   return (
     <Card title={<span className="flex items-center gap-2"><Cpu className="size-4 text-good-ink" />Run a grading model on this PC (Ollama)</span>}
-      subtitle="Free per call, and the answers being graded never leave this PC. Slower than a cloud model."
+      help={<>
+        <p>Free per call, and the answers being graded never leave this PC. Slower than a cloud model.</p>
+        <p>The four steps light up as they are done: install, running, a model downloaded, connected as a grading model. The full guide covers choosing a model, LM Studio and what to do when something goes wrong.</p>
+      </>}
       actions={<Button size="sm" variant="ghost" onClick={() => setGuide(true)}><BookOpen className="size-3.5" />Full guide</Button>}>
       <ol className="mb-4 flex flex-wrap gap-2">
         {steps.map((s, i) => (
           <li key={s.label} className={clsx('flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs', s.done ? 'border-good/40 text-good-ink' : 'border-line text-ink-3')}>
-            <span className={clsx('flex size-4 items-center justify-center rounded-full text-label font-semibold', s.done ? 'bg-good text-white' : 'bg-surface-3')}>{s.done ? <Check className="size-2.5" /> : i + 1}</span>{s.label}
+            <span className={clsx('flex size-4 items-center justify-center rounded-full font-mono text-label font-semibold', s.done ? 'bg-good text-white' : 'bg-surface-3')}>{s.done ? <Check className="size-2.5" /> : i + 1}</span>{s.label}
           </li>
         ))}
       </ol>
@@ -103,26 +106,27 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
           </a>
         </div>
       ) : (
-        <p className="mb-3 text-xs text-good-ink">Ollama {st.version} is running at {st.base_url}.</p>
+        <p className="mb-3 text-xs text-good-ink">Ollama <span className="font-mono">{st.version}</span> is running at <span className="font-mono">{st.base_url}</span>.</p>
       )}
 
       {a && (
         <div className="mt-4">
-          <div className="mb-1.5 text-xs font-medium text-ink-2">
-            Which model fits this PC: {a.memory.free_gb ?? '?'} GB of {a.memory.total_gb ?? '?'} GB memory free, {a.gpu ? `graphics: ${a.gpu}` : 'no graphics card found (models run on the processor, slowly)'}.
+          <div className="mb-1.5 flex items-center gap-1.5 text-sm text-ink-2">
+            <span><span className="font-medium text-ink">Which model fits this PC:</span> <span className="font-mono">{a.memory.free_gb ?? '?'}</span> GB of <span className="font-mono">{a.memory.total_gb ?? '?'}</span> GB memory free, {a.gpu ? `graphics: ${a.gpu}` : 'no graphics card found (models run on the processor, slowly)'}.</span>
+            {rec && <Help title="Time against cost"><p>Grading 100 answers on 2 meaning checks is 200 calls. With {rec.model} here: about {Math.round((200 * rec.seconds_per_check) / 60)} min, free. With a cloud model: about {Math.max(1, Math.round((200 * 2.5) / 4 / 60))} min at 4 in parallel, paid per call (see a cloud model's Check for its cost per 100 calls).</p><p>Greyed rows need more free memory than this PC has now.</p></Help>}
           </div>
           <Table>
-            <thead><tr><th>Model</th><th className="text-right">Download</th><th className="text-right">Needs memory</th><th className="text-right">Per grading call here</th><th /></tr></thead>
+            <thead><tr className="whitespace-nowrap"><th className="t-label">Model</th><th className="t-label text-right">Download</th><th className="t-label text-right">Needs memory</th><th className="t-label text-right">Per call here</th><th /></tr></thead>
             <tbody>
               {a.suggestions.map((s) => (
                 <tr key={s.model} className={clsx(!s.fits && !installed.has(s.model) && 'opacity-55')}>
                   <td>
-                    <code className="text-xs">{s.model}</code>{s.model === a.recommended && <Badge tone="accent" className="ml-1.5">suggested</Badge>}
-                    <div className="text-xs text-ink-3">{s.note}{!s.fits && (installed.has(s.model) ? ' Installed: free memory is tight now, so it may run slower.' : ' Needs more free memory than this PC has now.')}</div>
+                    <code className="font-mono text-xs">{s.model}</code>{s.model === a.recommended && <Badge tone="accent" className="ml-1.5">suggested</Badge>}
+                    <div className="text-xs text-ink-2">{s.note}{!s.fits && (installed.has(s.model) ? ' Installed: free memory is tight now, so it may run slower.' : ' Needs more free memory than this PC has now.')}</div>
                   </td>
-                  <td className="num text-right">~{s.size_gb} GB</td>
-                  <td className="num text-right">~{s.needs_gb} GB</td>
-                  <td className="num text-right">~{s.seconds_per_check} s</td>
+                  <td className="num whitespace-nowrap text-right font-mono">~{s.size_gb} GB</td>
+                  <td className="num whitespace-nowrap text-right font-mono">~{s.needs_gb} GB</td>
+                  <td className="num whitespace-nowrap text-right font-mono">~{s.seconds_per_check} s</td>
                   <td className="text-right">
                     {installed.has(s.model) ? (connected.has(s.model) ? <Badge tone="good"><Check className="size-3" />connected</Badge>
                       : <Button size="sm" variant="primary" loading={connect.isPending && connect.variables === s.model} onClick={() => connect.mutate(s.model)}>Use for grading</Button>)
@@ -132,7 +136,6 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
               ))}
             </tbody>
           </Table>
-          {rec && <p className="mt-1.5 text-xs text-ink-3">Time against cost: grading 100 answers on 2 meaning checks is 200 calls. With <code>{rec.model}</code> here: about {Math.round((200 * rec.seconds_per_check) / 60)} min, free. With a cloud model: about {Math.max(1, Math.round((200 * 2.5) / 4 / 60))} min at 4 in parallel, paid per call (see a cloud model's <i>Check</i> for its cost per 100 calls).</p>}
         </div>
       )}
 
@@ -152,7 +155,7 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
       {downloading && progress.data && (
         <div className="mt-3">
           <div className="mb-1 flex justify-between text-xs text-ink-2"><span>Downloading <code>{pulling}</code>: {progress.data.status}</span>
-            <span className="num">{progress.data.total ? `${(progress.data.completed / 1e9).toFixed(1)} / ${(progress.data.total / 1e9).toFixed(1)} GB` : ''}</span></div>
+            <span className="num font-mono">{progress.data.total ? `${(progress.data.completed / 1e9).toFixed(1)} / ${(progress.data.total / 1e9).toFixed(1)} GB` : ''}</span></div>
           <ProgressBar value={progress.data.total ? progress.data.completed / progress.data.total : 0} />
         </div>
       )}
@@ -168,7 +171,7 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
           <Button className="mt-2" size="sm" variant="primary" disabled={!ticked} loading={ack.isPending} onClick={() => ack.mutate()}>Continue to downloads</Button>
         </div>
       )}
-      {acked && <p className="mt-3 text-xs text-ink-3">Third-party notice accepted {new Date(settings.data!.values.ollama_notice_ack!).toLocaleDateString()}. <button type="button" className="underline" onClick={() => setGuide(true)}>Read it again</button></p>}
+      {acked && <p className="mt-3 text-xs text-ink-2">Third-party notice accepted {new Date(settings.data!.values.ollama_notice_ack!).toLocaleDateString()}. <button type="button" className="underline" onClick={() => setGuide(true)}>Read it again</button></p>}
 
       {connected.size > 0 && (
         <div className="mt-4"><Notice title="Calibrate before you trust it" action={<Link to="/calibration" className="text-sm font-medium text-accent-ink underline">Calibration</Link>}>
@@ -196,8 +199,8 @@ function LocalGuide() {
         <ol className="list-decimal space-y-1 pl-4">
           <li>Install Ollama from <a className="text-accent-ink underline" href={OLLAMA_URL} target="_blank" rel="noreferrer noopener">ollama.com/download</a> (external site) and open the app.</li>
           <li>Here, in Settings → Models &amp; keys, the Ollama card ticks <i>running</i> within a few seconds.</li>
-          <li>Accept the third-party notice, then <b>Download</b> the suggested model. The table shows the size and the expected time per grading call on this PC.</li>
-          <li><b>Use for grading</b>: GaugeLab connects it and runs a 5-call check (speed, JSON reliability).</li>
+          <li>Accept the third-party notice, then <b className="font-semibold">Download</b> the suggested model. The table shows the size and the expected time per grading call on this PC.</li>
+          <li><b className="font-semibold">Use for grading</b>: GaugeLab connects it and runs a 5-call check (speed, JSON reliability).</li>
           <li>Calibrate: label about 30 answers in Calibration; the judge bake-off compares it with other models on your labels.</li>
         </ol>
       </section>
@@ -212,10 +215,10 @@ function LocalGuide() {
       <section>
         <h3 className="mb-1 font-semibold text-ink">When something goes wrong</h3>
         <ul className="list-disc space-y-1 pl-4">
-          <li><b>Not answering at localhost:11434</b>: open the Ollama app; if another program uses port 11434, close it or point the model's base URL at Ollama's address.</li>
-          <li><b>Out of memory / very slow</b>: choose a smaller model, close other programs, or grade fewer answers at a time.</li>
-          <li><b>Download stopped</b>: press Download again; Ollama resumes where it stopped.</li>
-          <li><b>Answers marked "not evaluated"</b>: the model replied without valid JSON or timed out. Run its Check; small models fail the JSON test more often.</li>
+          <li><b className="font-semibold">Not answering at localhost:11434</b>: open the Ollama app; if another program uses port 11434, close it or point the model's base URL at Ollama's address.</li>
+          <li><b className="font-semibold">Out of memory / very slow</b>: choose a smaller model, close other programs, or grade fewer answers at a time.</li>
+          <li><b className="font-semibold">Download stopped</b>: press Download again; Ollama resumes where it stopped.</li>
+          <li><b className="font-semibold">Answers marked "not evaluated"</b>: the model replied without valid JSON or timed out. Run its Check; small models fail the JSON test more often.</li>
         </ul>
       </section>
       <section className="rounded-xl border border-warn/40 bg-warn-wash/40 p-3">

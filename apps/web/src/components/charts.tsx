@@ -6,7 +6,8 @@ import { motion } from 'motion/react'
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { pct } from '../lib/format'
 
-const axis = { stroke: 'var(--line-strong)', tick: { fill: 'var(--ink-3)', fontSize: 11 }, tickLine: false }
+const axis = { stroke: 'var(--line-strong)', tick: { fill: 'var(--ink-3)', fontSize: 11, fontFamily: 'var(--font-mono)' }, tickLine: false }
+const categoryAxis = { ...axis, tick: { fill: 'var(--ink-3)', fontSize: 11, fontFamily: 'var(--font-sans)' } }
 
 function TooltipBox({ active, payload, label, format }: {
   active?: boolean
@@ -17,16 +18,16 @@ function TooltipBox({ active, payload, label, format }: {
   if (!active || !payload?.length) return null
   const n = payload[0]?.payload?.n
   return (
-    <div className="rounded-lg border border-line bg-surface px-3 py-2 text-xs shadow-pop">
-      <div className="mb-1 font-medium text-ink">{label}</div>
+    <div className="rounded-xl border border-line bg-surface px-3.5 py-2.5 text-xs shadow-pop">
+      <div className="mb-1.5 text-sm font-semibold text-ink">{label}</div>
       {payload.map((p) => (
         <div key={p.name} className="flex items-center gap-2 text-ink-2">
           <span className="size-2 rounded-sm" style={{ background: p.color }} aria-hidden />
           <span>{p.name}</span>
-          <span className="num ml-auto pl-3 font-medium text-ink">{format(p.value)}</span>
+          <span className="num ml-auto pl-3 font-mono font-medium text-ink">{format(p.value)}</span>
         </div>
       ))}
-      {typeof n === 'number' && <div className="mt-1 text-ink-3">n = {n} cases</div>}
+      {typeof n === 'number' && <div className="mt-1.5 border-t border-line pt-1 text-ink-3"><span className="font-mono">n={n}</span> cases</div>}
     </div>
   )
 }
@@ -40,11 +41,11 @@ export function PairedBars({ data, height = 260, single = false }: {
   return (
     <ResponsiveContainer width="100%" height={height}>
       <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -12 }} barGap={2} barCategoryGap="22%">
-        <CartesianGrid vertical={false} stroke="var(--line)" />
-        <XAxis dataKey="group" {...axis} interval={0} />
+        <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="2 3" />
+        <XAxis dataKey="group" {...categoryAxis} interval={0} />
         <YAxis {...axis} axisLine={false} domain={[0, 1]} tickFormatter={(v: number) => `${Math.round(v * 100)}%`} />
         <Tooltip cursor={{ fill: 'var(--surface-2)' }} content={<TooltipBox format={(v) => pct(v)} />} />
-        {!single && <Legend iconType="square" iconSize={10} wrapperStyle={{ fontSize: 12, color: 'var(--ink-2)' }} />}
+        {!single && <Legend iconType="square" iconSize={10} wrapperStyle={{ fontSize: 12, color: 'var(--ink-2)', fontFamily: 'var(--font-sans)' }} />}
         {!single && <Bar dataKey="baseline" name="Baseline" fill="var(--series-1)" radius={[4, 4, 0, 0]} maxBarSize={28} />}
         <Bar dataKey="candidate" name={single ? 'Pass rate' : 'Candidate'} fill={single ? 'var(--accent)' : 'var(--series-2)'} radius={[4, 4, 0, 0]} maxBarSize={single ? 40 : 28} />
       </BarChart>
@@ -71,7 +72,7 @@ export function CountBars({ data, onSelect, selected }: {
               <motion.span className="block h-full rounded-full bg-bad/75" initial={{ width: 0 }} animate={{ width: `${(d.value / max) * 100}%` }}
                 transition={{ type: 'spring', stiffness: 120, damping: 20, delay: i * 0.03 }} />
             </span>
-            <span className="num text-right text-xs text-ink-2">{d.value}</span>
+            <span className="num text-right font-mono text-xs text-ink-2">{d.value}</span>
           </button>
         </li>
       ))}
@@ -81,7 +82,7 @@ export function CountBars({ data, onSelect, selected }: {
 
 /** A rate with its 95% interval as a thin track (0-100%, with 50% marked) - overlap is visible at a glance. */
 export function IntervalBar({ value, low, high, axis: showAxis = false }: { value: number | null; low: number | null; high: number | null; axis?: boolean }) {
-  if (value === null) return <span className="text-ink-3">n/a</span>
+  if (value === null) return <span className="text-xs text-ink-3">not reported</span>
   return (
     <div className="w-32">
       <div className="relative h-2 rounded-full bg-surface-2" title={`${pct(value)} (95% interval ${pct(low)} to ${pct(high)})`}>
@@ -91,7 +92,7 @@ export function IntervalBar({ value, low, high, axis: showAxis = false }: { valu
         )}
         <div className="absolute -top-0.5 h-3 w-0.5 rounded bg-accent" style={{ left: `calc(${value * 100}% - 1px)` }} />
       </div>
-      {showAxis && <div className="mt-0.5 flex justify-between text-label leading-none text-ink-3"><span>0</span><span>50%</span><span>100</span></div>}
+      {showAxis && <div className="mt-0.5 flex justify-between font-mono text-label leading-none text-ink-3"><span>0</span><span>50%</span><span>100</span></div>}
     </div>
   )
 }

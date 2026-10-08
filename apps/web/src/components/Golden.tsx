@@ -9,7 +9,8 @@ import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import { usePrefs } from '../lib/prefs'
 import type { Dataset, DatasetVersion, EditResult, Project, RunHeader, TestCase, TrialRow } from '../lib/types'
-import { Badge, Button, Card, Dialog, Empty, ErrorState, Explain, Field, Input, Kbd, Loading, Notice, ProgressBar, Select, Textarea } from './ui'
+import { Badge, Button, Card, Dialog, Empty, ErrorState, Field, Help, Input, Kbd, Loading, Notice, ProgressBar, Select, Textarea } from './ui'
+import { LabelHelp } from './LabelHelp'
 
 // --------------------------------------------------------------------------------------
 // Shared bits
@@ -46,7 +47,7 @@ export function TermChips({ text, picked, onToggle, exclude = [] }: { text: stri
   if (!list.length) return null
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-xs text-ink-3">Suggested:</span>
+      <span className="t-label">Suggested</span>
       {list.map((t) => (
         <button key={t} type="button" onClick={() => onToggle(t)} aria-pressed={picked.includes(t)}
           className={clsx('rounded-full border px-2 py-0.5 text-xs transition-colors', picked.includes(t) ? 'border-accent bg-accent text-on-accent' : 'border-line-strong text-ink-2 hover:border-accent')}>
@@ -100,21 +101,21 @@ function makeCase(question: string, existing: Set<string>, extra: { reference?: 
 export function BuildPanel({ dataset, version, project, onEdited }: { dataset: Dataset; version: DatasetVersion; project?: Project; onEdited: (r: EditResult) => void }) {
   const [tool, setTool] = useState<'kit' | 'real' | 'interview' | null>(null)
   return (
-    <div className="space-y-5">
-      <div className="grid gap-5 xl:grid-cols-2">
+    <div className="space-y-10">
+      <div className="grid gap-10 xl:grid-cols-2">
         <CoverageCard versionId={version.id} />
         <ChecksCard versionId={version.id} />
       </div>
       <AnswerReview dataset={dataset} version={version} onEdited={onEdited} />
-      <Card title="More ways to add questions" subtitle="Each one ends with a person vouching for every case">
+      <Card title="More ways to add questions" help={<p>Each one ends with a person vouching for every case. AI-drafted cases go to the review queue (Generate &amp; review) first.</p>}>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <ToolTile icon={ClipboardCopy} title="Prompt kit" body="A ready prompt for your own ChatGPT or Claude, with your documents; the result lands in the review queue." onClick={() => setTool('kit')} />
           <ToolTile icon={MessageSquareQuote} title="Real questions" body="Upload chat history; near-identical questions are grouped by how often they were asked." onClick={() => setTool('real')} />
           <ToolTile icon={Keyboard} title="Expert interview" body="One question at a time: what must a right answer say, and never say? Keyboard only." onClick={() => setTool('interview')} />
-          <a href="/api/datasets/template.csv" className="rounded-xl border border-line p-3 text-left transition-colors hover:border-accent/60">
+          <a href="/api/datasets/template.csv" className="flex flex-col items-start rounded-xl border border-line bg-surface p-3 text-left shadow-card transition-colors hover:border-accent/60">
             <Users className="size-4 text-accent-ink" />
             <div className="mt-1.5 text-sm font-semibold">Spreadsheet for colleagues</div>
-            <div className="text-xs text-ink-3">A CSV template with examples, filled in Excel; import it on the Datasets page.</div>
+            <div className="text-xs text-ink-2">A CSV template with examples, filled in Excel; import it on the Datasets page.</div>
           </a>
         </div>
       </Card>
@@ -133,10 +134,10 @@ export function BuildPanel({ dataset, version, project, onEdited }: { dataset: D
 
 function ToolTile({ icon: Icon, title, body, onClick }: { icon: typeof Users; title: string; body: string; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="rounded-xl border border-line p-3 text-left transition-colors hover:border-accent/60">
+    <button type="button" onClick={onClick} className="flex flex-col items-start rounded-xl border border-line bg-surface p-3 text-left shadow-card transition-colors hover:border-accent/60">
       <Icon className="size-4 text-accent-ink" />
       <div className="mt-1.5 text-sm font-semibold">{title}</div>
-      <div className="text-xs text-ink-3">{body}</div>
+      <div className="text-xs text-ink-2">{body}</div>
     </button>
   )
 }
@@ -151,20 +152,22 @@ function CoverageCard({ versionId }: { versionId: number }) {
   const cov = useQuery({ queryKey: ['coverage', versionId], queryFn: () => api.get<Coverage>(`/api/dataset-versions/${versionId}/coverage`) })
   const c = cov.data
   return (
-    <Card title="Coverage" subtitle="Kinds of question in this set, against a suggested mix">
+    <Card title="Coverage" meta={c ? `${c.total} cases` : undefined} help={<>
+      <p>Kinds of question in this set, against a suggested mix{c ? ` for ${Math.max(20, c.total)} questions` : ''}.</p>
+      <p>Kinds come from each case: "should decline" means a refusal; two or more needed documents, multi-source; a per-case field (plant, region), specific; a tag "confusable", easy to confuse.</p>
+    </>}>
       {!c ? <Loading rows={3} /> : (
         <div className="space-y-2">
           {c.kinds.map((k) => (
             <div key={k.id} className="grid grid-cols-[minmax(0,1fr)_120px_60px] items-center gap-2 text-sm">
               <span>{k.label}</span>
               <ProgressBar value={Math.min(1, k.count / k.target)} tone={k.count >= k.target ? 'good' : 'accent'} />
-              <span className="num text-right text-xs text-ink-3">{k.count}/{k.target}</span>
+              <span className="num text-right font-mono text-xs text-ink-2">{k.count}/{k.target}</span>
             </div>
           ))}
           {c.documents_without_cases && c.documents_without_cases.length > 0 && (
             <p className="text-xs text-warn-ink">No questions yet from: {c.documents_without_cases.slice(0, 6).join(', ')}{c.documents_without_cases.length > 6 ? ` and ${c.documents_without_cases.length - 6} more` : ''}.</p>
           )}
-          <Explain>Kinds come from each case: "should decline" means a refusal; two or more needed documents, multi-source; a per-case field (plant, region), specific; a tag "confusable", easy to confuse. The mix is a suggestion for {Math.max(20, c.total)} questions.</Explain>
         </div>
       )}
     </Card>
@@ -180,18 +183,21 @@ export function ChecksCard({ versionId }: { versionId: number }) {
   const lint = useQuery({ queryKey: ['lint', versionId], queryFn: () => api.get<{ issues: { case_id: string; kind: string; message: string }[]; documents_checked: number }>(`/api/dataset-versions/${versionId}/lint`) })
   const issues = lint.data?.issues ?? []
   return (
-    <Card title="Checks on this set" subtitle="Weak cases make a set look stricter (or kinder) than it is">
+    <Card title="Checks on this set" meta={lint.data ? `${issues.length}` : undefined} help={<>
+      <p>Weak cases make a set look stricter (or kinder) than it is: duplicates, phrases too generic to test anything, patterns that cannot fail, cases that always fail. Click a case id to open it.</p>
+      <p>Upload this chatbot's documents (Generate &amp; review) to also check expectations against them.</p>
+    </>}>
       {lint.isLoading ? <Loading rows={3} /> : issues.length === 0 ? <p className="text-sm text-good-ink"><Check className="mr-1 inline size-4" />No weak cases found.</p> : (
         <ul className="scroll-thin max-h-64 space-y-1.5 overflow-y-auto">
           {issues.map((i, k) => (
-            <li key={k} className="flex items-start gap-2 text-sm">
+            <li key={k} data-case={i.case_id} className="flex items-start gap-2 text-sm">
               <Badge tone={i.kind === 'always_fails' || i.kind === 'match_all' || i.kind === 'bad_pattern' ? 'bad' : 'warn'}>{ISSUE_LABEL[i.kind] ?? i.kind}</Badge>
               <span><Link className="font-mono text-xs text-accent-ink underline" to={`?tab=cases&case=${encodeURIComponent(i.case_id)}`}>{i.case_id}</Link> {i.message}</span>
             </li>
           ))}
         </ul>
       )}
-      {lint.data && !lint.data.documents_checked && <p className="mt-2 text-xs text-ink-3">Upload this chatbot's documents (Generate &amp; review) to also check expectations against them.</p>}
+      {lint.data && !lint.data.documents_checked && <p className="mt-2 text-xs text-ink-2">Not checked against documents: none uploaded.</p>}
     </Card>
   )
 }
@@ -253,13 +259,16 @@ function AnswerReview({ dataset, version, onEdited }: { dataset: Dataset; versio
 
   return (
     <Card title={<span className="flex items-center gap-2"><ListChecks className="size-4 text-accent-ink" />Approve good answers</span>}
-      subtitle="Judging an answer takes seconds; writing one takes minutes. Mark the bot's answers right or wrong, and keep what a correct answer must mention."
+      help={<>
+        <p>Judging an answer takes seconds; writing one takes minutes. Mark the bot's answers right or wrong, and keep what a correct answer must mention.</p>
+        <p>A wrong answer with your one-line correction becomes a case the current bot fails: the most valuable kind. Keys: Y right, N wrong, S skip, Enter save.</p>
+      </>}
       actions={own.length > 0 && (
         <Select className="w-64" value={rid} onChange={(e) => { setRunId(Number(e.target.value)); setI(0); setMode('judge') }} aria-label="Answers from run">
-          {own.map((r) => <option key={r.id} value={r.id}>Run #{r.id} - {r.experiment}</option>)}
+          {own.map((r) => <option key={r.id} value={r.id}>Run #{r.id} · {r.variant_label || r.experiment}</option>)}
         </Select>
       )}>
-      {!own.length ? <Empty title="No answers to review yet">Run this chatbot once (any question set), then come back: its answers appear here as cards.</Empty>
+      {!own.length ? <Empty title="No answers to review yet. The bot has not spoken.">Run this chatbot once (any question set), then come back: its answers appear here as cards.</Empty>
         : trials.isLoading ? <Loading rows={3} />
         : !card ? <Notice tone="good" title={saved ? `${saved} question${saved === 1 ? '' : 's'} saved` : 'Nothing left to review in this run'}>Every question in run #{rid} already has expectations in this set. Pick another run above.</Notice>
         : (
@@ -270,12 +279,12 @@ function AnswerReview({ dataset, version, onEdited }: { dataset: Dataset; versio
             if (mode === 'judge' && e.key.toLowerCase() === 's') next()
             if (mode !== 'judge' && e.key === 'Enter') save()
           }} tabIndex={0} className="outline-none">
-            <div className="mb-2 flex items-center justify-between text-xs text-ink-3"><span>{i + 1} of {cards.length}{saved ? ` · ${saved} added` : ''}</span><span>Keys: <Kbd>Y</Kbd> right <Kbd>N</Kbd> wrong <Kbd>S</Kbd> skip <Kbd>Enter</Kbd> save</span></div>
+            <div className="mb-2 flex items-center justify-between text-xs text-ink-3"><span><span className="font-mono">{i + 1}</span> of <span className="font-mono">{cards.length}</span>{saved ? <> · <span className="font-mono">{saved}</span> added</> : ''}</span><span className="flex items-center gap-1"><Kbd>Y</Kbd> right <Kbd>N</Kbd> wrong <Kbd>S</Kbd> skip <Kbd>Enter</Kbd> save</span></div>
             <AnimatePresence mode="wait">
               <motion.div key={card.id} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.16 }} className="rounded-xl border border-line bg-surface-2/40 p-4">
-                <div className="text-xs font-medium text-ink-3">Question</div>
-                <div className="text-base font-medium">{card.question}</div>
-                <div className="mt-3 text-xs font-medium text-ink-3">The bot answered</div>
+                <div className="t-label">Question</div>
+                <div className="mt-1 text-lead font-medium text-ink">{card.question}</div>
+                <div className="t-label mt-3">The bot answered</div>
                 <div className="scroll-thin max-h-56 overflow-y-auto whitespace-pre-wrap text-sm text-ink-2">{card.answer}</div>
               </motion.div>
             </AnimatePresence>
@@ -296,7 +305,7 @@ function AnswerReview({ dataset, version, onEdited }: { dataset: Dataset; versio
             )}
             {mode === 'wrong' && (
               <div className="mt-3 space-y-2">
-                <Field label="What should it have said? (one line)" hint="This becomes a case the current bot fails: the most valuable kind.">
+                <Field label={<LabelHelp label="What should it have said? (one line)" title="Your correction"><p>This becomes a case the current bot fails: the most valuable kind.</p></LabelHelp>}>
                   <Textarea rows={2} className="font-sans text-sm" value={correction} autoFocus onChange={(e) => setCorrection(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && correction.trim()) { e.preventDefault(); save() } }} />
                 </Field>
                 <TermChips text={correction} picked={chips} onToggle={toggle} />
@@ -358,7 +367,7 @@ function PromptKit({ dataset, project }: { dataset: Dataset; project?: Project }
       <ol className="list-decimal space-y-0.5 pl-5 text-sm text-ink-2">
         <li>Copy the prompt into your own ChatGPT or Claude (one your organisation allows), and attach the documents.</li>
         <li>Save its CSV answer as a file.</li>
-        <li>Upload it below: the cases enter the <b>review queue</b> as AI-drafted, and only those you approve join the set.</li>
+        <li>Upload it below: the cases enter the <span className="font-semibold">review queue</span> as AI-drafted, and only those you approve join the set.</li>
       </ol>
       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_120px]">
         <Field label="What the chatbot answers about"><Input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="e.g. SAP production planning at our plants" /></Field>
@@ -367,12 +376,12 @@ function PromptKit({ dataset, project }: { dataset: Dataset; project?: Project }
       <Textarea rows={12} readOnly value={prompt} aria-label="Prompt" />
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="primary" onClick={() => { void navigator.clipboard?.writeText(prompt); setCopied(true) }}><ClipboardCopy className="size-3.5" />{copied ? 'Copied' : 'Copy the prompt'}</Button>
-        <span className="text-xs text-ink-3">{(docs.data ?? []).length ? `Lists the ${(docs.data ?? []).length} document(s) uploaded for this chatbot.` : 'No documents uploaded here: the prompt refers to the ones you attach.'}</span>
+        <span className="text-xs text-ink-2">{(docs.data ?? []).length ? `Lists the ${(docs.data ?? []).length} document(s) uploaded for this chatbot.` : 'No documents uploaded here: the prompt refers to the ones you attach.'}</span>
       </div>
       <div className="border-t border-line pt-3">
         <Field label="Upload the result (CSV, YAML or JSON)"><input type="file" accept=".csv,.yaml,.yml,.json" aria-label="Drafted cases file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="block w-full text-xs file:mr-3 file:rounded-md file:border file:border-line-strong file:bg-surface file:px-2.5 file:py-1 file:text-xs" /></Field>
         <Button className="mt-2" disabled={!file} loading={upload.isPending} onClick={() => upload.mutate()}><FileUp className="size-3.5" />Send to the review queue</Button>
-        {upload.data && <div className="mt-2"><Notice tone="good" title={`${upload.data.created} draft case(s) in the review queue`}>{upload.data.notice} Open <b>Generate &amp; review</b> to go through them.</Notice></div>}
+        {upload.data && <div className="mt-2"><Notice tone="good" title={`${upload.data.created} draft case(s) in the review queue`}>{upload.data.notice} Open <span className="font-semibold">Generate &amp; review</span> to go through them.</Notice></div>}
         {upload.isError && <div className="mt-2"><ErrorState error={upload.error} /></div>}
       </div>
     </div>
@@ -408,20 +417,20 @@ function RealQuestions({ version, onEdited }: { version: DatasetVersion; onEdite
       {group.isError && <ErrorState error={group.error} />}
       {group.data && (
         <>
-          <div className="text-xs text-ink-3">{group.data.n_questions} questions, {group.data.n_groups} groups. Tick the ones worth testing (20–30 is plenty to start).</div>
+          <div className="flex items-center gap-1.5 text-xs text-ink-2"><span><span className="font-mono">{group.data.n_questions}</span> questions, <span className="font-mono">{group.data.n_groups}</span> groups. Tick the ones worth testing (20–30 is plenty to start).</span>
+            <Help title="No expectations yet"><p>They are added with no expectations yet: open each case (or use Approve good answers after a run) to say what a correct answer must contain.</p></Help></div>
           <ul className="scroll-thin max-h-80 space-y-1 overflow-y-auto rounded-lg border border-line p-2">
             {group.data.groups.map((g) => (
               <li key={g.question}>
                 <label className="flex items-start gap-2 rounded px-1 py-0.5 text-sm hover:bg-surface-2">
                   <input type="checkbox" className="mt-0.5 accent-[var(--accent)]" checked={picked.includes(g.question)} onChange={() => setPicked((p) => (p.includes(g.question) ? p.filter((x) => x !== g.question) : [...p, g.question]))} />
                   <span className="flex-1">{g.question}{g.examples.length > 1 && <span className="block text-xs text-ink-3">also: {g.examples.slice(1, 3).join(' · ')}</span>}</span>
-                  <Badge tone={g.count > 1 ? 'accent' : 'neutral'}>{g.count}x</Badge>
+                  <Badge tone={g.count > 1 ? 'accent' : 'neutral'}><span className="font-mono">{g.count}×</span></Badge>
                 </label>
               </li>
             ))}
           </ul>
           <Button variant="primary" disabled={!picked.length} loading={add.isPending} onClick={() => void addAll()}>Add {picked.length || ''} question{picked.length === 1 ? '' : 's'}</Button>
-          <Explain>They are added with no expectations yet: open each case (or use Approve good answers after a run) to say what a correct answer must contain.</Explain>
         </>
       )}
       {done > 0 && <Notice tone="good" title={`${done} real question(s) added`} />}
@@ -499,7 +508,7 @@ export function AddFailureToDataset({ projectId, question, answer, runId, trialI
         ) : (
           <div className="space-y-3">
             <p className="text-sm text-ink-2">A question the bot got wrong in real use is the best guard against the same mistake coming back.</p>
-            <div className="rounded-lg border border-line bg-surface-2/40 p-3 text-sm"><div className="text-xs text-ink-3">Question</div>{question}<div className="mt-2 text-xs text-ink-3">It answered</div><div className="line-clamp-4 text-ink-2">{answer}</div></div>
+            <div className="rounded-lg border border-line bg-surface-2/40 p-3 text-sm"><div className="t-label mb-0.5">Question</div>{question}<div className="t-label mb-0.5 mt-2">It answered</div><div className="line-clamp-4 text-ink-2">{answer}</div></div>
             {own.length === 0 && !datasets.isLoading ? <Notice tone="warn" title="This chatbot has no dataset yet">Create one on the Datasets page first.</Notice> : (
               <Field label="Into which dataset?">
                 <Select value={ds?.id ?? ''} onChange={(e) => setDsId(Number(e.target.value))} aria-label="Dataset for the failure">
@@ -542,7 +551,7 @@ export function AddVariations({ versionId, caseId }: { versionId: number; caseId
             <label key={k} className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[var(--accent)]" checked={kinds.includes(k)} onChange={() => setKinds((x) => (x.includes(k) ? x.filter((y) => y !== k) : [...x, k]))} />{label}</label>
           ))}
         </div>
-        <p className="mt-2 text-xs text-ink-3">Other words and translations use the drafting model from Settings &gt; Defaults.</p>
+        <p className="mt-2 text-xs text-ink-2">Other words and translations use the drafting model from Settings › Defaults.</p>
         <Button className="mt-3" variant="primary" disabled={!kinds.length} loading={make.isPending} onClick={() => make.mutate()}>Create {kinds.length} variation{kinds.length === 1 ? '' : 's'}</Button>
         {make.data && <div className="mt-3"><Notice tone="good" title={`${make.data.created} variation(s) in the review queue`}>{make.data.errors.length ? `Not created: ${make.data.errors.join('; ')}` : 'Open Generate & review to approve them.'}</Notice></div>}
         {make.isError && <div className="mt-3"><ErrorState error={make.error} /></div>}

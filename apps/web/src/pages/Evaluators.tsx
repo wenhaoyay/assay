@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Badge, Button, Card, ErrorState, Field, Input, Json, Loading, Notice, PageHeader, Table } from '../components/ui'
+import { Badge, Button, Card, Empty, ErrorState, Field, Input, Json, Loading, Notice, PageHeader, Table } from '../components/ui'
 import { api } from '../lib/api'
 import { useCrumbs } from '../lib/crumbs'
 import type { EvaluatorInfo } from '../lib/types'
@@ -18,7 +18,11 @@ export function EvaluatorsPage() {
   useCrumbs([{ label: 'Judge trust' }, { label: 'Evaluators' }], 'evaluators')
   return (
     <>
-      <PageHeader title="Evaluators" description={<>The checks GaugeLab can run. Every score names the check and version that produced it. Grading models are set up in <Link className="text-accent-ink underline" to="/settings?tab=models">Settings - Models &amp; keys</Link>.</>} />
+      <PageHeader title="Evaluators" help={<>
+        <p>The checks GaugeLab can run, grouped by how they decide. Every score names the check and version that produced it.</p>
+        <p>Gating checks count toward the pass rate; diagnostic ones are shown but never fail a run. Checks that use a grading model show their rubric and prompt.</p>
+        <p>Grading models are set up in <Link className="text-accent-ink underline" to="/settings?tab=models">Settings · Models &amp; keys</Link>.</p>
+      </>} />
       <EvaluatorList />
     </>
   )
@@ -30,19 +34,21 @@ function EvaluatorList() {
   if (q.isLoading) return <Loading />
   if (q.isError) return <ErrorState error={q.error} />
   return (
-    <div className="space-y-5">
-      {KINDS.map(([kind, title, desc]) => (
-        <Card key={kind} title={title} padded={false}>
-          <p className="border-b border-line px-4 py-2 text-xs text-ink-2">{desc}</p>
+    <div className="space-y-10">
+      {KINDS.map(([kind, title, desc]) => {
+        const list = q.data!.evaluators.filter((e) => e.kind === kind)
+        return (
+        <Card key={kind} title={title} help={<p>{desc}</p>} meta={`${list.length}`} padded={false}>
+          {list.length === 0 ? <div className="py-4"><Empty title="None of this kind yet." /></div> : (
           <Table>
             <tbody>
-              {q.data!.evaluators.filter((e) => e.kind === kind).map((e) => (
+              {list.map((e) => (
                 <tr key={e.id} className="align-top">
-                  <td className="w-56"><div className="font-medium">{e.name}</div><code className="text-xs text-ink-3">{e.id}</code></td>
+                  <td className="w-56"><div className="font-medium text-ink">{e.name}</div><code className="font-mono text-xs text-ink-3">{e.id}</code></td>
                   <td className="text-ink-2">{e.description}
                     {e.rubric && open === e.id && (
                       <div className="mt-2 space-y-2">
-                        <dl className="space-y-1 text-xs">{Object.entries(e.rubric.labels).map(([l, d]) => <div key={l}><dt className="inline font-semibold">{l}: </dt><dd className="inline">{d}</dd></div>)}</dl>
+                        <dl className="space-y-1 text-xs">{Object.entries(e.rubric.labels).map(([l, d]) => <div key={l}><dt className="inline font-mono font-semibold text-ink">{l}: </dt><dd className="inline">{d}</dd></div>)}</dl>
                         {e.rubric.notes && <p className="text-xs italic">{e.rubric.notes}</p>}
                         <Json value={e.rubric.system_prompt} maxHeight={240} />
                       </div>
@@ -61,8 +67,10 @@ function EvaluatorList() {
               ))}
             </tbody>
           </Table>
+          )}
         </Card>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -74,14 +82,14 @@ export function Pricing() {
   const add = useMutation({ mutationFn: () => api.post('/api/pricing', { ...f, input_per_1m: Number(f.input_per_1m), output_per_1m: Number(f.output_per_1m) }), onSuccess: () => qc.invalidateQueries({ queryKey: ['pricing'] }) })
   return (
     <div className="space-y-4">
-      <Notice tone="warn" title="Costs are estimates">GaugeLab multiplies reported token counts by this table. A model that is not listed shows cost as <b>unknown</b>, never as zero. Prices change: every row records when it took effect and where it came from.</Notice>
-      <Card padded={false}>
+      <Notice tone="warn" title="Costs are estimates">GaugeLab multiplies reported token counts by this table. A model that is not listed shows cost as <span className="font-semibold">unknown</span>, never as zero. Prices change: every row records when it took effect and where it came from.</Notice>
+      <Card title="Prices" meta={`${(q.data ?? []).length}`} padded={false}>
         <Table>
-          <thead><tr><th>Provider</th><th>Model</th><th className="text-right">Input / 1M</th><th className="text-right">Output / 1M</th><th>From</th><th>Source</th></tr></thead>
-          <tbody>{(q.data ?? []).map((p, i) => <tr key={i}><td>{p.provider}</td><td className="font-mono text-xs">{p.model}</td><td className="num text-right">${p.input_per_1m}</td><td className="num text-right">${p.output_per_1m}</td><td className="num text-xs">{p.effective_from}</td><td className="text-xs text-ink-2">{p.source_note}</td></tr>)}</tbody>
+          <thead><tr className="whitespace-nowrap"><th className="t-label">Provider</th><th className="t-label">Model</th><th className="t-label text-right">Input / 1M</th><th className="t-label text-right">Output / 1M</th><th className="t-label">From</th><th className="t-label">Source</th></tr></thead>
+          <tbody>{(q.data ?? []).map((p, i) => <tr key={i}><td>{p.provider}</td><td className="font-mono text-xs">{p.model}</td><td className="num text-right font-mono">${p.input_per_1m}</td><td className="num text-right font-mono">${p.output_per_1m}</td><td className="num font-mono text-xs">{p.effective_from}</td><td className="text-xs text-ink-2">{p.source_note}</td></tr>)}</tbody>
         </Table>
       </Card>
-      <Card title="Add or override a price">
+      <Card title="Add or override a price" boxed help={<p>A new row for a provider and model takes effect from its date; older runs keep the price that applied then. Say where the price came from.</p>}>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
           {(['provider', 'model', 'input_per_1m', 'output_per_1m', 'effective_from', 'source_note'] as const).map((k) => (
             <Field key={k} label={k.replace(/_/g, ' ')}><Input value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} /></Field>

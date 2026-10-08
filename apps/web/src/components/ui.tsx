@@ -430,7 +430,7 @@ export function Stat({ label, value, sub, title, tone, hatched, numeric, format,
   return (
     <div className={clsx('min-w-0 px-4 py-3.5 first:pl-0 max-lg:first:pl-4', hatched && 'hatched')} title={title}>
       <div className="t-label flex items-center gap-1">{label}{h && <Help title={typeof label === 'string' ? label : 'About this figure'}>{h}</Help>}</div>
-      <div className={clsx('t-fig mt-2 truncate', tone === 'good' && 'text-good-ink', tone === 'bad' && 'text-bad-ink')}>
+      <div className={clsx('t-fig mt-2 break-words', tone === 'good' && 'text-good-ink', tone === 'bad' && 'text-bad-ink')}>
         {numeric !== undefined && format ? <CountUp value={numeric} format={format} /> : value}
       </div>
       {delta && <div className="num mt-1.5 font-mono text-xs">{delta}</div>}

@@ -6,7 +6,8 @@ import { useState } from 'react'
 import { api } from '../lib/api'
 import { projectOption, useProjects } from '../lib/projects'
 import type { Dataset } from '../lib/types'
-import { Button, ErrorState, Explain, Field, Input, Segmented, Select, Textarea } from './ui'
+import { Button, ErrorState, Field, Help, Input, Segmented, Select, Textarea } from './ui'
+import { LabelHelp } from './LabelHelp'
 
 type Mode = 'file' | 'type' | 'empty'
 
@@ -60,7 +61,7 @@ export function DatasetAdd({ projectId: fixedProject, defaultProjectId = '', onD
   return (
     <div className="space-y-3">
       {!fixedProject && (
-        <Field label="For which chatbot?" hint="New run lists a chatbot's own question sets first.">
+        <Field label={<LabelHelp label="For which chatbot?"><p>New run lists a chatbot's own question sets first.</p></LabelHelp>}>
           <Select value={projectId} onChange={(e) => setPicked(e.target.value ? Number(e.target.value) : '')} aria-label="Chatbot for the dataset">
             <option value="">Choose a chatbot...</option>
             {projects.visible.map((p) => <option key={p.id} value={p.id}>{projectOption(p)}</option>)}
@@ -71,7 +72,7 @@ export function DatasetAdd({ projectId: fixedProject, defaultProjectId = '', onD
         options={[{ id: 'file', label: 'Import a file' }, { id: 'type', label: 'Type questions' }, { id: 'empty', label: 'Empty' }]} />
       {mode === 'file' && (
         <>
-          <Field label="JSON, YAML or CSV" hint={<>CSV columns can be plain words: <i>Question</i>, <i>Must mention</i>, <i>Must never say</i>, <i>Should refuse?</i>, <i>Correct answer</i>, <i>Topic</i>.</>}>
+          <Field label={<LabelHelp label="JSON, YAML or CSV" title="File columns"><p>CSV columns can be plain words: <i>Question</i>, <i>Must mention</i>, <i>Must never say</i>, <i>Should refuse?</i>, <i>Correct answer</i>, <i>Topic</i>.</p></LabelHelp>}>
             <input type="file" accept=".json,.yaml,.yml,.csv" aria-label="Dataset file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="block w-full text-xs file:mr-3 file:rounded-md file:border file:border-line-strong file:bg-surface file:px-2.5 file:py-1 file:text-xs" />
           </Field>
           <Input placeholder="Name (optional: the file's own name otherwise)" value={name} onChange={(e) => setName(e.target.value)} aria-label="Dataset name" />
@@ -81,9 +82,9 @@ export function DatasetAdd({ projectId: fixedProject, defaultProjectId = '', onD
       {mode === 'type' && (
         <>
           <Input placeholder="Name, e.g. First questions" value={name} onChange={(e) => setName(e.target.value)} aria-label="Dataset name" />
+          <div className="flex items-center gap-1.5 text-xs font-medium text-ink-2">Questions, one per line<Help title="Questions without expectations"><p>Each line becomes a question with no expectations yet: rule checks show "not applicable" until you add what a correct answer must say (open the set afterwards).</p></Help></div>
           <Textarea rows={5} value={typed} onChange={(e) => setTyped(e.target.value)} aria-label="Questions, one per line"
             placeholder={'One question per line, the way users ask:\nWhich REM profile does SCRS use?\nWhat does material status Z3 block?'} />
-          <Explain>Each line becomes a question with no expectations yet: rule checks show "not applicable" until you add what a correct answer must say (open the set afterwards).</Explain>
         </>
       )}
       {mode === 'empty' && <Input placeholder="Name of the new, empty set" value={name} onChange={(e) => setName(e.target.value)} aria-label="Dataset name" />}
@@ -92,7 +93,7 @@ export function DatasetAdd({ projectId: fixedProject, defaultProjectId = '', onD
           {mode === 'file' ? <FileUp className="size-3.5" /> : mode === 'type' ? <ListPlus className="size-3.5" /> : <Plus className="size-3.5" />}
           {mode === 'file' ? 'Import' : mode === 'type' ? `Add ${lines || ''} question${lines === 1 ? '' : 's'}` : 'Create'}
         </Button>
-        {why && <span className="text-xs text-ink-3">{why}</span>}
+        {why && <span className="text-xs text-ink-2">{why}</span>}
       </div>
       {add.isError && <ErrorState error={add.error} />}
     </div>

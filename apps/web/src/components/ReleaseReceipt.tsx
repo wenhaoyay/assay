@@ -8,10 +8,25 @@ import { Fingerprint, Receipt, ReceiptLine, type Cell } from './instrument'
 import { Button } from './ui'
 import { Stamp } from './viz'
 
+const LOWER_IS_BETTER = /latency|_ms$|cost|tokens/
+const NAMES: Record<string, string> = {
+  overall_pass_rate: 'Pass rate', tool_accuracy: 'Tool accuracy', must_mention: 'Must-mention',
+  'recall_at_k.mean': 'Search recall', recall_at_k: 'Search recall', p95_latency_ms: 'p95 speed',
+  p50_latency_ms: 'p50 speed', average_cost_usd: 'Cost per answer', average_total_tokens: 'Tokens per answer',
+}
+const metricName = (m: string) => NAMES[m] ?? metricLabel(m.replace(/\.mean$/, ''))
+
+/** A rule's value as the reader thinks of it. Regression rules store how much WORSE the run got;
+ *  show the change itself instead (+23.6pp is better for a rate, +120ms worse for speed). */
 function checkValue(c: GateCheck): string {
   if (c.value === null || c.value === undefined) return 'n/a'
-  if (c.kind === 'relative') return `${c.value >= 0 ? '+' : '−'}${Math.abs(c.value * 100).toFixed(1)}pp`
-  return /latency|_ms$/.test(c.metric) ? ms(c.value) : pct(c.value, 0)
+  const timeLike = /latency|_ms$/.test(c.metric)
+  if (c.kind === 'relative') {
+    const change = LOWER_IS_BETTER.test(c.metric) ? c.value : -c.value
+    const sign = change >= 0 ? '+' : '−'
+    return timeLike ? `${sign}${ms(Math.abs(change))}` : `${sign}${Math.abs(change * 100).toFixed(1)}pp`
+  }
+  return timeLike ? ms(c.value) : pct(c.value, 0)
 }
 
 export function ReleaseReceipt({ run, className }: { run: RunDetail; className?: string }) {
@@ -43,7 +58,7 @@ export function ReleaseReceipt({ run, className }: { run: RunDetail; className?:
       <ReceiptLine label="Questions" value={`${run.n_cases ?? '?'} × ${run.trials_per_case}`} />
       <hr />
       {checks.map((c, i) => (
-        <ReceiptLine key={i} label={`${metricLabel(c.metric)}${c.kind === 'relative' ? ' vs baseline' : ''}`}
+        <ReceiptLine key={i} label={`${metricName(c.metric)}${c.kind === 'relative' ? ' vs baseline' : ''}`}
           value={`${checkValue(c)} ${c.status === 'PASS' ? '✓' : c.status === 'FAIL' ? '✕' : '·'}`} />
       ))}
       <hr />

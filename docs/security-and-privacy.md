@@ -60,7 +60,7 @@ headers. The curl parser hands a found secret back to the page that pasted it, s
 can offer to store it; it is not kept anywhere else.
 
 Nothing secret is kept in `localStorage`; it holds only viewer preferences (theme, density,
-motion, the Explain switch) and the reviewer name you typed.
+motion) and the reviewer name you typed.
 
 ## Redaction
 

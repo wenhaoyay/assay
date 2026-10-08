@@ -57,7 +57,7 @@ const GROUPS = [
 
 export function Logo({ live }: { live: boolean }) {
   return (
-    <Link to="/" className="flex items-center gap-2 px-3 py-4" aria-label="GaugeLab home">
+    <Link to="/" className="flex items-center gap-2.5 px-4 pb-3 pt-4" aria-label="GaugeLab home">
       <svg viewBox="0 0 32 32" className="size-7" aria-hidden>
         <rect width="32" height="32" rx="8" className="fill-ink" />
         <path d="M8 21a8 8 0 1 1 16 0" fill="none" className="stroke-surface" strokeWidth="2.5" strokeLinecap="round" />
@@ -66,7 +66,7 @@ export function Logo({ live }: { live: boolean }) {
         </g>
         <circle cx="16" cy="21" r="2" className="fill-surface" />
       </svg>
-      <span className="text-h font-semibold tracking-tight max-md:hidden">GaugeLab</span>
+      <span className="text-base font-semibold tracking-tight max-md:hidden">GaugeLab</span>
       {live && <span className="relative ml-auto flex size-2 max-md:hidden" title="A run is in progress"><span className="absolute inline-flex size-full animate-ping rounded-full bg-accent opacity-60" /><span className="relative inline-flex size-2 rounded-full bg-accent" /></span>}
     </Link>
   )
@@ -75,11 +75,11 @@ export function Logo({ live }: { live: boolean }) {
 function NavItem({ to, label, icon: Icon, end }: { to: string; label: string; icon: typeof Target; end?: boolean }) {
   return (
     <NavLink to={to} end={end} title={label} viewTransition
-      className={({ isActive }) => clsx('group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm transition-colors',
-        isActive ? 'bg-accent-wash font-medium text-accent-ink' : 'text-ink-2 hover:bg-surface-2 hover:text-ink')}>
+      className={({ isActive }) => clsx('group relative flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-base transition-colors duration-150',
+        isActive ? 'bg-surface text-ink shadow-[inset_0_0_0_1px_var(--line)]' : 'text-ink-3 hover:bg-surface-2 hover:text-ink')}>
       {({ isActive }) => (
         <>
-          {isActive && <span className="absolute -left-2 top-1.5 bottom-1.5 w-0.5 rounded-full bg-accent" aria-hidden />}
+          {isActive && <span className="absolute -left-2.5 top-[7px] bottom-[7px] w-[3px] rounded-full bg-accent" aria-hidden />}
           <Icon className="size-4 shrink-0" aria-hidden />
           <span className="max-md:hidden">{label}</span>
         </>
@@ -92,21 +92,27 @@ function Sidebar({ live }: { live: boolean }) {
   const projects = useQuery({ queryKey: ['projects'], queryFn: () => api.get<Project[]>('/api/projects') })
   const prefs = usePrefs()
   return (
-    <aside className="flex w-56 shrink-0 flex-col border-r border-line bg-surface max-md:w-14">
+    <aside className="flex w-56 shrink-0 flex-col border-r border-line bg-[color-mix(in_oklch,var(--page)_70%,var(--surface-2))] max-md:w-14">
       <Logo live={live} />
-      <nav className="scroll-thin flex-1 space-y-4 overflow-y-auto px-2 pb-3" aria-label="Main">
+      <nav className="scroll-thin flex-1 overflow-y-auto px-2.5 pb-3" aria-label="Main">
         {GROUPS.map((g, gi) => (
           <div key={g.label}>
-            <div className="mb-1 px-3 text-label font-medium uppercase tracking-wide text-ink-3 max-md:hidden">{g.label}</div>
+            <div className="t-label mx-2 mb-1 mt-3.5 max-md:hidden">{g.label}</div>
             <div className="space-y-0.5">
               {g.items.map((it) => <NavItem key={it.to} {...it} />)}
             </div>
             {gi === 0 && (projects.data?.length ?? 0) > 0 && (
-              <div className="mt-2 space-y-0.5 max-md:hidden">
+              <div className="mt-1 space-y-0.5 max-md:hidden" aria-label="Chatbots">
                 {projects.data!.map((p) => (
                   <NavLink key={p.id} to={`/p/${p.id}`} viewTransition
-                    className={({ isActive }) => clsx('flex items-center gap-2 rounded-md px-3 py-1 text-sm', isActive ? 'bg-surface-2 font-medium text-ink' : 'text-ink-2 hover:bg-surface-2')}>
-                    <ProjectMark name={p.name} color={p.color} size={18} /><span className="truncate">{p.name}</span>
+                    className={({ isActive }) => clsx('relative flex items-center gap-2.5 rounded-lg py-1 pl-2.5 pr-2 text-sm transition-colors duration-150',
+                      isActive ? 'bg-surface text-ink shadow-[inset_0_0_0_1px_var(--line)]' : 'text-ink-3 hover:bg-surface-2 hover:text-ink')}>
+                    {({ isActive }) => (
+                      <>
+                        {isActive && <span className="absolute -left-2.5 top-[6px] bottom-[6px] w-[3px] rounded-full bg-accent" aria-hidden />}
+                        <ProjectMark name={p.name} color={p.color} size={16} /><span className="truncate">{p.name}</span>
+                      </>
+                    )}
                   </NavLink>
                 ))}
               </div>
@@ -114,10 +120,10 @@ function Sidebar({ live }: { live: boolean }) {
           </div>
         ))}
       </nav>
-      <div className="space-y-0.5 border-t border-line p-2">
+      <div className="space-y-0.5 border-t border-line px-2.5 py-2">
         <NavItem to="/settings" label="Settings" icon={Settings} />
         <button type="button" onClick={() => prefs.toggle('theme')}
-          className="flex w-full items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-ink-2 hover:bg-surface-2 hover:text-ink">
+          className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-base text-ink-3 transition-colors duration-150 hover:bg-surface-2 hover:text-ink">
           {prefs.theme === 'dark' ? <Sun className="size-4" aria-hidden /> : <Moon className="size-4" aria-hidden />}
           <span className="max-md:hidden">{prefs.theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
         </button>
@@ -129,8 +135,8 @@ function Sidebar({ live }: { live: boolean }) {
 function TopBar({ onPalette, onShortcuts }: { onPalette: () => void; onShortcuts: () => void }) {
   const crumbs = useCrumbsValue()
   return (
-    <div data-topbar className="sticky top-0 z-30 flex h-12 items-center gap-3 border-b border-line bg-page/85 px-6 backdrop-blur max-sm:px-4">
-      <nav aria-label="Breadcrumb" className="flex min-w-0 flex-1 items-center gap-1 text-sm">
+    <div data-topbar className="sticky top-0 z-30 flex h-[52px] items-center gap-2.5 border-b border-line bg-page/80 px-8 backdrop-blur-md max-sm:px-4">
+      <nav aria-label="Breadcrumb" className="flex min-w-0 flex-1 items-center gap-1.5 text-sm text-ink-3">
         {crumbs.map((c, i) => (
           <Fragment key={i}>
             {i > 0 && <ChevronRight className="size-3.5 shrink-0 text-ink-3" aria-hidden />}
@@ -143,7 +149,7 @@ function TopBar({ onPalette, onShortcuts }: { onPalette: () => void; onShortcuts
         ))}
       </nav>
       <button type="button" onClick={onPalette} data-tour="palette"
-        className="flex h-8 w-64 items-center gap-2 rounded-lg border border-line bg-surface px-2.5 text-sm text-ink-3 shadow-sm hover:border-line-strong max-lg:w-auto">
+        className="flex h-8 w-60 items-center gap-2 rounded-lg border border-line bg-surface px-2.5 text-sm text-ink-3 shadow-[inset_0_-1.5px_0_color-mix(in_oklch,var(--ink)_5%,transparent)] transition-colors duration-150 hover:border-line-strong hover:text-ink-2 max-lg:w-auto">
         <Search className="size-3.5" aria-hidden /><span className="flex-1 truncate whitespace-nowrap text-left max-lg:hidden">Search or command</span>
         <span className="flex gap-0.5 max-lg:hidden"><Kbd>Ctrl</Kbd><Kbd>K</Kbd></span>
       </button>
@@ -187,7 +193,7 @@ export function Layout() {
       <Sidebar live={live} />
       <main className="scroll-thin min-w-0 flex-1 overflow-y-auto" id="main">
         <TopBar onPalette={() => setPalette(true)} onShortcuts={() => setShortcuts(true)} />
-        <div className="mx-auto max-w-[1400px] px-6 py-6 max-sm:px-4">
+        <div className="mx-auto max-w-[1360px] px-8 pb-20 pt-7 max-sm:px-4">
           <Outlet context={{ startTour: () => setTour(true) }} />
         </div>
       </main>

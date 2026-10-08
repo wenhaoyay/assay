@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { Check, Clipboard, Cloud, Cpu, ExternalLink, KeyRound, Lock, Plus, RefreshCw, ShieldCheck, Star, Trash2, X } from 'lucide-react'
+import { Check, Clipboard, Cloud, Cpu, ExternalLink, Lock, Plus, RefreshCw, ShieldCheck, Star, Trash2, X } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { Fragment, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Badge, Button, Card, Empty, ErrorState, Explain, Field, Input, Json, Loading, Notice, PageHeader, Segmented, Select, Table, Tabs, Term, Toggle } from '../components/ui'
+import { Badge, Button, Card, Empty, ErrorState, Field, Help, Input, Json, Loading, Notice, PageHeader, Segmented, Select, Table, Tabs, Term, Toggle } from '../components/ui'
 import { api } from '../lib/api'
 import { whereLabel } from '../lib/models'
 import { useCrumbs } from '../lib/crumbs'
@@ -22,12 +22,12 @@ export function SettingsPage() {
   useCrumbs([{ label: 'Settings' }, { label: { models: 'Models & keys', defaults: 'Defaults', appearance: 'Appearance', shape: 'Reply shape', templates: 'Templates', pricing: 'Pricing', server: 'Server' }[tab] }], `settings-${tab}`)
   return (
     <>
-      <PageHeader title="Settings" description="Grading models and keys, workspace defaults, and how GaugeLab looks." />
+      <PageHeader title="Settings" help={<p>Grading models and keys, workspace defaults, connection templates, prices, and how GaugeLab looks.</p>} />
       <Tabs tabs={[
         { id: 'models', label: 'Models & keys' }, { id: 'defaults', label: 'Defaults' }, { id: 'appearance', label: 'Appearance' },
         { id: 'shape', label: 'Reply shape' }, { id: 'templates', label: 'Connection templates' }, { id: 'pricing', label: 'Pricing' }, { id: 'server', label: 'Server' },
       ]} value={tab} onChange={(t) => setParams({ tab: t })} />
-      <div className="mt-5">
+      <div className="mt-7">
         {tab === 'models' && <ModelsTab />}
         {tab === 'defaults' && <DefaultsTab />}
         {tab === 'appearance' && <AppearanceTab />}
@@ -54,22 +54,22 @@ function ModelsTab() {
   const byCatalog = (id: string) => (models.data ?? []).filter((m) => m.catalog_id === id)
 
   return (
-    <div className="space-y-6" data-tour="models">
-      <Explain>A grading model ("judge") reads an answer and decides whether it is correct, grounded, relevant... Objective checks never need one. Keys are stored in your operating system's credential store and never shown again.</Explain>
-      <section>
-        <h2 className="mb-3 text-h font-semibold">Your grading models</h2>
+    <div className="space-y-10" data-tour="models">
+      <Card title="Your grading models" meta={models.data?.length ? `${models.data.length}` : undefined} help={<>
+        <p>A grading model ("judge") reads an answer and decides whether it is correct, grounded, relevant... Objective checks never need one.</p>
+        <p>Keys are stored in your operating system's credential store and never shown again.</p>
+        <p>Check sends five grading calls and reports speed, how many verdicts came back as valid JSON, and what 100 calls would cost.</p>
+      </>}>
         {models.isLoading ? <Loading /> : (models.data ?? []).length === 0 ? (
-          <Empty title="No grading model yet" icon={<KeyRound className="size-6" />}>Connect OpenAI below (or a local model) to enable meaning checks and the judge bake-off.</Empty>
+          <Empty title="No grading model yet. Objective checks still run; meaning needs a judge.">Connect OpenAI below (or a local model) to enable meaning checks and the judge bake-off.</Empty>
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">
             {models.data!.map((m) => <ModelCard key={m.id} m={m} settings={settings.data?.values} onChange={refresh} />)}
           </div>
         )}
-      </section>
+      </Card>
       <LocalModelsCard models={models.data ?? []} onChange={refresh} />
-      <section>
-        <h2 className="mb-1 text-h font-semibold">Connect a provider</h2>
-        <p className="mb-3 text-sm text-ink-3">Model lists come from the provider itself, so they are never out of date.</p>
+      <Card title="Connect a provider" help={<p>Pick a provider to connect a grading model from it. Model lists come from the provider itself, so they are never out of date.</p>}>
         {!settings.data?.keyring_available && <div className="mb-3"><Notice tone="warn" title="No OS credential store here">Keys can still be used from the server environment: set them in <code>.env</code> and use the "environment variable" option.</Notice></div>}
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {(catalog.data ?? []).map((c, i) => (
@@ -80,12 +80,12 @@ function ModelsTab() {
                 {c.local ? <Badge tone="good"><Cpu className="size-3" />local</Badge> : <Badge><Cloud className="size-3" />cloud</Badge>}
                 {byCatalog(c.id).length > 0 && <Badge tone="accent">{byCatalog(c.id).length} connected</Badge>}
               </div>
-              <p className="mt-1 text-xs text-ink-3">{c.blurb}</p>
+              <p className="mt-1 text-xs text-ink-2">{c.blurb}</p>
               <span className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-accent-ink"><Plus className="size-3" />Connect</span>
             </motion.button>
           ))}
         </div>
-      </section>
+      </Card>
       <AnimatePresence>
         {connecting && <ConnectProvider key={connecting.id} entry={connecting} keyring={settings.data?.keyring_available ?? false} onClose={() => setConnecting(null)} onDone={() => { setConnecting(null); refresh() }} />}
       </AnimatePresence>
@@ -124,7 +124,7 @@ function ModelCard({ m, settings, onChange }: { m: ProviderConfig; settings?: Se
         {check && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
             {check.ok ? (
-              <div className="mt-3 grid grid-cols-3 gap-2">
+              <div className="mt-3 grid grid-cols-3 border-y border-line [&>*+*]:border-l [&>*+*]:border-line">
                 <CheckTile label="Speed" value={ms(check.median_ms)} sub="median of the calls" />
                 <CheckTile label="Valid verdicts" value={`${check.valid_json}/${check.answered}`} sub={pct(check.json_reliability, 0)} tone={check.json_reliability === 1 ? 'good' : 'warn'} />
                 <CheckTile label="100 grading calls" value={check.cost_per_100_calls_usd === null ? 'price unknown' : usd(check.cost_per_100_calls_usd)} sub={check.price_known ? 'from the price table' : 'add it under Pricing'} />
@@ -147,10 +147,10 @@ function ModelCard({ m, settings, onChange }: { m: ProviderConfig; settings?: Se
 
 function CheckTile({ label, value, sub, tone }: { label: string; value: string; sub: string; tone?: 'good' | 'warn' }) {
   return (
-    <div className="rounded-lg border border-line bg-surface-2/50 p-2">
-      <div className="text-label text-ink-3">{label}</div>
-      <div className={clsx('num text-h font-semibold', tone === 'good' && 'text-good-ink', tone === 'warn' && 'text-warn-ink')}>{value}</div>
-      <div className="text-label text-ink-3">{sub}</div>
+    <div className="min-w-0 px-3 py-2 first:pl-0">
+      <div className="t-label">{label}</div>
+      <div className={clsx('num mt-1 truncate font-mono text-lead font-medium', tone === 'good' && 'text-good-ink', tone === 'warn' && 'text-warn-ink')}>{value}</div>
+      <div className="text-xs text-ink-3">{sub}</div>
     </div>
   )
 }
@@ -177,10 +177,10 @@ function ConnectProvider({ entry, keyring, onClose, onDone }: { entry: CatalogEn
   const keyReady = !entry.needs_key || !!keyRef
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}>
-      <Card title={`Connect ${entry.label}`} actions={<Button size="sm" variant="ghost" onClick={onClose} aria-label="Close"><X className="size-4" /></Button>}>
+      <Card boxed title={`Connect ${entry.label}`} actions={<Button size="sm" variant="ghost" onClick={onClose} aria-label="Close"><X className="size-4" /></Button>}>
         <ol className="space-y-5">
           <li>
-            <div className="mb-2 flex items-center gap-2 text-sm font-semibold"><span className="flex size-5 items-center justify-center rounded-full bg-accent text-label text-on-accent">1</span>Where it is{entry.needs_key ? ' and the key' : ''}</div>
+            <div className="mb-2 flex items-center gap-2 text-sm font-semibold"><span className="flex size-5 items-center justify-center rounded-full bg-accent font-mono text-label text-on-accent">1</span>Where it is{entry.needs_key ? ' and the key' : ''}</div>
             <div className="grid gap-3 md:grid-cols-2">
               <Field label="Base URL" hint={entry.local ? 'On this machine' : undefined}><Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} /></Field>
               {entry.needs_key && (
@@ -207,7 +207,8 @@ function ConnectProvider({ entry, keyring, onClose, onDone }: { entry: CatalogEn
             </div>
           </li>
           <li className={clsx(!keyReady && 'pointer-events-none opacity-40')}>
-            <div className="mb-2 flex items-center gap-2 text-sm font-semibold"><span className="flex size-5 items-center justify-center rounded-full bg-accent text-label text-on-accent">2</span>Pick a model</div>
+            <div className="mb-2 flex items-center gap-2 text-sm font-semibold"><span className="flex size-5 items-center justify-center rounded-full bg-accent font-mono text-label text-on-accent">2</span>Pick a model
+              <Help title="Which model?"><p>For grading, a small fast model is usually enough; check its agreement with your labels in the bake-off before trusting it.</p></Help></div>
             <div className="flex flex-wrap items-end gap-2">
               <Button loading={list.isPending} onClick={() => list.mutate()}><RefreshCw className="size-3.5" />Load models from {entry.label}</Button>
               {list.data?.ok && (
@@ -220,17 +221,16 @@ function ConnectProvider({ entry, keyring, onClose, onDone }: { entry: CatalogEn
               <Field label="or type a model id"><Input className="w-56" value={model} onChange={(e) => setModel(e.target.value)} placeholder="model id" /></Field>
             </div>
             {list.data && !list.data.ok && <p className="mt-2 text-xs text-bad-ink">{list.data.error}</p>}
-            <Explain className="mt-2">For grading, a small fast model is usually enough; check its agreement with your labels in the bake-off before trusting it.</Explain>
           </li>
           <li className={clsx(!model && 'pointer-events-none opacity-40')}>
-            <div className="mb-2 flex items-center gap-2 text-sm font-semibold"><span className="flex size-5 items-center justify-center rounded-full bg-accent text-label text-on-accent">3</span>Name and save</div>
+            <div className="mb-2 flex items-center gap-2 text-sm font-semibold"><span className="flex size-5 items-center justify-center rounded-full bg-accent font-mono text-label text-on-accent">3</span>Name and save
+              <Help title="A new model is uncalibrated"><p>A new model starts uncalibrated: runs it grades are marked so until you compare it with your own labels (Calibration).</p></Help></div>
             <div className="flex flex-wrap items-end gap-3">
               <Field label="Name"><Input className="w-72" value={name} onChange={(e) => setName(e.target.value)} placeholder={`${entry.label} - ${model || 'model'}`} /></Field>
               <label className="flex items-center gap-2 pb-1.5 text-sm"><input type="checkbox" className="accent-[var(--accent)]" checked={makeDefault} onChange={(e) => setMakeDefault(e.target.checked)} />Make it the default judge</label>
               <Button variant="primary" loading={add.isPending} disabled={!model || !keyReady} onClick={() => add.mutate()}><Check className="size-3.5" />Save</Button>
             </div>
             {add.isError && <div className="mt-2"><ErrorState error={add.error} /></div>}
-            <p className="mt-2 text-xs text-ink-3">A new model starts <Term k="calibrated">uncalibrated</Term>: runs it grades are marked so until you compare it with your own labels.</p>
           </li>
         </ol>
       </Card>
@@ -252,33 +252,35 @@ function DefaultsTab() {
   const s = settings.data!.values
   const judgeVal = s.default_judge ? (s.default_judge.provider === 'heuristic' ? 'heuristic' : String(s.default_judge.provider_config_id)) : ''
   return (
-    <div className="grid max-w-3xl gap-5">
-      <Card title="Default grading model" subtitle="Used by new runs unless a run picks its own">
+    <div className="grid max-w-3xl gap-10">
+      <Card title="Default grading model" help={<>
+        <p>Used by new runs unless a run picks its own.</p>
+        <p>Changing the default never re-grades old runs: each run keeps the grading model it used.</p>
+      </>}>
         <Select className="w-96" value={judgeVal} aria-label="Default judge"
           onChange={(e) => put.mutate({ default_judge: e.target.value === '' ? null : e.target.value === 'heuristic' ? { provider: 'heuristic' } : { provider_config_id: Number(e.target.value) } })}>
           <option value="">None</option>
           <option value="heuristic">Heuristic (word overlap, free, not an LLM)</option>
           {(models.data ?? []).map((m) => <option key={m.id} value={m.id}>{m.name} ({whereLabel(m)})</option>)}
         </Select>
-        <Explain className="mt-2">Changing the default never re-grades old runs: each run keeps the grading model it used.</Explain>
       </Card>
-      <Card title="Model for drafting test cases" subtitle="Generates candidate questions from your documents; you approve each one">
+      <Card title="Model for drafting test cases" help={<p>Generates candidate questions from your documents; you approve each one.</p>}>
         <Select className="w-96" value={s.default_generator?.provider_config_id ?? ''} aria-label="Default generator"
           onChange={(e) => put.mutate({ default_generator: e.target.value ? { provider_config_id: Number(e.target.value) } : null })}>
           <option value="">None</option>{(models.data ?? []).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
         </Select>
       </Card>
-      <Card title="Spend cap per run" subtitle="A run stops scheduling questions when its estimated spend reaches this">
+      <Card title="Spend cap per run" help={<p>A run stops scheduling questions when its estimated spend reaches this. Questions already sent still finish.</p>}>
         <div className="flex items-end gap-2">
           <Field label="USD"><Input className="w-40" type="number" min={0} step="0.5" value={cap ?? (s.spend_cap_usd ?? '')} onChange={(e) => setCap(e.target.value)} placeholder="no cap" /></Field>
           <Button variant="primary" loading={put.isPending} onClick={() => put.mutate({ spend_cap_usd: cap === '' || cap === null ? null : Number(cap) })}>Save</Button>
         </div>
       </Card>
-      <Card title="Demo data" subtitle="The seeded Acme Support Demo chatbot, for trying GaugeLab and for showing it">
-        <Toggle checked={!!s.hide_demo} onChange={(v) => { put.mutate({ hide_demo: v }); qc.invalidateQueries({ queryKey: ['projects'] }) }} label="Hide demo data"
-          hint="Drops the demo chatbot from the home page and from chatbot pickers. Nothing is deleted; turn it back on before a demo." />
+      <Card title="Demo data" help={<p>The seeded Acme Support Demo chatbot, for trying GaugeLab and for showing it.</p>}>
+        <Toggle checked={!!s.hide_demo} onChange={(v) => { put.mutate({ hide_demo: v }); qc.invalidateQueries({ queryKey: ['projects'] }) }}
+          label={<span className="inline-flex items-center gap-1.5">Hide demo data<Help title="Hide demo data"><p>Drops the demo chatbot from the home page and from chatbot pickers. Nothing is deleted; turn it back on before a demo.</p></Help></span>} />
       </Card>
-      <Notice title="No silent fallback">If a grading model fails or is rate-limited, those answers are marked <b>not evaluated</b>. GaugeLab never switches to another model in the middle of a run, so one run is always graded by one model.</Notice>
+      <Notice title="No silent fallback">If a grading model fails or is rate-limited, those answers are marked <span className="font-semibold">not evaluated</span>. GaugeLab never switches to another model in the middle of a run, so one run is always graded by one model.</Notice>
       {put.isError && <ErrorState error={put.error} />}
     </div>
   )
@@ -287,16 +289,17 @@ function DefaultsTab() {
 function AppearanceTab() {
   const p = usePrefs()
   return (
-    <div className="grid max-w-2xl gap-5">
+    <div className="grid max-w-2xl gap-10">
       <Card title="Look">
         <div className="space-y-4">
           <div className="flex items-center justify-between"><span className="text-sm font-medium">Theme</span><Segmented value={p.theme} onChange={(v) => p.set('theme', v)} options={[{ id: 'light', label: 'Light' }, { id: 'dark', label: 'Dark' }]} /></div>
           <div className="flex items-center justify-between"><span className="text-sm font-medium">Density</span><Segmented value={p.density} onChange={(v) => p.set('density', v)} options={[{ id: 'comfortable', label: 'Comfortable' }, { id: 'compact', label: 'Compact' }]} /></div>
         </div>
       </Card>
-      <Card title="Motion" help="Explanations live behind the circled ? beside every heading: hover it, or click to keep it open.">
+      <Card title="Motion" help={<p>The needle sweeps, figures roll and a passed gate stamps. Explanations live behind the circled ? beside every heading: hover it, or click to keep it open.</p>}>
         <div className="space-y-4">
-          <Toggle checked={p.motion === 'full'} onChange={(v) => p.set('motion', v ? 'full' : 'reduced')} label="Animations" hint="Off: everything appears instantly. Your system's reduce-motion setting is always respected." />
+          <Toggle checked={p.motion === 'full'} onChange={(v) => p.set('motion', v ? 'full' : 'reduced')}
+            label={<span className="inline-flex items-center gap-1.5">Animations<Help title="Animations"><p>Off: everything appears instantly. Your system's reduce-motion setting is always respected.</p></Help></span>} />
         </div>
       </Card>
     </div>
@@ -309,10 +312,10 @@ function ServerTab() {
   return (
     <Card title="GaugeLab server" className="max-w-2xl">
       <dl className="grid grid-cols-[160px_minmax(0,1fr)] gap-y-2 text-sm">
-        <dt className="text-ink-3">Status</dt><dd className="flex items-center gap-2"><span className={clsx('size-2 rounded-full', health.isSuccess ? 'bg-good' : 'bg-bad')} />{health.isSuccess ? 'running' : 'unreachable'}</dd>
-        <dt className="text-ink-3">Version</dt><dd className="num">{s.data?.server.version}</dd>
-        <dt className="text-ink-3">Database</dt><dd>{s.data?.server.database} <span className="font-mono text-xs text-ink-3">{s.data?.server.database_url}</span></dd>
-        <dt className="text-ink-3">API reference</dt><dd><a className="inline-flex items-center gap-1 text-accent-ink hover:underline" href="/docs" target="_blank" rel="noreferrer">OpenAPI docs <ExternalLink className="size-3" /></a></dd>
+        <dt className="t-label self-center">Status</dt><dd className="flex items-center gap-2"><span className={clsx('size-2 rounded-full', health.isSuccess ? 'bg-good' : 'bg-bad')} />{health.isSuccess ? 'running' : 'unreachable'}</dd>
+        <dt className="t-label self-center">Version</dt><dd className="num font-mono">{s.data?.server.version}</dd>
+        <dt className="t-label self-center">Database</dt><dd>{s.data?.server.database} <span className="font-mono text-xs text-ink-3">{s.data?.server.database_url}</span></dd>
+        <dt className="t-label self-center">API reference</dt><dd><a className="inline-flex items-center gap-1 text-accent-ink hover:underline" href="/docs" target="_blank" rel="noreferrer">OpenAPI docs <ExternalLink className="size-3" /></a></dd>
       </dl>
     </Card>
   )
@@ -383,8 +386,11 @@ function ShapeTab() {
   const [lang, setLang] = useState<keyof typeof SNIPPETS>('FastAPI')
   const [copied, setCopied] = useState(false)
   return (
-    <div className="grid gap-5 xl:grid-cols-2">
-      <Card title="The GaugeLab reply shape" subtitle="A bot that answers like this connects without any mapping">
+    <div className="grid gap-10 xl:grid-cols-2">
+      <Card title="The GaugeLab reply shape" help={<>
+        <p>A bot that answers like this connects without any mapping.</p>
+        <p>Only "answer" is required. Every extra field unlocks more checks: sources → retrieval and groundedness, tool calls → agent checks, usage → cost.</p>
+      </>}>
         <ul className="mb-3 space-y-1 text-sm">
           <li><code>answer</code> - the text the user sees (required)</li>
           <li><code>sources</code> - retrieved documents: <code>id</code>, <code>title</code>, <code>text</code>, <code>score</code></li>
@@ -393,13 +399,14 @@ function ShapeTab() {
           <li><code>usage</code> - <code>input_tokens</code>, <code>output_tokens</code> (for cost)</li>
         </ul>
         {shape.data && <Json value={shape.data.example} maxHeight={380} />}
-        <Explain className="mt-3">Only "answer" is required. Every extra field unlocks more checks: sources → retrieval and groundedness, tool calls → agent checks, usage → cost.</Explain>
       </Card>
-      <Card title="Add it to a bot" subtitle="One extra endpoint, about 20 lines"
+      <Card title="Add it to a bot" help={<>
+        <p>One extra endpoint, about 20 lines, in the framework your bot already uses.</p>
+        <p>Bots you did not build keep working: turn "My bot replies in the GaugeLab shape" off in the connect wizard and map their reply by clicking it.</p>
+      </>}
         actions={<Button size="sm" onClick={async () => { await navigator.clipboard.writeText(SNIPPETS[lang]); setCopied(true); setTimeout(() => setCopied(false), 1500) }}>{copied ? <Check className="size-3.5" /> : <Clipboard className="size-3.5" />}{copied ? 'Copied' : 'Copy'}</Button>}>
         <Segmented size="sm" value={lang} onChange={setLang} options={Object.keys(SNIPPETS).map((k) => ({ id: k as keyof typeof SNIPPETS, label: k }))} />
         <pre className="code scroll-thin mt-3 max-h-[440px] overflow-auto rounded-lg border border-line bg-surface-2 p-3">{SNIPPETS[lang]}</pre>
-        <p className="mt-2 text-xs text-ink-3">Bots you did not build keep working: turn "My bot replies in the GaugeLab shape" off in the connect wizard and map their reply by clicking it.</p>
       </Card>
     </div>
   )
@@ -412,9 +419,12 @@ function TemplatesTab() {
   const [open, setOpen] = useState<string | null>(null)
   if (t.isLoading) return <Loading />
   return (
-    <Card padded={false} title="Connection templates" subtitle="Start a new connection from one of these in the connect wizard">
+    <Card padded={false} title="Connection templates" meta={`${(t.data ?? []).length}`} help={<>
+      <p>Start a new connection from one of these in the connect wizard. Save your own from a connection's page.</p>
+      <p>Templates hold key references (env:/keyring:), never keys.</p>
+    </>}>
       <Table>
-        <thead><tr><th>Name</th><th>Kind</th><th>Description</th><th></th></tr></thead>
+        <thead><tr><th className="t-label">Name</th><th className="t-label">Kind</th><th className="t-label">Description</th><th></th></tr></thead>
         <tbody>
           {(t.data ?? []).map((x) => (
             <Fragment key={x.id}>
@@ -432,7 +442,7 @@ function TemplatesTab() {
           ))}
         </tbody>
       </Table>
-      <p className="flex items-center gap-1.5 border-t border-line px-4 py-2 text-xs text-ink-3"><ShieldCheck className="size-3.5" />Templates hold key references (env:/keyring:), never keys.</p>
+      <p className="flex items-center gap-1.5 border-t border-line py-2 text-xs text-ink-2"><ShieldCheck className="size-3.5 text-good-ink" />Templates hold key references (env:/keyring:), never keys.</p>
     </Card>
   )
 }

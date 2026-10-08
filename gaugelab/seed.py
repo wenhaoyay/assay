@@ -99,8 +99,10 @@ def seed(run: bool = False, trials: int = 3, force_runs: bool = False, history: 
         out["runs"] = "skipped: the demo project already has runs (use --force-runs to add more)"
     elif run:
         ids = {}
-        steps = HISTORY if history else [("baseline", None, None, None, 0), ("candidate", None, None, None, 0)]
-        for base, overrides, label, name, days_ago in steps:
+        plain: list[tuple[str, dict[str, Any] | None, str | None, str | None, int]] = [
+            ("baseline", None, None, None, 0), ("candidate", None, None, None, 0)]
+        steps = HISTORY if history else plain
+        for base, overrides, label, run_name, days_ago in steps:
             cfg = load_yaml(BENCH / "variants" / f"{base}.yaml")
             cfg["trials"] = trials
             if overrides is not None:
@@ -109,7 +111,7 @@ def seed(run: bool = False, trials: int = 3, force_runs: bool = False, history: 
                     cfg["seed"] = overrides.pop("_seed")
                 cfg["target"]["config"]["options"]["overrides"] = overrides
                 cfg["target"]["variant_label"] = label
-                cfg["experiment"]["name"] = name
+                cfg["experiment"]["name"] = run_name
             with db.session() as s:
                 r, _ = prepare_run(s, cfg)
                 svc.get(s, m.Experiment, r.experiment_id).gate_id = out["gate_id"]

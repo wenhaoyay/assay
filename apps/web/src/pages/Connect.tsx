@@ -11,7 +11,8 @@ import { useState, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { CleanupMethodHelp, ConnectionHelp, MethodHelp } from '../components/helpTexts'
 import { JsonTree } from '../components/JsonTree'
-import { Badge, Button, Card, ErrorState, Explain, Field, Input, Json, Notice, PageHeader, PageSkeleton, Segmented, Select, Table, Textarea, Toggle } from '../components/ui'
+import { Badge, Button, Card, ErrorState, Field, Input, Json, Notice, PageHeader, PageSkeleton, Segmented, Select, Table, Textarea, Toggle } from '../components/ui'
+import { LabelHelp } from '../components/LabelHelp'
 import { api } from '../lib/api'
 import { useCrumbs } from '../lib/crumbs'
 import { projectOption, useProjects } from '../lib/projects'
@@ -149,7 +150,11 @@ function ConnectWizard({ editing }: { editing: Target | null }) {
   return (
     <>
       <PageHeader title={fromId ? `Edit ${editing?.name ?? 'connection'}` : 'Connect a chatbot'}
-        description="Each step shows what it found before you go on. Nothing is saved until a test question has come back right."
+        help={<>
+          <p>Four steps: how you reach the bot, the request, a test question with the reply mapped, then safety and save.</p>
+          <p>Each step shows what it found before you go on. Nothing is saved until a test question has come back right.</p>
+          <p>Advanced (JSON) shows the whole configuration beside the steps; edits on either side update the other.</p>
+        </>}
         actions={<Button variant={advanced ? 'primary' : 'secondary'} onClick={() => setAdvanced((v) => !v)}><Code2 className="size-3.5" />Advanced (JSON)</Button>} />
       <Stepper step={step} onStep={(i) => i <= step && setStep(i)} />
       <div className={clsx('mt-5 grid gap-5', advanced && 'xl:grid-cols-[minmax(0,1fr)_420px]')}>
@@ -173,7 +178,7 @@ function ConnectWizard({ editing }: { editing: Target | null }) {
             <div className="mt-5 flex items-center gap-2">
               {step > 0 && <Button onClick={() => setStep(step - 1)}><ArrowLeft className="size-3.5" />Back</Button>}
               {step < 3 && <Button variant="primary" disabled={!canNext} onClick={() => setStep(step + 1)}>Next: {STEPS[step + 1]} <ArrowRight className="size-3.5" /></Button>}
-              {step === 2 && !test?.ok && <span className="text-xs text-ink-3">Send a test question that comes back right to continue.</span>}
+              {step === 2 && !test?.ok && <span className="text-xs text-ink-2">Send a test question that comes back right to continue.</span>}
             </div>
           )}
         </div>
@@ -191,7 +196,7 @@ function Stepper({ step, onStep }: { step: number; onStep: (i: number) => void }
           <button type="button" onClick={() => onStep(i)} disabled={i > step}
             className={clsx('flex items-center gap-2 rounded-full border px-3 py-1 text-sm transition-colors',
               i === step ? 'border-accent bg-accent-wash font-medium text-accent-ink' : i < step ? 'border-good/40 text-good-ink' : 'border-line text-ink-3')}>
-            <span className={clsx('flex size-5 items-center justify-center rounded-full text-label font-semibold', i === step ? 'bg-accent text-on-accent' : i < step ? 'bg-good text-white' : 'bg-surface-3 text-ink-3')}>
+            <span className={clsx('flex size-5 items-center justify-center rounded-full font-mono text-label font-semibold', i === step ? 'bg-accent text-on-accent' : i < step ? 'bg-good text-white' : 'bg-surface-3 text-ink-3')}>
               {i < step ? <Check className="size-3" /> : i + 1}
             </span>
             {s}
@@ -213,27 +218,30 @@ function StepRoute({ route, onRoute, templates, onTemplate, standard, setStandar
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" role="radiogroup">
           {ROUTES.map((r) => (
             <button key={r.id} type="button" role="radio" aria-checked={route === r.id} onClick={() => onRoute(r.id)}
-              className={clsx('relative rounded-xl border p-4 text-left transition-colors', route === r.id ? 'border-accent bg-accent-wash/50' : 'border-line hover:border-line-strong')}>
+              className={clsx('relative flex flex-col items-start rounded-xl border p-4 text-left transition-colors', route === r.id ? 'border-accent bg-accent-wash/50' : 'border-line hover:border-line-strong')}>
               {route === r.id && <motion.span layoutId="route-ring" className="absolute inset-0 rounded-xl ring-2 ring-accent" />}
               <div className="flex items-center gap-2"><r.icon className={clsx('size-4', route === r.id ? 'text-accent-ink' : 'text-ink-3')} /><span className="text-sm font-semibold">{r.title}</span>{r.badge && <Badge tone="accent">{r.badge}</Badge>}</div>
-              <p className="mt-1 text-xs text-ink-3">{r.body}</p>
+              <p className="mt-1 text-xs text-ink-2">{r.body}</p>
             </button>
           ))}
         </div>
       </Card>
       {route !== 'logs' && route !== 'python' && (
         <Card>
-          <Toggle checked={standard} onChange={setStandard} label="My bot replies in the GaugeLab shape"
-            hint={<>The reply is <code>{'{answer, sources, citations, tool_calls, usage}'}</code>: nothing to map. Turn it off for bots you did not build - you will map the reply by clicking it. <a className="text-accent-ink underline" href="/settings?tab=shape">How to add the shape to a bot</a></>} />
+          <Toggle checked={standard} onChange={setStandard}
+            label={<LabelHelp label="My bot replies in the GaugeLab shape" title="The GaugeLab reply shape">
+              <p>The reply is <code>{'{answer, sources, citations, tool_calls, usage}'}</code>: nothing to map.</p>
+              <p>Turn it off for bots you did not build: you will map the reply by clicking it. <a className="text-accent-ink underline" href="/settings?tab=shape">How to add the shape to a bot</a></p>
+            </LabelHelp>} />
         </Card>
       )}
       {route !== 'logs' && (
-        <Card title="Or start from a template" subtitle="Your saved connections appear here too">
+        <Card title="Or start from a template" meta={`${templates.length}`} help={<p>Fills the steps from a known setup. Your saved connections appear here too.</p>}>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {templates.map((t) => (
-              <button key={t.id} type="button" onClick={() => onTemplate(t)} className="rounded-lg border border-line p-3 text-left hover:border-accent/50 hover:bg-surface-2">
+              <button key={t.id} type="button" onClick={() => onTemplate(t)} className="flex flex-col items-start rounded-lg border border-line p-3 text-left hover:border-accent/50 hover:bg-surface-2">
                 <div className="flex items-center gap-2 text-sm font-medium">{t.name}{!t.builtin && <Badge tone="accent">yours</Badge>}</div>
-                <div className="mt-0.5 line-clamp-2 text-xs text-ink-3">{t.description}</div>
+                <div className="mt-0.5 line-clamp-2 text-xs text-ink-2">{t.description}</div>
               </button>
             ))}
           </div>
@@ -295,23 +303,25 @@ function StepRequest({ route, adapter, cfg, setCfg }: { route: Route; adapter: '
   const set = (k: string, v: unknown) => setCfg((c) => ({ ...c, [k]: v }))
   if (adapter === 'python') {
     return (
-      <Card title="Which function?">
+      <Card title="Which function?" help={<p>Return a dict with at least "answer"; add "retrieved_documents", "citations", "tool_calls" and "usage" to unlock more checks.</p>}>
         <div className="grid gap-3 md:grid-cols-2">
-          <Field label="Callable" hint="package.module:function - called as function(test_input, options, ctx)"><Input value={field('callable')} onChange={(e) => set('callable', e.target.value)} /></Field>
+          <Field label={<LabelHelp label="Callable"><p><code>package.module:function</code>, called as <code>function(test_input, options, ctx)</code>.</p></LabelHelp>}><Input value={field('callable')} onChange={(e) => set('callable', e.target.value)} /></Field>
           <Field label="Options (JSON)"><Input value={JSON.stringify(cfg.options ?? {})} onChange={(e) => { try { set('options', JSON.parse(e.target.value)) } catch { /* typing */ } }} /></Field>
         </div>
-        <Explain className="mt-3">Return a dict with at least "answer"; add "retrieved_documents", "citations", "tool_calls" and "usage" to unlock more checks.</Explain>
       </Card>
     )
   }
   return (
     <div className="space-y-5">
       {route === 'curl' && (
-        <Card title="Paste the curl command">
+        <Card title="Paste the curl command" help={<>
+          <p>Copy a real request to your bot as curl and GaugeLab reads the address, headers and body from it, finds where the question goes, and offers to store any key securely.</p>
+          <p>Chrome / Edge DevTools → Network → right-click the request → Copy → Copy as cURL (bash).</p>
+        </>}>
           <Textarea rows={6} value={curl} onChange={(e) => setCurl(e.target.value)} placeholder={"curl 'https://my-bot.example.com/api/chat' \\\n  -H 'Authorization: Bearer sk-...' \\\n  -H 'Content-Type: application/json' \\\n  --data-raw '{\"question\":\"How do I reset it?\"}'"} aria-label="curl command" />
           <div className="mt-2 flex items-center gap-2">
             <Button variant="primary" loading={parse.isPending} disabled={curl.trim().length < 6} onClick={() => parse.mutate()}><Wand2 className="size-3.5" />Read it</Button>
-            <span className="text-xs text-ink-3">Chrome / Edge DevTools → Network → right-click the request → Copy → Copy as cURL (bash).</span>
+            <span className="text-xs text-ink-2">DevTools → Network → Copy as cURL (bash)</span>
           </div>
           {parse.isError && <div className="mt-2"><ErrorState error={parse.error} /></div>}
           {parsed && (
@@ -330,10 +340,10 @@ function StepRequest({ route, adapter, cfg, setCfg }: { route: Route; adapter: '
         <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_110px]">
           <Field label="Base URL"><Input value={field('base_url')} onChange={(e) => set('base_url', e.target.value)} /></Field>
           <Field label="Endpoint"><Input value={field('endpoint')} onChange={(e) => set('endpoint', e.target.value)} /></Field>
-          <Field label={<>Method<MethodHelp /></>}><Select value={field('method') || 'POST'} onChange={(e) => set('method', e.target.value)} aria-label="Method"><option>POST</option><option>GET</option></Select></Field>
+          <Field label={<span className="inline-flex items-center gap-1.5">Method<MethodHelp /></span>}><Select value={field('method') || 'POST'} onChange={(e) => set('method', e.target.value)} aria-label="Method"><option>POST</option><option>GET</option></Select></Field>
         </div>
         <div className="mt-3">
-          <Field label="Body (JSON)" error={bodyErr ?? undefined} hint={<>Placeholders: <code>{'{{input.message}}'}</code> the question, <code>{'{{uuid}}'}</code> a fresh id per call, <code>{'{{input.fields.x}}'}</code> a per-case field.</>}>
+          <Field label={<LabelHelp label="Body (JSON)" title="Placeholders in the body"><p><code>{'{{input.message}}'}</code> the question, <code>{'{{uuid}}'}</code> a fresh id per call, <code>{'{{input.fields.x}}'}</code> a per-case field.</p></LabelHelp>} error={bodyErr ?? undefined}>
             <Textarea rows={7} value={bodyText} spellCheck={false} onChange={(e) => { setBodyText(e.target.value); try { set('body', JSON.parse(e.target.value)); setBodyErr(null) } catch { setBodyErr('Not valid JSON yet') } }} />
           </Field>
         </div>
@@ -358,10 +368,10 @@ function SecretRow({ secret, onStored, stored }: { secret: { header: string; pre
   return (
     <div className={clsx('flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2', stored ? 'border-good/40 bg-good-wash/40' : 'border-warn/40 bg-warn-wash/50')}>
       <KeyRound className={clsx('size-4', stored ? 'text-good-ink' : 'text-warn-ink')} />
-      <span className="text-sm"><b>{secret.header}</b> looks like a secret ({secret.hint}).</span>
+      <span className="text-sm"><span className="font-mono font-semibold">{secret.header}</span> looks like a secret ({secret.hint}).</span>
       {stored ? <span className="ml-auto text-xs text-good-ink">Stored in the OS credential store</span> : (
         <>
-          <span className="ml-auto text-xs text-ink-3">Save as</span>
+          <span className="ml-auto text-xs text-ink-2">Save as</span>
           <Input className="w-40" value={name} onChange={(e) => setName(e.target.value)} aria-label="Secret name" />
           <Button size="sm" variant="primary" loading={save.isPending} onClick={() => save.mutate()}><Lock className="size-3.5" />Store securely</Button>
         </>
@@ -476,13 +486,13 @@ function StepMap(props: {
   const reasons = probe?.suggestion?.reasons ?? {}
   return (
     <div className="space-y-5">
-      <Card title="Send a test question">
+      <Card title="Send a test question" help={<p>Sends one question with the request so far and shows the raw reply. With the GaugeLab shape off, map the reply below by clicking it.</p>}>
         <div className="flex gap-2">
           <Input value={message} onChange={(e) => setMessage(e.target.value)} aria-label="Test question" />
           <Button variant="primary" loading={probing} onClick={runProbe}><Send className="size-3.5" />Send</Button>
         </div>
         {probe && !probe.ok && <div className="mt-3"><Notice tone="bad" title={probe.explanation ?? 'The request failed'}><span className="font-mono text-xs">{probe.error}</span></Notice></div>}
-        {probe?.ok && <p className="mt-2 text-xs text-good-ink">Reply received{probe.status ? ` (HTTP ${probe.status}` : ''}{probe.elapsed_ms ? `, ${ms(probe.elapsed_ms)})` : ')'}{isStream ? `: a stream of ${probe.events?.length} event type(s)` : ''}.</p>}
+        {probe?.ok && <p className="num mt-2 text-xs text-good-ink">Reply received{probe.status ? ` (HTTP ${probe.status}` : ''}{probe.elapsed_ms ? `, ${ms(probe.elapsed_ms)})` : ')'}{isStream ? `: a stream of ${probe.events?.length} event type(s)` : ''}.</p>}
       </Card>
 
       {probe?.ok && adapter === 'http' && standard && probe.suggestion && (
@@ -495,24 +505,24 @@ function StepMap(props: {
 
       {probe?.ok && adapter === 'http' && !standard && raw !== undefined && (
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-          <Card title={isStream ? 'The reply, with the stream folded into one' : 'The reply'} subtitle={picking ? 'Click the node for the role you picked' : 'Pick a role on the right, then click where it is'}>
-            <AnimatePresence>{picking && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="mb-2 flex items-center gap-2 text-xs text-accent-ink"><MousePointerClick className="size-3.5" />Picking: <b>{ROLES.find((r) => r.id === picking)?.label}</b><Button size="sm" variant="ghost" onClick={() => setPicking(null)}>Cancel</Button></motion.div>}</AnimatePresence>
+          <Card title={isStream ? 'The reply, with the stream folded into one' : 'The reply'} help={<p>Pick a role on the right, then click the node in the reply where it is. Nodes already mapped carry their role's label.</p>}>
+            <AnimatePresence>{picking && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="mb-2 flex items-center gap-2 text-xs text-accent-ink"><MousePointerClick className="size-3.5" />Picking <span className="font-semibold">{ROLES.find((r) => r.id === picking)?.label}</span>: click its node<Button size="sm" variant="ghost" onClick={() => setPicking(null)}>Cancel</Button></motion.div>}</AnimatePresence>
             {pickError && <p className="mb-2 text-xs text-bad-ink">{pickError}</p>}
             <JsonTree data={raw} onPick={onPick} marks={marksFor(mapping)} picking={!!picking} />
           </Card>
-          <Card title="Where is each thing?" subtitle="GaugeLab guessed; confirm or fix">
+          <Card title="Where is each thing?" boxed help={<p>GaugeLab guessed from the reply; confirm or fix. A green dot is mapped. Hover a path to see why it was guessed.</p>}>
             <ul className="space-y-1">
               {ROLES.map((r, i) => {
                 const p = getRole(mapping, r.id)
                 const prevGroup = i > 0 ? ROLES[i - 1].group : null
                 return (
                   <li key={r.id}>
-                    {r.group !== prevGroup && <div className="mt-2 text-label font-medium uppercase tracking-wide text-ink-3">{r.group}</div>}
+                    {r.group !== prevGroup && <div className="t-label mt-2">{r.group}</div>}
                     <div className={clsx('flex items-center gap-2 rounded-md px-2 py-1', picking === r.id && 'bg-accent-wash')}>
                       <span className={clsx('size-1.5 shrink-0 rounded-full', p ? 'bg-good' : 'bg-untested')} />
                       <span className="min-w-0 flex-1">
                         <span className="text-sm">{r.label}</span>
-                        <span className="block truncate font-mono text-label text-ink-3" title={reasons[r.id === 'sources' ? 'retrieved_documents' : r.id === 'tools' ? 'tool_calls' : r.id] ?? ''}>{p ?? (r.hint || 'not mapped')}</span>
+                        <span className={clsx('block truncate text-xs text-ink-3', p && 'font-mono')} title={reasons[r.id === 'sources' ? 'retrieved_documents' : r.id === 'tools' ? 'tool_calls' : r.id] ?? ''}>{p ?? (r.hint || 'not mapped')}</span>
                       </span>
                       <Button size="sm" variant={picking === r.id ? 'primary' : 'ghost'} onClick={() => setPicking(picking === r.id ? null : r.id)}>{p ? 'Change' : 'Pick'}</Button>
                       {p && r.id !== 'answer' && <button type="button" aria-label={`Clear ${r.label}`} className="text-ink-3 hover:text-bad-ink" onClick={() => setCfg((c) => ({ ...c, response: setRole((c.response ?? {}) as Mapping, r.id, null) }))}><X className="size-3.5" /></button>}
@@ -526,31 +536,33 @@ function StepMap(props: {
       )}
 
       {probe?.ok && isStream && (
-        <Card title="Streamed reply" subtitle="Event types seen and how each is folded into one reply">
+        <Card title="Streamed reply" help={<>
+          <p>Event types seen in the stream and how each is folded into one reply.</p>
+          <p>Text pieces ("deltas") are joined into the answer; other events are kept by name so the mapping can read them. Edit the details in Advanced (JSON).</p>
+        </>}>
           <ul className="space-y-1.5">
             {probe.events?.map((e) => {
               const rule = ((cfg.stream as { events?: Record<string, { op?: string; path?: string; into?: string }> })?.events ?? {})[e.type]
               return (
                 <li key={e.type} className="grid grid-cols-[120px_60px_minmax(0,1fr)_minmax(0,1fr)] items-center gap-2 text-xs">
-                  <code className="font-medium">{e.type}</code><span className="num text-ink-3">x{e.count}</span>
+                  <code className="font-medium">{e.type}</code><span className="num font-mono text-ink-3">×{e.count}</span>
                   <span className="truncate font-mono text-ink-3">{JSON.stringify(e.sample).slice(0, 80)}</span>
                   <span>{rule ? <>{rule.op === 'concat' ? 'append text' : rule.op ?? 'keep'} <code>{rule.path}</code> → <code>{rule.into}</code></> : <span className="text-ink-3">ignored</span>}</span>
                 </li>
               )
             })}
           </ul>
-          <Explain className="mt-2">Text pieces ("deltas") are joined into the answer; other events are kept by name so the mapping can read them. Edit the details in Advanced (JSON).</Explain>
         </Card>
       )}
 
       {probe?.ok && (
-        <Card title="What GaugeLab will see" actions={<Button variant="primary" loading={testing} onClick={runTest}><Check className="size-3.5" />Check the mapping</Button>}>
-          {!test ? <p className="text-sm text-ink-3">Run the whole connection (request and mapping) to see the result as GaugeLab reads it.</p> : !test.ok ? (
+        <Card title="What GaugeLab will see" help={<p>Runs the whole connection (request and mapping) and shows the result as GaugeLab reads it, and which checks that makes possible.</p>} actions={<Button variant="primary" loading={testing} onClick={runTest}><Check className="size-3.5" />Check the mapping</Button>}>
+          {!test ? <p className="text-sm text-ink-2">Not checked yet: press Check the mapping.</p> : !test.ok ? (
             <Notice tone="bad" title={test.explanation ?? test.error ?? 'No answer'}>{test.error}</Notice>
           ) : (
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="space-y-2 text-sm">
-                <div className="text-xs text-ink-3">Answer ({ms(test.elapsed_ms)})</div>
+                <div className="t-label">Answer · <span className="font-mono normal-case">{ms(test.elapsed_ms)}</span></div>
                 <div className="line-clamp-6 rounded-lg border border-line bg-surface-2/50 px-3 py-2">{test.normalized?.answer}</div>
                 {test.normalized?.retrieved_documents && <div className="text-xs text-ink-2">{test.normalized.retrieved_documents.length} source(s): {test.normalized.retrieved_documents.slice(0, 5).map((d) => <code key={d.id} className="mr-1">{d.id}</code>)}</div>}
                 {test.normalized?.tool_calls && <div className="text-xs text-ink-2">{test.normalized.tool_calls.length} tool call(s): {test.normalized.tool_calls.map((t, i) => <code key={i} className="mr-1">{t.name}</code>)}</div>}
@@ -567,14 +579,14 @@ function StepMap(props: {
 export function Capabilities({ caps }: { caps: Capability[] }) {
   return (
     <div>
-      <div className="mb-1.5 text-xs font-medium text-ink-3">What you'll get</div>
+      <div className="t-label mb-1.5">What you'll get</div>
       <ul className="space-y-1.5">
         {caps.map((c, i) => (
           <motion.li key={c.field} initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }} className="flex items-start gap-2 text-sm">
             {c.received ? <Check className="mt-0.5 size-4 shrink-0 text-good-ink" /> : c.mapped ? <CircleAlert className="mt-0.5 size-4 shrink-0 text-warn-ink" /> : <X className="mt-0.5 size-4 shrink-0 text-ink-3" />}
             <span>
-              <b className={clsx(!c.received && 'font-medium text-ink-2')}>{c.label}</b>{c.count !== null && c.received ? ` (${c.count})` : ''}
-              <span className="block text-xs text-ink-3">{c.received ? `→ ${c.unlocks}` : c.mapped ? `Mapped, but empty in this reply - ${c.unlocks} may show "not evaluated"` : `Not mapped: ${c.unlocks} won't run`}</span>
+              <span className={clsx(c.received ? 'font-semibold text-ink' : 'font-medium text-ink-2')}>{c.label}</span>{c.count !== null && c.received ? <span className="font-mono"> ({c.count})</span> : ''}
+              <span className="block text-xs text-ink-2">{c.received ? `→ ${c.unlocks}` : c.mapped ? `Mapped, but empty in this reply - ${c.unlocks} may show "not evaluated"` : `Not mapped: ${c.unlocks} won't run`}</span>
             </span>
           </motion.li>
         ))}
@@ -688,7 +700,7 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved, reply, tes
   return (
     <div className="space-y-5">
       {!editing && (
-        <Card title="Which chatbot is this?" subtitle="Decides which question sets are offered below and where its runs appear">
+        <Card title="Which chatbot is this?" help={<p>Decides which question sets are offered below and where its runs appear.</p>}>
           <div className="flex flex-wrap items-center gap-2">
             <Segmented size="sm" value={projectMode} onChange={setProjectMode} options={[{ id: 'existing', label: 'Existing' }, { id: 'new', label: 'New' }]} />
             {projectMode === 'existing'
@@ -704,8 +716,9 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved, reply, tes
         </Card>
       )}
       {adapter === 'http' && (
-        <Card title="Side effects">
-          <Toggle checked={savesChats} onChange={setCleanup} label="Each question saves a conversation in the bot" hint="Then GaugeLab deletes it right after the answer, so test runs do not pile up in the bot's history." />
+        <Card title="Side effects" help={<p>Also check what else a question writes (usage tables, shared logs, budgets) before pointing GaugeLab at a shared instance. When that is not acceptable, use an isolated copy or import logs instead.</p>}>
+          <Toggle checked={savesChats} onChange={setCleanup}
+            label={<LabelHelp label="Each question saves a conversation in the bot" title="Clean-up"><p>Then GaugeLab deletes it right after the answer, so test runs do not pile up in the bot's history.</p></LabelHelp>} />
           {!savesChats && idPath && (
             <div className="mt-3">
               <Notice tone="info" title={<>The reply carries a chat id (<code>{idPath}</code>)</>} action={<Button size="sm" onClick={() => setCleanup(true)}>Clean up after each question</Button>}>
@@ -715,10 +728,10 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved, reply, tes
           )}
           {savesChats && (
             <div className="mt-3 grid gap-3 md:grid-cols-[120px_minmax(0,1fr)_220px]">
-              <Field label={<>Method<CleanupMethodHelp /></>}>
+              <Field label={<span className="inline-flex items-center gap-1.5">Method<CleanupMethodHelp /></span>}>
                 <Select value={cleanup.method} aria-label="Clean-up method" onChange={(e) => setCfg((c) => ({ ...c, cleanup: { ...cleanup, method: e.target.value } }))}><option>DELETE</option><option>POST</option></Select>
               </Field>
-              <Field label="Clean-up endpoint" hint={idPath ? <>The reply has the chat id at <code>{idPath}</code>. <code>{'{{raw.x}}'}</code> reads a field of the reply.</> : '{{raw.x}} reads a field of the reply'}>
+              <Field label={<LabelHelp label="Clean-up endpoint"><p><code>{'{{raw.x}}'}</code> reads a field of the reply.</p></LabelHelp>} hint={idPath ? <>Chat id at <code>{idPath}</code></> : undefined}>
                 <Input aria-label="Clean-up endpoint" value={cleanup.endpoint} onChange={(e) => setCfg((c) => ({ ...c, cleanup: { ...cleanup, endpoint: e.target.value } }))} />
               </Field>
               <Field label="Only if the reply has">
@@ -733,10 +746,12 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved, reply, tes
               </Notice>
             </div>
           )}
-          <Explain className="mt-3">Also check what else a question writes (usage tables, shared logs, budgets) before pointing GaugeLab at a shared instance. When that is not acceptable, use an isolated copy or import logs instead.</Explain>
         </Card>
       )}
-      <Card title="Dry run" subtitle="Speed (and cost, when the bot reports it) before a full run">
+      <Card title="Dry run" help={<>
+        <p>Speed (and cost, when the bot reports it) before a full run. Ask a few questions, optionally all at once too, to see how the bot copes when busy.</p>
+        <p>Tries multiply everything: 3 tries per question = 3× the answers. Grading-model calls are extra (shown on New run).</p>
+      </>}>
         <div className="flex flex-wrap items-end gap-2">
           <Field label="Questions from">
             <Select className="w-80" value={src} onChange={(e) => setSource(e.target.value)} aria-label="Dry-run questions">
@@ -760,7 +775,7 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved, reply, tes
           {canAsk && <Button loading={dry.isPending} onClick={() => dry.mutate()}><Send className="size-3.5" />Ask {asked} question{asked === 1 ? '' : 's'}{loadCheck ? `, then ${asked} at once` : ''}</Button>}
         </div>
         {others.length > 0 && (
-          <label className="mt-2 flex items-center gap-2 text-xs text-ink-3">
+          <label className="mt-2 flex items-center gap-2 text-xs text-ink-2">
             <input type="checkbox" className="accent-[var(--accent)]" checked={showOthers} onChange={(e) => setShowOthers(e.target.checked)} />Also list question sets written for other chatbots ({others.length})
           </label>
         )}
@@ -782,7 +797,7 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved, reply, tes
             Also check how it copes when busy: ask the same questions again, all at once ({asked} more answer{asked === 1 ? '' : 's'})
           </label>
         )}
-        {src === 'test' && <p className="mt-2 text-xs text-ink-3">No new questions: the estimate below uses the {ms(testMs)} the test question took. One answer is a rough guide; three are steadier.</p>}
+        {src === 'test' && <p className="mt-2 text-xs text-ink-2">No new questions: the estimate below uses the <span className="font-mono">{ms(testMs)}</span> the test question took. One answer is a rough guide; three are steadier.</p>}
         {dry.isError && <div className="mt-2"><ErrorState error={dry.error} /></div>}
         {dry.data && src !== 'test' && (
           <div className="mt-3 space-y-2">
@@ -790,13 +805,13 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved, reply, tes
               <div key={i} className="flex items-start gap-2 text-sm">
                 {c.ok ? <Check className="mt-0.5 size-4 text-good-ink" /> : <X className="mt-0.5 size-4 text-bad-ink" />}
                 <span className="min-w-0 flex-1"><span className="text-ink-2">{c.question}</span><span className="block truncate text-xs text-ink-3">{c.ok ? c.answer : c.explanation ?? c.error}</span></span>
-                <span className="num text-xs text-ink-3">{ms(c.elapsed_ms)}{c.cleanup && ` - clean-up ${c.cleanup}`}</span>
+                <span className="num font-mono text-xs text-ink-3">{ms(c.elapsed_ms)}{c.cleanup && ` - clean-up ${c.cleanup}`}</span>
               </div>
             ))}
             {dry.data.load && (
               <Notice tone={dry.data.load.verdict === 'copes' ? 'good' : dry.data.load.verdict === 'unknown' ? 'info' : 'warn'}
                 title={`Alone: ${ms(dry.data.load.alone_ms)} per answer. ${dry.data.load.n} at once: ${ms(dry.data.load.together_ms)}${dry.data.load.ratio ? ` (x${dry.data.load.ratio})` : ''}${dry.data.load.errors ? `, ${dry.data.load.errors} error(s)` : ''}.`}>
-                This bot {LOAD_TEXT[dry.data.load.verdict]} Suggested <b>In parallel: {dry.data.load.suggested_concurrency}</b>.
+                This bot {LOAD_TEXT[dry.data.load.verdict]} Suggested <span className="font-semibold">In parallel: <span className="font-mono">{dry.data.load.suggested_concurrency}</span></span>.
               </Notice>
             )}
           </div>
@@ -807,30 +822,29 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved, reply, tes
               What a full run would take{perCost === null ? '. The bot reports no token counts, so its price is unknown: count the billed answers.' : ''}
             </div>
             <Table>
-              <thead><tr><th>Question set</th><th className="text-right">Answers (1 try)</th><th className="text-right">Time at 1 / 4 in parallel</th><th className="text-right">Bot cost</th></tr></thead>
+              <thead><tr><th className="t-label">Question set</th><th className="t-label text-right">Answers (1 try)</th><th className="t-label text-right">Time at 1 / 4 in parallel</th><th className="t-label text-right">Bot cost</th></tr></thead>
               <tbody>
                 {[...own.map((d) => ({ key: d.id, label: d.name, n: d.latest?.case_count ?? 0 })), { key: 0, label: 'Per 10 questions', n: 10 }].map((r) => (
                   <tr key={r.key}>
                     <td>{r.label}</td>
-                    <td className="num text-right">{r.n} billed</td>
-                    <td className="num text-right">{dur(r.n * perMs)} / {dur((r.n * perMs) / 4)}</td>
-                    <td className="num text-right">{perCost !== null ? usd(perCost * r.n) : 'unknown'}</td>
+                    <td className="num text-right"><span className="font-mono">{r.n}</span> billed</td>
+                    <td className="num text-right font-mono">{dur(r.n * perMs)} / {dur((r.n * perMs) / 4)}</td>
+                    <td className="num text-right">{perCost !== null ? <span className="font-mono">{usd(perCost * r.n)}</span> : 'unknown'}</td>
                   </tr>
                 ))}
               </tbody>
             </Table>
-            <p className="mt-1 text-xs text-ink-3">Tries multiply everything: 3 tries per question = 3x the answers. Grading-model calls are extra (shown on New run).</p>
           </div>
         )}
       </Card>
-      <Card title={editing ? `Save as version ${editing.latest_version.version + 1}` : 'Name and save'}>
+      <Card title={editing ? `Save as version ${editing.latest_version.version + 1}` : 'Name and save'} boxed>
         <div className="grid gap-3 md:grid-cols-2">
           {!editing && (
-            <Field label={<>Name this connection<ConnectionHelp /></>} hint="Where this copy of the bot runs. You may add others later (a test copy, the server).">
+            <Field label={<span className="inline-flex items-center gap-1.5">Name this connection<ConnectionHelp /></span>}>
               <Input aria-label="Connection name" placeholder={`e.g. ${initials} – local dev (:8120)`} value={name} onChange={(e) => setName(e.target.value)} />
             </Field>
           )}
-          <Field label="What's inside this version" hint={'Model, prompt, retriever. Say what it is ("gpt-6-sol answer, high effort"), not just "v1": in six months it still tells you what changed.'}>
+          <Field label={<LabelHelp label="What's inside this version"><p>Model, prompt, retriever. Say what it is ("gpt-6-sol answer, high effort"), not just "v1": in six months it still tells you what changed.</p></LabelHelp>}>
             <Input aria-label="Version description" placeholder="e.g. gpt-x answer / hybrid top-20 / prompt v3" value={label} onChange={(e) => setLabel(e.target.value)} />
           </Field>
           {editing && <Field label="What changed"><Input value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>}
@@ -841,7 +855,7 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved, reply, tes
           <Button variant="primary" size="lg" loading={save.isPending} disabled={!!saveWhy} onClick={() => save.mutate()}>
             <Check className="size-4" />{editing ? `Save version ${editing.latest_version.version + 1}` : 'Save connection'}
           </Button>
-          {saveWhy && <span className="text-xs text-ink-3">{saveWhy}</span>}
+          {saveWhy && <span className="text-xs text-ink-2">{saveWhy}</span>}
         </div>
       </Card>
     </div>
@@ -854,11 +868,13 @@ function AdvancedPanel({ adapter, cfg, setCfg }: { adapter: string; cfg: Cfg; se
   const text = draft ?? JSON.stringify(cfg, null, 2)
   return (
     <div className="xl:sticky xl:top-16 xl:self-start">
-      <Card title={`Configuration (${adapter})`} subtitle="The record of this connection. Edits here update the steps, and the other way round.">
+      <Card title="Configuration" boxed meta={adapter} help={<>
+        <p>The record of this connection. Edits here update the steps, and the other way round.</p>
+        <p>Same format as YAML experiment files and <code>local/targets/*.yaml</code>.</p>
+      </>}>
         <Textarea rows={26} value={text} spellCheck={false} onBlur={() => setDraft(null)}
           onChange={(e) => { setDraft(e.target.value); try { const v = JSON.parse(e.target.value); setCfg(() => v); setErr(null) } catch { setErr('Not valid JSON yet - the steps keep the last valid version.') } }} />
         {err && <p className="mt-1 text-xs text-warn-ink">{err}</p>}
-        <p className="mt-2 text-xs text-ink-3">Same format as YAML experiment files and <code>local/targets/*.yaml</code>.</p>
       </Card>
     </div>
   )
@@ -897,11 +913,14 @@ function LogsImport({ projects, onDone }: { projects: Project[]; onDone: (target
   const cols = preview.data?.columns ?? []
   const ROLE_LIST: [string, string][] = [['case_id', 'Id'], ['message', 'Question'], ['answer', 'Answer'], ['sources', 'Sources (list)'], ['category', 'Category'], ['latency_ms', 'Latency (ms)'], ['latency_s', 'Latency (s)']]
   return (
-    <Card title="Import past answers">
+    <Card title="Import past answers" help={<>
+      <p>Drop a log of past questions and answers (.jsonl, .json or .csv), then say which column is which.</p>
+      <p>Creates a dataset of the logged questions and a "replay" connection that answers with what was logged: graded without calling the bot.</p>
+    </>}>
       <label className={clsx('flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-8 text-sm transition-colors', file ? 'border-good/50 bg-good-wash/30' : 'border-line-strong hover:border-accent')}
         onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) { setFile(f); preview.mutate(f) } }}>
         <FileUp className="size-6 text-ink-3" />
-        {file ? <span><b>{file.name}</b> - {Math.round(file.size / 1024)} KB</span> : <span>Drop a <b>.jsonl</b>, <b>.json</b> or <b>.csv</b> file, or click to choose</span>}
+        {file ? <span><span className="font-mono font-medium">{file.name}</span> · <span className="font-mono">{Math.round(file.size / 1024)}</span> KB</span> : <span>Drop a <span className="font-mono">.jsonl</span>, <span className="font-mono">.json</span> or <span className="font-mono">.csv</span> file, or click to choose</span>}
         <input type="file" accept=".jsonl,.json,.csv,.ndjson" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) { setFile(f); preview.mutate(f) } }} />
       </label>
       {preview.isError && <div className="mt-3"><ErrorState error={preview.error} /></div>}
@@ -929,7 +948,7 @@ function LogsImport({ projects, onDone }: { projects: Project[]; onDone: (target
           </div>
           {imp.isError && <ErrorState error={imp.error} />}
           <Button variant="primary" loading={imp.isPending} disabled={!roles.message} onClick={() => imp.mutate()}><FileUp className="size-3.5" />Import</Button>
-          <Explain>Creates a dataset of the logged questions and a "replay" connection that answers with what was logged - graded without calling the bot.</Explain>
+
         </div>
       )}
     </Card>

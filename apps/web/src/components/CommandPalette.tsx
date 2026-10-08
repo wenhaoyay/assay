@@ -78,9 +78,9 @@ export function CommandPalette({ open, onClose, onShortcuts, onTour }: { open: b
     const out: Item[] = []
     const ql = q.trim().toLowerCase()
     const cmp = ql.match(/^(?:compare|cmp|c)\s+#?(\d+)\s+(?:vs\s+|and\s+)?#?(\d+)$/)
-    if (cmp) out.push({ id: 'cmp', group: 'Jump', label: <>Compare run <b>#{cmp[1]}</b> with <b>#{cmp[2]}</b></>, icon: GitCompareArrows, run: go(`/compare?baseline=${cmp[1]}&candidate=${cmp[2]}`) })
+    if (cmp) out.push({ id: 'cmp', group: 'Jump', label: <>Compare run <span className="font-mono font-semibold">#{cmp[1]}</span> with <span className="font-mono font-semibold">#{cmp[2]}</span></>, icon: GitCompareArrows, run: go(`/compare?baseline=${cmp[1]}&candidate=${cmp[2]}`) })
     const runId = ql.match(/^#?(\d+)$/)
-    if (runId) out.push({ id: 'run', group: 'Jump', label: <>Open run <b>#{runId[1]}</b></>, icon: Rows3, run: go(`/runs/${runId[1]}`) })
+    if (runId) out.push({ id: 'run', group: 'Jump', label: <>Open run <span className="font-mono font-semibold">#{runId[1]}</span></>, icon: Rows3, run: go(`/runs/${runId[1]}`) })
     const actions: Item[] = [
       { id: 'a-run', group: 'Actions', label: 'New run', hint: 'Start a run on a chatbot version', icon: Play, run: go('/runs/new'), keywords: 'experiment start evaluate' },
       { id: 'a-connect', group: 'Actions', label: 'Connect a chatbot', hint: 'Paste a curl command, map the reply', icon: Plug, run: go('/targets/new'), keywords: 'target connection add wizard new' },
@@ -105,8 +105,8 @@ export function CommandPalette({ open, onClose, onShortcuts, onTour }: { open: b
     const r = results.data
     if (r && ql) {
       r.projects.forEach((p) => out.push({ id: `pr${p.id}`, group: 'Chatbots', label: p.name, icon: Bot, run: go(`/p/${p.id}`) }))
-      r.runs.forEach((x) => out.push({ id: `r${x.id}`, group: 'Runs', label: <><span className="font-mono">#{x.id}</span> {x.name}</>, icon: Rows3, run: go(`/runs/${x.id}`) }))
-      r.cases.forEach((c) => out.push({ id: `c${c.dataset_id}${c.id}`, group: 'Test cases', label: <><span className="font-mono">{c.id}</span> {c.title}</>, hint: c.dataset, icon: FileText, run: go(`/datasets/${c.dataset_id}?case=${encodeURIComponent(c.id)}`) }))
+      r.runs.forEach((x) => out.push({ id: `r${x.id}`, group: 'Runs', label: <><span className="font-mono text-ink-3">#{x.id}</span> {x.name}</>, icon: Rows3, run: go(`/runs/${x.id}`) }))
+      r.cases.forEach((c) => out.push({ id: `c${c.dataset_id}${c.id}`, group: 'Test cases', label: <><span className="font-mono text-ink-3">{c.id}</span> {c.title}</>, hint: c.dataset, icon: FileText, run: go(`/datasets/${c.dataset_id}?case=${encodeURIComponent(c.id)}`) }))
       r.targets.forEach((t) => out.push({ id: `t${t.id}`, group: 'Connections', label: t.name, icon: Target, run: go(`/targets/${t.id}`) }))
       r.datasets.forEach((d) => out.push({ id: `d${d.id}`, group: 'Datasets', label: d.name, icon: Database, run: go(`/datasets/${d.id}`) }))
     }
@@ -130,17 +130,17 @@ export function CommandPalette({ open, onClose, onShortcuts, onTour }: { open: b
   return (
     <AnimatePresence>
       {open && (
-        <motion.div className="fixed inset-0 z-[70] flex items-start justify-center bg-black/30 p-4 pt-[12vh] backdrop-blur-[2px]"
+        <motion.div className="fixed inset-0 z-[70] flex items-start justify-center bg-ink/25 p-4 pt-[12vh] backdrop-blur-[2px]"
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }} onMouseDown={onClose}>
           <motion.div role="dialog" aria-label="Command palette" onMouseDown={(e) => e.stopPropagation()}
             initial={{ opacity: 0, y: -8, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.98 }}
             transition={{ type: 'spring', stiffness: 500, damping: 36 }}
-            className="w-full max-w-xl overflow-hidden rounded-2xl border border-line bg-surface shadow-pop">
+            className="w-full max-w-xl overflow-hidden rounded-xl border border-line bg-surface shadow-pop">
             <div className="flex items-center gap-2 border-b border-line px-4">
               <Search className="size-4 text-ink-3" aria-hidden />
               <input ref={input} value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKey}
                 placeholder="Search runs, cases, chatbots... or type a command (compare 5 6)"
-                className="h-12 flex-1 bg-transparent text-base outline-none placeholder:text-ink-3" aria-label="Search" />
+                className="h-12 flex-1 bg-transparent text-lead text-ink outline-none placeholder:text-ink-3" style={{ outline: 'none' }} aria-label="Search" />
               <Kbd>Esc</Kbd>
             </div>
             <ul className="scroll-thin max-h-[52vh] overflow-y-auto p-2" role="listbox">
@@ -151,9 +151,9 @@ export function CommandPalette({ open, onClose, onShortcuts, onTour }: { open: b
                 const Icon = it.icon
                 return (
                   <li key={it.id}>
-                    {header && <div className="px-3 pb-1 pt-2 text-label font-medium uppercase tracking-wide text-ink-3">{header}</div>}
+                    {header && <div className="t-label px-3 pb-1 pt-2.5">{header}</div>}
                     <button type="button" data-cmd-index={i} role="option" aria-selected={i === active} onMouseMove={() => setActive(i)} onClick={it.run}
-                      className={clsx('flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm', i === active ? 'bg-accent-wash text-ink' : 'text-ink-2')}>
+                      className={clsx('relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors duration-100', i === active ? 'bg-surface-2 text-ink shadow-[inset_0_0_0_1px_var(--line)]' : 'text-ink-2')}>
                       <Icon className={clsx('size-4 shrink-0', i === active ? 'text-accent-ink' : 'text-ink-3')} aria-hidden />
                       <span className="min-w-0 flex-1 truncate">{it.label}</span>
                       {it.hint && <span className="truncate text-xs text-ink-3">{it.hint}</span>}
@@ -163,10 +163,10 @@ export function CommandPalette({ open, onClose, onShortcuts, onTour }: { open: b
                 )
               })}
             </ul>
-            <div className="flex items-center gap-3 border-t border-line px-4 py-2 text-label text-ink-3">
+            <div className="flex items-center gap-3 border-t border-line bg-surface-2/60 px-4 py-2 text-xs text-ink-3">
               <span className="flex items-center gap-1"><Kbd>↑</Kbd><Kbd>↓</Kbd> move</span>
               <span className="flex items-center gap-1"><Kbd>Enter</Kbd> open</span>
-              <span className="ml-auto flex items-center gap-1"><Kbd>?</Kbd> all shortcuts</span>
+              <span className="ml-auto flex items-center gap-1"><Kbd>?</Kbd> all shortcuts · <HelpGlyph /> beside a heading explains it</span>
             </div>
           </motion.div>
         </motion.div>
@@ -178,7 +178,7 @@ export function CommandPalette({ open, onClose, onShortcuts, onTour }: { open: b
 export const SHORTCUTS: { group: string; keys: string[]; label: string }[] = [
   { group: 'Anywhere', keys: ['Ctrl', 'K'], label: 'Search and commands' },
   { group: 'Anywhere', keys: ['?'], label: 'This list' },
-  { group: 'Anywhere', keys: ['?'], label: 'Beside a heading: what it shows and how to use it (hover or click)' },
+  { group: 'Anywhere', keys: ['(?)'], label: 'Beside a heading: what it shows, how to use it, any caveat (hover or click)' },
   { group: 'Anywhere', keys: ['G', 'H'], label: 'Go home' },
   { group: 'Anywhere', keys: ['G', 'R'], label: 'Go to runs' },
   { group: 'Anywhere', keys: ['G', 'C'], label: 'Go to compare' },
@@ -198,26 +198,31 @@ export const SHORTCUTS: { group: string; keys: string[]; label: string }[] = [
   { group: 'Calibration', keys: ['U'], label: 'Label UNKNOWN' },
 ]
 
+/** The circled ? as it appears beside headings (a picture of it, not a working one). */
+function HelpGlyph() {
+  return <span aria-label="the circled question mark" className="inline-flex size-[18px] items-center justify-center rounded-full border-[1.5px] border-line-strong text-label font-semibold leading-none text-ink-3">?</span>
+}
+
 export function ShortcutSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const groups = [...new Set(SHORTCUTS.map((s) => s.group))]
   return (
     <AnimatePresence>
       {open && (
-        <motion.div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/30 p-4 backdrop-blur-[2px]"
+        <motion.div className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/25 p-4 backdrop-blur-[2px]"
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={onClose}>
           <motion.div role="dialog" aria-label="Keyboard shortcuts" onMouseDown={(e) => e.stopPropagation()}
             initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.97 }}
-            className="w-full max-w-2xl rounded-2xl border border-line bg-surface p-5 shadow-pop">
-            <div className="mb-4 flex items-center justify-between"><h2 className="text-h font-semibold">Keyboard shortcuts</h2><Kbd>Esc</Kbd></div>
+            className="w-full max-w-2xl rounded-xl border border-line bg-surface p-5 shadow-pop">
+            <div className="mb-4 flex items-center justify-between border-b border-line pb-2.5"><h2 className="text-h font-semibold tracking-tight">Keyboard shortcuts</h2><Kbd>Esc</Kbd></div>
             <div className="grid gap-x-8 gap-y-4 sm:grid-cols-2">
               {groups.map((g) => (
                 <div key={g}>
-                  <div className="mb-1.5 text-label font-medium uppercase tracking-wide text-ink-3">{g}</div>
+                  <div className="t-label mb-1.5">{g}</div>
                   <ul className="space-y-1">
                     {SHORTCUTS.filter((s) => s.group === g).map((s) => (
                       <li key={s.label} className="flex items-center justify-between gap-3 text-sm">
                         <span className="text-ink-2">{s.label}</span>
-                        <span className="flex gap-1">{s.keys.map((k) => <Kbd key={k}>{k}</Kbd>)}</span>
+                        <span className="flex shrink-0 gap-1">{s.keys.map((k) => k === '(?)' ? <HelpGlyph key={k} /> : <Kbd key={k}>{k}</Kbd>)}</span>
                       </li>
                     ))}
                   </ul>

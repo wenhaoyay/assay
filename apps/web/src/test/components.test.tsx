@@ -28,7 +28,8 @@ describe('dataset version badge', () => {
     wrap(<VersionBadge v={{ version: 3, status: 'frozen', run_count: 2 }} />)
     expect(screen.getByText('v3')).toBeInTheDocument()
     expect(screen.getByText('Frozen')).toBeInTheDocument()
-    expect(screen.getByText(/used by 2 runs/)).toBeInTheDocument()
+    // The count is set in mono, so the sentence spans elements: match the badge's whole text.
+    expect(screen.getByText((_, el) => el?.tagName === 'SPAN' && /^used by 2 runs$/.test(el.textContent?.trim() ?? ''))).toBeInTheDocument()
   })
   it('a draft says nothing about runs', () => {
     wrap(<VersionBadge v={{ version: 4, status: 'draft', run_count: 0 }} />)

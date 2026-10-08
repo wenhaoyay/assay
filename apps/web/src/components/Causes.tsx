@@ -3,15 +3,16 @@
 // fixed and broke, a person's notes grouped into themes, and how a connection reads replies.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { ArrowRight, BookOpenCheck, Check, ChevronRight, Eye, Pencil, Sparkles, Wand2 } from 'lucide-react'
-import { AnimatePresence, motion } from 'motion/react'
+import { ArrowRight, BookOpenCheck, Check, Eye, Pencil, Sparkles, Wand2 } from 'lucide-react'
+import { motion } from 'motion/react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useSettings } from '../lib/projects'
 import { pct, when } from '../lib/format'
 import type { CauseCount, ProviderConfig, RunCauses, TrialDetail, Verdict } from '../lib/types'
-import { Badge, Button, Card, ErrorState, Explain, Field, Help, Notice, ProgressBar, Select } from './ui'
+import { causeColor, SampleSize } from './instrument'
+import { Badge, Button, Card, ErrorState, Field, Help, Notice, ProgressBar, Select } from './ui'
 import { Capabilities } from '../pages/Connect'
 
 /** Every cause, in the order the server ranks them (gaugelab/diagnosis.py CAUSES). */
@@ -51,8 +52,12 @@ export function CauseBadge({ v, className }: { v: Pick<Verdict, 'label' | 'kind'
 }
 
 export function CauseHelp() {
+  return <Help title="How GaugeLab finds the cause" wide><CauseHelpBody /></Help>
+}
+
+function CauseHelpBody() {
   return (
-    <Help title="How GaugeLab finds the cause" wide>
+    <>
       <p>For each failed answer, GaugeLab looks for what a correct answer needed (the must-mention phrases, the patterns, the reference answer's codes and numbers) in three places:</p>
       <ol className="mt-1.5 list-decimal space-y-1 pl-4">
         <li><b>In the answer</b>: missing, so the answer failed.</li>
@@ -61,25 +66,29 @@ export function CauseHelp() {
       </ol>
       <p className="mt-1.5">It also flags answers that say what no passage says, citations that point at a passage without the fact, and questions that fail in every run (often the test, not the bot). Plain text matching, no model, so it costs nothing and shows its evidence. When the evidence does not decide it, it says <i>Can't tell yet</i>: you can ask a grading model, or set the cause yourself.</p>
       <p className="mt-1.5 text-ink-3">After Barnett et al., "Seven failure points when engineering a retrieval-augmented generation system" (2024).</p>
-    </Help>
+    </>
   )
 }
 
-/** "What to fix first": a run's failures counted by cause, the bot's own causes first. */
+/** "What to fix first": a run's failures counted by cause, largest first, each with its fix and examples. */
 export function FixFirst({ runId, targetId, selected, onPick, compact = false }: {
   runId: number; targetId?: number | null; selected?: string | null; onPick?: (cause: string | null) => void; compact?: boolean
 }) {
   const q = useRunCauses(runId)
-  const [open, setOpen] = useState<string | null>(null)
   if (q.isLoading) return <Card title="What to fix first"><div className="skeleton h-24" /></Card>
   if (q.isError) return <Card title="What to fix first"><ErrorState error={q.error} /></Card>
   const d = q.data!
   if (!d?.causes?.length) return null
   const total = d.causes.reduce((a, c) => a + c.cases, 0)
-  const groups = (['bot', 'content', 'unknown', 'test', 'run'] as const).map((k) => ({ k, rows: d.causes.filter((c) => c.kind === k) })).filter((g) => g.rows.length)
+  const max = Math.max(...d.causes.map((c) => c.cases))
+  const kinds = new Set(d.causes.map((c) => c.kind))
+  const groups = (['bot', 'content', 'unknown', 'test', 'run'] as const).map((k) => ({ k, rows: d.causes.filter((c) => c.kind === k).sort((a, b) => b.cases - a.cases) })).filter((g) => g.rows.length)
   return (
-    <Card title={<span className="flex items-center gap-1.5">What to fix first <CauseHelp /></span>}
-      subtitle={`${total} failing question${total === 1 ? '' : 's'}, by likely cause - largest first`}>
+    <Card title="What to fix first" meta={<SampleSize n={total} min={0} unit={total === 1 ? 'question' : 'questions'} />}
+      help={<>
+        <p>Failing questions grouped by their likely cause, largest group first, with the change most likely to fix them. Each chip opens one example.{onPick ? ' Show lists only that cause\'s questions.' : ''}</p>
+        <CauseHelpBody />
+      </>}>
       <div data-testid="fix-first">
       {d.off_topic && (
         <div className="mb-3"><Notice tone="warn" title={`These questions were written for ${d.off_topic}`}>
@@ -87,15 +96,14 @@ export function FixFirst({ runId, targetId, selected, onPick, compact = false }:
         </Notice></div>
       )}
       {!d.sources_reported && !d.off_topic && <SourcesNotice targetId={targetId} />}
-      <div className="space-y-4">
+      <div className="space-y-5">
         {groups.map((g) => (
           <section key={g.k}>
-            <div className="mb-1.5 text-label font-medium uppercase tracking-wide text-ink-3">{KIND_HEAD[g.k]}</div>
-            <ul className="space-y-1.5">
+            {kinds.size > 1 && <div className="t-label mb-2">{KIND_HEAD[g.k]}</div>}
+            <ul className="space-y-4">
               {g.rows.map((c, i) => (
-                <CauseRow key={c.cause} c={c} total={total} delay={i * 0.04} open={open === c.cause} compact={compact}
-                  selected={selected === c.cause} onToggle={() => setOpen(open === c.cause ? null : c.cause)}
-                  onPick={onPick ? () => onPick(selected === c.cause ? null : c.cause) : undefined} />
+                <CauseRow key={c.cause} c={c} max={max} delay={i * 0.04} compact={compact}
+                  selected={selected === c.cause} onPick={onPick ? () => onPick(selected === c.cause ? null : c.cause) : undefined} />
               ))}
             </ul>
           </section>
@@ -107,39 +115,32 @@ export function FixFirst({ runId, targetId, selected, onPick, compact = false }:
   )
 }
 
-function CauseRow({ c, total, delay, open, onToggle, onPick, selected, compact }: {
-  c: CauseCount; total: number; delay: number; open: boolean; onToggle: () => void; onPick?: () => void; selected: boolean; compact: boolean
+function CauseRow({ c, max, delay, onPick, selected, compact }: {
+  c: CauseCount; max: number; delay: number; onPick?: () => void; selected: boolean; compact: boolean
 }) {
+  const col = causeColor(c.cause)
+  const ex = compact ? c.examples.slice(0, 4) : c.examples
   return (
     <motion.li initial={{ opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }} transition={{ delay }}
-      className={clsx('rounded-lg border px-3 py-2', selected ? 'border-accent bg-accent-wash/50' : 'border-line')}>
+      className={clsx('rounded-lg', selected && 'bg-accent-wash/50 ring-1 ring-accent ring-offset-4 ring-offset-page')} data-cause={c.cause}>
       <div className="flex items-center gap-2">
-        <button type="button" onClick={onToggle} aria-expanded={open} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-          <ChevronRight className={clsx('size-3.5 shrink-0 text-ink-3 transition-transform', open && 'rotate-90')} />
-          <span className="text-sm font-medium">{c.label}</span>
-          <span className="num text-xs text-ink-3">{c.cases}</span>
-          <span className="ml-auto hidden h-1.5 w-28 overflow-hidden rounded-full bg-surface-3 sm:block">
-            <motion.span className={clsx('block h-full rounded-full', c.kind === 'bot' ? 'bg-bad' : c.kind === 'content' ? 'bg-warn' : 'bg-ink-3')}
-              initial={{ width: 0 }} animate={{ width: `${(c.cases / total) * 100}%` }} transition={{ delay: delay + 0.1, duration: 0.4 }} />
-          </span>
-        </button>
-        {onPick && <Button size="sm" variant={selected ? 'primary' : 'ghost'} onClick={onPick}>{selected ? 'Showing' : 'Show'}</Button>}
+        <span className="size-2 shrink-0 rounded-full" style={{ background: col }} />
+        <span className="text-sm font-semibold">{c.label}</span>
+        <span className="num font-mono text-xs text-ink-3">{c.cases}</span>
+        <span className="h-1.5 max-w-56 flex-1 overflow-hidden rounded-full bg-surface-3">
+          <motion.span className="block h-full rounded-full" style={{ background: col }}
+            initial={{ width: 0 }} animate={{ width: `${(c.cases / max) * 100}%` }} transition={{ delay: delay + 0.1, duration: 0.5 }} />
+        </span>
+        {onPick && <Button size="sm" variant={selected ? 'primary' : 'ghost'} className="ml-auto" onClick={onPick}>{selected ? 'Showing' : 'Show'}</Button>}
       </div>
-      {!compact && <p className="mt-1 pl-5.5 text-xs text-ink-2">{c.fix}</p>}
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.ul initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden pl-5.5">
-            {compact && <li className="mt-1 text-xs text-ink-2">{c.fix}</li>}
-            {c.examples.map((e) => (
-              <li key={e.trial_id} className="mt-1 text-xs">
-                <Link className="font-mono text-accent-ink hover:underline" to={`/trials/${e.trial_id}`}>{e.case_id}</Link>
-                {(e.question || e.title) && <span className="ml-1.5 text-ink-2">{e.question || e.title}</span>}
-              </li>
-            ))}
-            {c.cases > c.examples.length && <li className="mt-1 text-xs text-ink-3">and {c.cases - c.examples.length} more</li>}
-          </motion.ul>
-        )}
-      </AnimatePresence>
+      {!compact && <p className="ml-4 mt-1 max-w-[640px] text-sm text-ink-2">{c.fix}</p>}
+      <div className="ml-4 mt-1.5 flex flex-wrap items-center gap-1.5">
+        {ex.map((e) => (
+          <Link key={e.trial_id} to={`/trials/${e.trial_id}`} data-case={e.case_id} title={e.question || e.title}
+            className="inline-flex h-6 items-center rounded-full border border-line-strong px-2.5 font-mono text-xs text-ink-2 hover:bg-surface-2">{e.case_id}</Link>
+        ))}
+        {c.cases > ex.length && <span className="text-xs text-ink-3">and {c.cases - ex.length} more</span>}
+      </div>
     </motion.li>
   )
 }
@@ -177,10 +178,10 @@ function ExplainAll({ runId, ids }: { runId: number; ids: number[] }) {
       <div className="flex flex-wrap items-center gap-2">
         <Wand2 className="size-4 text-accent-ink" />
         <span className="text-sm">{ids.length} failure{ids.length === 1 ? '' : 's'} not placed by the rules.</span>
+        <Help title="Ask the grading model">{hasJudge ? 'One short call per failure to your default grading model. It picks a cause and says why in a sentence; you can change it on the answer\'s page.' : 'Set a default grading model in Settings > Models & keys first.'}</Help>
         <Button size="sm" className="ml-auto" disabled={!hasJudge} loading={running} onClick={go}>Ask the grading model ({ids.length} call{ids.length === 1 ? '' : 's'})</Button>
       </div>
       {running && <ProgressBar value={done / ids.length} className="mt-2" />}
-      <Explain className="mt-1.5">{hasJudge ? 'One short call per failure to your default grading model. It picks a cause and says why in a sentence; you can change it on the answer\'s page.' : 'Set a default grading model in Settings > Models & keys first.'}</Explain>
       {error != null && <div className="mt-2"><ErrorState error={error} /></div>}
     </div>
   )
@@ -197,7 +198,7 @@ export function CauseCard({ t }: { t: TrialDetail }) {
   if (!v) return null
   const ruleSaid = v.rule ?? v.cause
   return (
-    <Card title={<span className="flex items-center gap-1.5">Why it failed <CauseHelp /></span>}
+    <Card title="Why it failed" help={<CauseHelpBody />}
       actions={!editing && <Button size="sm" variant="ghost" onClick={() => setEditing(true)}><Pencil className="size-3.5" />Change</Button>}>
       <div className="space-y-2" data-testid="cause-card">
         <div className="flex flex-wrap items-center gap-1.5">
@@ -216,7 +217,7 @@ export function CauseCard({ t }: { t: TrialDetail }) {
         {ask.isError && <ErrorState error={ask.error} />}
         {editing && (
           <div className="space-y-2 rounded-lg border border-line p-3">
-            <Field label="Cause">
+            <Field label={<span className="inline-flex items-center gap-1.5">Cause <Help title="Your choice counts">Run summaries and comparisons count your choice.</Help></span>}>
               <Select defaultValue={v.cause} onChange={(e) => set.mutate(e.target.value)} aria-label="Cause">
                 {Object.entries(CAUSE_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
               </Select>
@@ -225,7 +226,6 @@ export function CauseCard({ t }: { t: TrialDetail }) {
               {v.source === 'you' && <Button size="sm" variant="ghost" onClick={() => set.mutate(null)}>Back to automatic</Button>}
               <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Close</Button>
             </div>
-            <Explain>Run summaries and comparisons count your choice.</Explain>
           </div>
         )}
       </div>
@@ -247,7 +247,7 @@ export function CompareCauses({ fixed, broke, baseline, candidate }: { fixed: Ca
     </ul>
   )
   return (
-    <Card title={<span className="flex items-center gap-1.5">By cause <CauseHelp /></span>} subtitle="Did the change fix what you meant it to?">
+    <Card title="By cause" help={<><p>Did the change fix what you meant it to? Fixed lists why the newly passing questions failed before; Broke lists why the newly failing ones fail now.</p><CauseHelpBody /></>}>
       <div data-testid="compare-causes">
       <div className="grid gap-5 md:grid-cols-2">
         <div><div className="mb-1.5 text-xs font-medium text-good-ink">Fixed: why they failed in #{baseline}</div>{list(fixed, 'good', 'Nothing newly passing.')}</div>
@@ -269,9 +269,9 @@ export function NotesCard({ projectId }: { projectId: number }) {
   const group = useMutation({ mutationFn: () => api.post<Themes>(`/api/projects/${projectId}/notes/group`, { provider_config_id: model ? Number(model) : null }) })
   const n = notes.data?.length ?? 0
   return (
-    <Card title={<span className="flex items-center gap-1.5">Your notes on failures
-      <Help title="Why write notes">Reading failures and writing one line on each ("ignores the plant", "too formal") finds problems no check was written for. Grouping the notes and counting them shows which problem is biggest: the practice evaluation teams call error analysis.</Help></span>}
-      subtitle={n ? `${n} note${n === 1 ? '' : 's'} across this chatbot's runs` : undefined}>
+    <Card title="Your notes on failures"
+      help={<><p>Reading failures and writing one line on each ("ignores the plant", "too formal") finds problems no check was written for. Grouping the notes and counting them shows which problem is biggest: the practice evaluation teams call error analysis.</p>{n ? <p>{n} note{n === 1 ? '' : 's'} across this chatbot's runs.</p> : null}</>}
+      meta={n ? `${n} note${n === 1 ? '' : 's'}` : undefined}>
       <div data-testid="notes-card">
       {notes.isLoading ? <div className="skeleton h-12" /> : n === 0 ? (
         <p className="text-sm text-ink-3">No notes yet. On a failed answer's page, use <b>Kind of failure &gt; Change &gt; Why</b> to write one line about what went wrong. Twenty or thirty notes are enough to group.</p>
@@ -332,9 +332,9 @@ export function ReadingCard({ targetId }: { targetId: number }) {
   if (!d || !d.supported) return null
   const gained = (d.suggested_caps ?? []).filter((c) => c.received && !(d.current_caps ?? []).find((x) => x.field === c.field)?.received)
   return (
-    <Card id="reading" title={<span className="flex items-center gap-1.5">Reading the reply
-      <Help title="What this is">Each reply from the bot is read for its answer and, when the bot sends them, the passages it read, its citations, tool calls and token counts. The more GaugeLab reads, the more checks can run and the more precisely it can say why an answer failed. Changing this changes how GaugeLab reads, not what is inside the bot, so it does not make a new version.</Help></span>}
-      subtitle={d.updated_at ? `Changed ${when(d.updated_at)}` : 'What GaugeLab takes from each reply'}>
+    <Card id="reading" title="Reading the reply"
+      help={<><p>What GaugeLab takes from each reply. Each reply from the bot is read for its answer and, when the bot sends them, the passages it read, its citations, tool calls and token counts. The more GaugeLab reads, the more checks can run and the more precisely it can say why an answer failed.</p><p>Changing this changes how GaugeLab reads, not what is inside the bot, so it does not make a new version.</p></>}
+      meta={d.updated_at ? `changed ${when(d.updated_at)}` : undefined}>
       {q.isLoading ? <div className="skeleton h-16" /> : (
         <div className="space-y-4">
           {d.standard ? <p className="text-sm text-ink-2">The bot replies in the GaugeLab shape: everything it sends is read.</p> : (
@@ -342,10 +342,9 @@ export function ReadingCard({ targetId }: { targetId: number }) {
               <div><div className="mb-1 text-xs font-medium text-ink-3">Now</div><Capabilities caps={d.current_caps ?? []} /></div>
               {d.suggestion && !d.same && gained.length > 0 && (
                 <div className="rounded-lg border border-accent/40 bg-accent-wash/40 p-3">
-                  <div className="mb-1 text-xs font-medium text-accent-ink">The last stored reply also has</div>
+                  <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-accent-ink">The last stored reply also has <Help title="Where this comes from">Found in a reply already stored{d.sample_trial_id ? <> (<Link className="underline" to={`/trials/${d.sample_trial_id}`}>this one</Link>)</> : ''}; nothing is sent to the bot.</Help></div>
                   <Capabilities caps={(d.suggested_caps ?? []).filter((c) => gained.some((g) => g.field === c.field))} />
                   <Button className="mt-2" size="sm" variant="primary" loading={save.isPending} onClick={() => save.mutate(d.suggestion!.mapping)}><Check className="size-3.5" />Read these too</Button>
-                  <Explain className="mt-1.5">Found in a reply already stored{d.sample_trial_id ? <> (<Link className="underline" to={`/trials/${d.sample_trial_id}`}>this one</Link>)</> : ''}; nothing is sent to the bot.</Explain>
                 </div>
               )}
             </div>
@@ -353,7 +352,7 @@ export function ReadingCard({ targetId }: { targetId: number }) {
           {save.isError && <ErrorState error={save.error} />}
           {(d.runs ?? []).length > 0 && (
             <div>
-              <div className="mb-1 text-xs font-medium text-ink-3">Read past runs again with the current reading</div>
+              <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-ink-3">Read past runs again with the current reading <Help title="Re-reading is free">Free: the stored replies are read again and the checks that need no grading model run again. Grading-model verdicts are carried over, not asked again. Each re-read is a new run, so the original stays as it was.</Help></div>
               <ul className="space-y-1">
                 {d.runs!.map((r) => (
                   <li key={r.id} className="flex items-center gap-2 text-sm">
@@ -365,7 +364,6 @@ export function ReadingCard({ targetId }: { targetId: number }) {
                   </li>
                 ))}
               </ul>
-              <Explain className="mt-1.5">Free: the stored replies are read again and the checks that need no grading model run again. Grading-model verdicts are carried over, not asked again. Each re-read is a new run, so the original stays as it was.</Explain>
               {reread.isError && <div className="mt-2"><ErrorState error={reread.error} /></div>}
             </div>
           )}

@@ -1,5 +1,6 @@
-// Regenerate the README screenshots from a running server with the seeded demo
-// (and the demo agent on :9040 for the connect-wizard shot).
+// Regenerate the README screenshots from a running server with the seeded demo and its history
+// (`gaugelab seed --run --history --fresh`: run #4 = baseline, #9 = candidate) and the demo agent
+// on :9040 for the connect-wizard shot.
 //   node e2e/screenshots.mjs            (BASE=http://127.0.0.1:8040, OUT=../../docs/screenshots)
 import { mkdirSync } from 'node:fs'
 import { chromium } from 'playwright'
@@ -9,14 +10,13 @@ const OUT = process.env.OUT ?? new URL('../../../docs/screenshots/', import.meta
 mkdirSync(OUT, { recursive: true })
 const browser = await chromium.launch({ channel: process.env.PW_CHANNEL || undefined })
 
-async function shot(name, path, { theme = 'light', explain = false, prepare, height = 900 } = {}) {
+async function shot(name, path, { theme = 'light', prepare, height = 900 } = {}) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height }, deviceScaleFactor: 1 })
-  await ctx.addInitScript(([t, x]) => {
+  await ctx.addInitScript(([t]) => {
     localStorage.setItem('gl-theme', t)
-    localStorage.setItem('gl-explain', x)
     localStorage.setItem('gl-annotator', 'Reviewer')
     localStorage.setItem('gl-motion', 'reduced') // stills, not mid-animation frames
-  }, [theme, String(explain)])
+  }, [theme])
   const page = await ctx.newPage()
   await page.goto(BASE + path, { waitUntil: 'networkidle' })
   if (prepare) await prepare(page)
@@ -26,18 +26,19 @@ async function shot(name, path, { theme = 'light', explain = false, prepare, hei
 }
 
 await shot('home', '/')
-await shot('chatbot', '/p/1')
-await shot('compare', '/compare?baseline=1&candidate=2')
-await shot('compare-dark', '/compare?baseline=1&candidate=2', { theme: 'dark' })
-await shot('run-summary', '/runs/2', { explain: true })
-await shot('failures', '/runs/1?tab=failures')
-await shot('trial', '/runs/1?tab=failures', {
+await shot('chatbot', '/p/1', { height: 1100 })
+await shot('compare', '/compare?baseline=4&candidate=9', { height: 1000 })
+await shot('compare-dark', '/compare?baseline=4&candidate=9', { theme: 'dark', height: 1000 })
+await shot('run-summary', '/runs/9', { height: 1100 })
+await shot('explore', '/runs/4?tab=explore', { height: 1400, prepare: async (page) => { await page.waitForTimeout(1800) } })
+await shot('failures', '/runs/4?tab=failures')
+await shot('trial', '/runs/4?tab=failures', {
   prepare: async (page) => {
-    await page.locator('a[href^="/trials/"]').first().click()
+    await page.locator('td a[href^="/trials/"]').first().click()
     await page.waitForLoadState('networkidle')
   },
 })
-await shot('trace', '/runs/2?tab=traces')
+await shot('trace', '/runs/9?tab=traces')
 await shot('dataset-history', '/datasets/1?tab=history')
 await shot('calibration', '/calibration')
 await shot('models', '/settings?tab=models')

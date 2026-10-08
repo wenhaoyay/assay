@@ -528,10 +528,14 @@ def auto_gate(s: Session, run: m.Run) -> m.GateResult | None:
 
     baseline = e.baseline_run_id
     if baseline is None:
+        # The previous comparable run of the SAME chatbot, never another chatbot's run that happens
+        # to share the questions, and never a run that asked another chatbot's questions.
         key = comparability(run)["key"]
-        prev = s.scalars(select(m.Run).where(m.Run.id < run.id, m.Run.status.in_(["completed", "completed_with_errors"]))
+        prev = s.scalars(select(m.Run).join(m.Experiment, m.Experiment.id == m.Run.experiment_id)
+                         .where(m.Run.id < run.id, m.Run.status.in_(["completed", "completed_with_errors"]),
+                                m.Experiment.project_id == e.project_id)
                          .order_by(m.Run.id.desc())).all()
-        baseline = next((r.id for r in prev if comparability(r)["key"] == key), None)
+        baseline = next((r.id for r in prev if comparability(r)["key"] == key and not off_topic(s, r)), None)
     return apply_gate(s, run.id, gate.config, baseline, gate.id)
 
 

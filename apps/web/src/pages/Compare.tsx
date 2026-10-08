@@ -1,20 +1,24 @@
 import { useQuery } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { ArrowDownRight, ArrowLeftRight, ArrowUpRight, Check, ChevronDown, ChevronRight, Minus, X } from 'lucide-react'
-import { AnimatePresence, motion } from 'motion/react'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { ArrowDownRight, ArrowLeftRight, ArrowUpRight, Minus } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { CompareCauses } from '../components/Causes'
-import { PairedBars } from '../components/charts'
+import { Bootstrap } from '../components/compare/Bootstrap'
+import { Changed, Dumbbell } from '../components/compare/Changed'
+import { Hero } from '../components/compare/Hero'
+import { Power } from '../components/compare/Power'
+import { Replay } from '../components/compare/Replay'
+import { RunPicker } from '../components/compare/RunPicker'
+import { SampleSize } from '../components/instrument'
 import { ShareMenu } from '../components/Share'
-import { Confetti, DeltaList, ForestPlot, VerdictNeedle } from '../components/viz'
-import { Badge, Card, DotStrip, Empty, ErrorState, Explain, Input, Loading, Notice, PageHeader, PageSkeleton, Segmented, StatusBadge, Table, Term } from '../components/ui'
+import { Badge, Card, Empty, ErrorState, Loading, Notice, PageSkeleton, Segmented, Table, Term } from '../components/ui'
+import { Confetti, DeltaList, ForestPlot } from '../components/viz'
 import { api } from '../lib/api'
-import { direction, fmtDelta, fmtValue, reading, verdictSentence } from '../lib/compare'
+import { direction, fmtDelta, fmtValue, pairCases, reading } from '../lib/compare'
 import { useCrumbs } from '../lib/crumbs'
-import { FAILURE_LABELS, pct } from '../lib/format'
-import type { CaseChange, Comparison, ComparisonRow, EvaluatorInfo, RunHeader, TrialRow } from '../lib/types'
-import { HighlightedAnswer } from './Trial'
+import { pct } from '../lib/format'
+import type { Comparison, ComparisonRow, EvaluatorInfo, RunHeader, TrialRow } from '../lib/types'
 
 export function MetricTable({ rows }: { rows: ComparisonRow[] }) {
   return (
@@ -29,14 +33,14 @@ export function MetricTable({ rows }: { rows: ComparisonRow[] }) {
           const Icon = r.delta === null || r.delta === 0 ? Minus : r.delta > 0 ? ArrowUpRight : ArrowDownRight
           return (
             <tr key={r.metric} data-testid={`metric-${r.metric}`}>
-              <td className="font-medium">{r.label}</td>
-              <td className="num text-right">{fmtValue(r, r.baseline)}</td>
-              <td className="num text-right">{fmtValue(r, r.candidate)}</td>
-              <td className={clsx('num text-right font-medium', d === 'better' && 'text-good-ink', d === 'worse' && 'text-bad-ink')}>
+              <td>{r.label}</td>
+              <td className="num text-right font-mono">{fmtValue(r, r.baseline)}</td>
+              <td className="num text-right font-mono">{fmtValue(r, r.candidate)}</td>
+              <td className={clsx('num text-right font-mono', d === 'better' && 'text-good-ink', d === 'worse' && 'text-bad-ink')}>
                 {/* Arrow = which way the number moved; colour = better or worse. */}
                 <span className="inline-flex items-center gap-1"><Icon className="size-3.5" aria-label={r.delta === null ? 'n/a' : r.delta > 0 ? 'up' : r.delta < 0 ? 'down' : 'same'} />{fmtDelta(r)}</span>
               </td>
-              <td className="num whitespace-nowrap text-right text-xs text-ink-2">
+              <td className="num whitespace-nowrap text-right font-mono text-xs text-ink-2">
                 {r.ci && r.ci.ci_low !== null ? `${(r.ci.ci_low * 100).toFixed(1)} to ${(r.ci.ci_high! * 100).toFixed(1)}pp (n=${r.ci.n})` : '-'}
               </td>
               <td><Badge tone={read.tone}>{read.text}</Badge></td>
@@ -45,59 +49,6 @@ export function MetricTable({ rows }: { rows: ComparisonRow[] }) {
         })}
       </tbody>
     </Table>
-  )
-}
-
-function RunPicker({ runs, value, onChange, side }: { runs: RunHeader[]; value: number | null; onChange: (id: number) => void; side: 'baseline' | 'candidate' }) {
-  const [open, setOpen] = useState(false)
-  const [q, setQ] = useState('')
-  const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    if (!open) return
-    const close = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
-    window.addEventListener('mousedown', close)
-    return () => window.removeEventListener('mousedown', close)
-  }, [open])
-  const cur = runs.find((r) => r.id === value)
-  const list = runs.filter((r) => !q || `${r.id} ${r.experiment} ${r.target} ${r.variant_label}`.toLowerCase().includes(q.toLowerCase()))
-  return (
-    <div className="relative min-w-0 flex-1" ref={ref}>
-      <button type="button" onClick={() => setOpen((v) => !v)} aria-label={side} aria-expanded={open}
-        className={clsx('flex w-full items-center gap-3 rounded-xl border bg-surface px-3 py-2.5 text-left shadow-card transition-colors hover:border-line-strong',
-          side === 'baseline' ? 'border-series-1/40' : 'border-series-2/40')}>
-        <span className={clsx('size-2.5 shrink-0 rounded-sm', side === 'baseline' ? 'bg-series-1' : 'bg-series-2')} />
-        <span className="min-w-0 flex-1">
-          <span className="block text-label font-medium uppercase tracking-wide text-ink-3">{side}</span>
-          {cur ? (
-            <>
-              <span className="block truncate text-sm font-medium"><span className="font-mono">#{cur.id}</span> {cur.experiment}</span>
-              <span className="block truncate text-xs text-ink-3">{cur.target} v{cur.target_version} - {cur.variant_label} - {cur.n_cases} x {cur.trials_per_case} - judge {cur.judge ? (cur.judge.provider === 'heuristic' ? 'heuristic' : cur.judge.model) : 'none'}</span>
-            </>
-          ) : <span className="block text-sm text-ink-3">Choose a run...</span>}
-        </span>
-        {cur?.gate_status && <StatusBadge status={cur.gate_status} />}
-        <ChevronDown className="size-4 text-ink-3" />
-      </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.12 }}
-            className="absolute z-30 mt-1 w-full min-w-[340px] rounded-xl border border-line bg-surface p-1.5 shadow-pop">
-            <Input autoFocus placeholder="Filter runs" value={q} onChange={(e) => setQ(e.target.value)} className="mb-1" />
-            <ul className="scroll-thin max-h-80 overflow-y-auto">
-              {list.map((r) => (
-                <li key={r.id}>
-                  <button type="button" onClick={() => { onChange(r.id); setOpen(false) }}
-                    className={clsx('w-full rounded-lg px-2.5 py-1.5 text-left hover:bg-surface-2', r.id === value && 'bg-accent-wash')}>
-                    <div className="text-sm"><span className="font-mono text-xs">#{r.id}</span> {r.experiment}</div>
-                    <div className="text-xs text-ink-3">{r.target} - {r.n_cases} cases - {pct(r.metrics.overall_pass_rate)} - judge {r.judge ? (r.judge.provider === 'heuristic' ? 'heuristic' : r.judge.model) : 'none'}</div>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
   )
 }
 
@@ -112,7 +63,7 @@ export function ComparePage() {
   useEffect(() => {
     // Default: the newest completed run as candidate, the newest earlier comparable run as baseline.
     if (!done.length || (baseline && candidate)) return
-    const cand = candidate ? done.find((r) => r.id === candidate) : done[0]
+    const cand = candidate ? done.find((r) => r.id === candidate) : done.find((r) => !r.off_topic) ?? done[0]
     const base = done.find((r) => r.id !== cand?.id && r.comparability_key === cand?.comparability_key && r.id < (cand?.id ?? 0))
       ?? done.find((r) => r.id !== cand?.id && r.dataset === cand?.dataset && r.id < (cand?.id ?? 0)) ?? done.find((r) => r.id !== cand?.id)
     if (cand && base) setParams({ baseline: String(base.id), candidate: String(cand.id) }, { replace: true })
@@ -128,17 +79,20 @@ export function ComparePage() {
   if (runs.isLoading) return <PageSkeleton />
   return (
     <>
-      <PageHeader title="Compare" description="Baseline against candidate on the same questions. Changes are paired by question; intervals come from resampling questions."
-        actions={baseline && candidate ? <ShareMenu runId={candidate} baselineId={baseline} /> : null} />
-      <div className="mb-5 flex flex-wrap items-center gap-2 max-md:flex-col max-md:items-stretch">
+      <div className="flex flex-wrap items-center gap-3 max-md:flex-col max-md:items-stretch" data-testid="run-pickers">
         <RunPicker runs={done} value={baseline} onChange={(v) => set('baseline', v)} side="baseline" />
-        <button type="button" title="Swap" aria-label="Swap baseline and candidate" onClick={() => baseline && candidate && setParams({ baseline: String(candidate), candidate: String(baseline) })}
-          className="flex size-8 shrink-0 items-center justify-center self-center rounded-full border border-line bg-surface text-ink-3 hover:text-ink"><ArrowLeftRight className="size-4" /></button>
+        <button type="button" title="Swap baseline and candidate" aria-label="Swap baseline and candidate" onClick={() => baseline && candidate && setParams({ baseline: String(candidate), candidate: String(baseline) })}
+          className="flex size-8 shrink-0 items-center justify-center self-center rounded-lg text-ink-3 hover:bg-surface-2 hover:text-ink"><ArrowLeftRight className="size-4" /></button>
         <RunPicker runs={done} value={candidate} onChange={(v) => set('candidate', v)} side="candidate" />
       </div>
       {done.length < 2 ? (
-        <Empty title="Two completed runs are needed">Run a baseline and a candidate on the same dataset (<code>gaugelab seed --run</code> does this for the Acme demo).</Empty>
-      ) : baseline === candidate ? <Notice tone="warn" title="Pick two different runs" /> : cmp.isLoading ? <Loading label="Comparing" rows={8} /> : cmp.isError ? <ErrorState error={cmp.error} /> : cmp.data && <CompareView c={cmp.data} />}
+        <div className="mt-8"><Empty title="Two finished runs are needed to compare">Run a baseline and a candidate on the same questions (<code className="font-mono">gaugelab seed --run</code> does this for the Acme demo), then pick them above.</Empty></div>
+      ) : !baseline || !candidate ? (
+        <div className="mt-8"><Empty title="Pick a baseline and a candidate">Choose two runs above; the same questions are paired between them.</Empty></div>
+      ) : baseline === candidate ? <div className="mt-6"><Notice tone="warn" title="Pick two different runs" /></div>
+        : cmp.isLoading ? <div className="mt-8"><Loading label="Comparing" rows={8} /></div>
+          : cmp.isError ? <div className="mt-6"><ErrorState error={cmp.error} /></div>
+            : cmp.data && <CompareView key={`${baseline}-${candidate}`} c={cmp.data} />}
     </>
   )
 }
@@ -146,13 +100,15 @@ export function ComparePage() {
 function CompareView({ c }: { c: Comparison }) {
   const evs = useQuery({ queryKey: ['evaluators'], queryFn: () => api.get<{ evaluators: EvaluatorInfo[]; judges: string[] }>('/api/evaluators') })
   const issues = useQuery({ queryKey: ['comparability', c.candidate_run.id, c.baseline_run.id], queryFn: () => api.get<{ issues: string[] }>(`/api/runs/${c.candidate_run.id}/comparability?other=${c.baseline_run.id}`) })
+  const sides = useQuery({
+    queryKey: ['side-by-side', c.baseline_run.id, c.candidate_run.id],
+    queryFn: async () => Promise.all([c.baseline_run, c.candidate_run].map((r) => api.get<TrialRow[]>(`/api/runs/${r.id}/trials`))),
+  })
   const [view, setView] = useState<'picture' | 'table'>('picture')
   const judgeIds = new Set(evs.data?.judges ?? [])
   const anyHeuristic = [c.baseline_run, c.candidate_run].some((r) => r.judge?.provider === 'heuristic')
-  const isHeuristic = (metric: string) => anyHeuristic && judgeIds.has(metric)
+  const isHeuristic = (metric: string) => anyHeuristic && (judgeIds.has(metric) || /\(judge\)$/.test(c.metrics.find((m) => m.metric === metric)?.label ?? ''))
   const overall = c.metrics.find((m) => m.metric === 'overall_pass_rate') ?? null
-  const verdict = verdictSentence({ overall, regressions: c.regressions.length, improvements: c.improvements.length, rows: c.metrics })
-  const mc = c.mcnemar
   const win = reading(overall ?? ({ delta: null } as ComparisonRow)).text === 'likely better'
   const [celebrate] = useState(() => {
     if (!win) return false
@@ -165,169 +121,112 @@ function CompareView({ c }: { c: Comparison }) {
       return false
     }
   })
+  const cases = useMemo(() => (sides.data ? pairCases(sides.data[0], sides.data[1]) : []), [sides.data])
+  const diffs = useMemo(() => cases.filter((x) => x.a?.total && x.b?.total).map((x) => x.d), [cases])
+  const mc = c.mcnemar
+  const nPaired = mc.both_pass + mc.both_fail + mc.only_baseline + mc.only_candidate
+  const flipShare = nPaired ? (mc.only_baseline + mc.only_candidate) / nPaired : 0
 
   // Speed figures from runs that asked a different number of questions at a time are not comparable.
   const loadDiffers = !!c.baseline_run.concurrency && !!c.candidate_run.concurrency && c.baseline_run.concurrency !== c.candidate_run.concurrency
+  const offTopic = [c.baseline_run, c.candidate_run].filter((r) => r.off_topic)
+  const rateRows = c.metrics.filter((m) => m.unit === 'rate')
+  const onlyOne = c.only_in_baseline.length + c.only_in_candidate.length
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-12">
       <Confetti fire={celebrate} />
-      {(issues.data?.issues.length ?? 0) > 0 && (
-        <Notice tone="warn" title="These runs differ in more than the chatbot version">
-          <ul className="list-disc space-y-0.5 pl-4">{issues.data!.issues.map((x) => <li key={x}>{x}</li>)}</ul>
-        </Notice>
-      )}
-      <section className="overflow-hidden rounded-xl border border-line bg-surface shadow-card" data-tour="verdict">
-        <div className="grid items-center gap-5 p-5 md:grid-cols-[auto_minmax(0,1fr)]">
-          <div className="flex flex-col items-center">
-            <VerdictNeedle delta={overall?.delta ?? null} low={overall?.ci?.ci_low} high={overall?.ci?.ci_high} label={verdict.text} />
-            <span className="flex w-[168px] justify-between px-2 text-label text-ink-3"><span>worse</span><span>better</span></span>
-            <span className="num mt-1 text-xs text-ink-3">pass rate {pct(overall?.baseline)} → <b className="text-ink">{pct(overall?.candidate)}</b></span>
-          </div>
-          <div>
-            <div className="text-xs font-medium text-ink-3">{c.n_shared_cases} questions in both runs</div>
-            <p className={clsx('mt-1 text-h font-semibold leading-snug', verdict.tone === 'good' && 'text-good-ink', verdict.tone === 'bad' && 'text-bad-ink')} data-testid="verdict">{verdict.text}</p>
-            <p className="mt-2 text-sm text-ink-2">
-              Of {mc.both_pass + mc.both_fail + mc.only_baseline + mc.only_candidate} questions, {mc.both_pass} pass in both and {mc.both_fail} fail in both;
-              {' '}<b className="text-bad-ink">{mc.only_baseline}</b> passed only before and <b className="text-good-ink">{mc.only_candidate}</b> pass only now.
-              {' '}<Term k="mcnemar">McNemar</Term> {mc.p_value === null ? 'n/a' : `p = ${mc.p_value.toFixed(3)}`}
-              {mc.p_value !== null && (mc.p_value < 0.05 ? ' - a split this lopsided is unlikely by chance.' : ' - a split like this often happens by chance.')}
-            </p>
-            <Explain className="mt-2">The needle shows the change in pass rate; the grey arc is its 95% interval. If the arc covers the middle, the versions may really be equally good.</Explain>
-          </div>
+      <Hero c={c} actions={<ShareMenu runId={c.candidate_run.id} baselineId={c.baseline_run.id} />} />
+
+      {((issues.data?.issues.length ?? 0) > 0 || loadDiffers || offTopic.length > 0 || onlyOne > 0) && (
+        <div className="-mt-4 space-y-2">
+          {offTopic.map((r) => (
+            <Notice key={r.id} tone="warn" title={<>Run <span className="font-mono">#{r.id}</span> asked {r.off_topic}'s questions</>}>
+              Its questions were written for another chatbot, so its pass rate says little about this one. Compare runs that asked this chatbot's own questions.
+            </Notice>
+          ))}
+          {(issues.data?.issues.length ?? 0) > 0 && (
+            <Notice tone="warn" title="These runs differ in more than the chatbot version">
+              <ul className="list-disc space-y-0.5 pl-4">{issues.data!.issues.map((x) => <li key={x}>{x}</li>)}</ul>
+            </Notice>
+          )}
+          {loadDiffers && (
+            <Notice tone="warn" title={<>Run <span className="font-mono">#{c.baseline_run.id}</span> asked <span className="font-mono">{c.baseline_run.concurrency}</span> at a time, run <span className="font-mono">#{c.candidate_run.id}</span> asked <span className="font-mono">{c.candidate_run.concurrency}</span></>}>
+              The latency difference may be load, not the bot: questions asked together wait for each other. Speed rows are marked; compare speed only between runs at the same setting (pass rates are unaffected).
+            </Notice>
+          )}
+          {onlyOne > 0 && (
+            <Notice title={<>Only the <span className="font-mono">{c.n_shared_cases}</span> questions both runs asked are compared</>}>
+              {c.only_in_baseline.length > 0 && <>Only #{c.baseline_run.id} asked <span className="font-mono">{c.only_in_baseline.length}</span>. </>}
+              {c.only_in_candidate.length > 0 && <>Only #{c.candidate_run.id} asked <span className="font-mono">{c.only_in_candidate.length}</span>.</>}
+            </Notice>
+          )}
         </div>
-      </section>
-
-      {loadDiffers && (
-        <Notice tone="warn" title={`Run #${c.baseline_run.id} asked ${c.baseline_run.concurrency} at a time, run #${c.candidate_run.id} asked ${c.candidate_run.concurrency}`}>
-          The latency difference may be load, not the bot: questions asked together wait for each other. Speed rows are marked; compare speed only between runs at the same setting (pass rates are unaffected).
-        </Notice>
-      )}
-      {anyHeuristic && (
-        <Notice title={<>Hatched rows come from the <Term k="heuristic">heuristic judge</Term></>}>
-          They were scored by word overlap with the reference, not by an LLM: a cheap signal that cannot see paraphrase. Re-grade both runs with a grading model for meaning.
-        </Notice>
       )}
 
-      <Card title="Every metric" subtitle={`${c.n_shared_cases} paired questions`} padded={false}
-        actions={<Segmented size="sm" value={view} onChange={setView} options={[{ id: 'picture', label: 'Picture' }, { id: 'table', label: 'Table' }]} />}>
-        {view === 'picture' ? (
-          <div className="space-y-5 p-4">
-            <ForestPlot rows={c.metrics} isHeuristic={isHeuristic} />
-            <div>
-              <div className="mb-1.5 text-xs font-medium text-ink-3"><Term k="point_estimate">Measured once</Term> (no interval): arrow = which way it moved, colour = better or worse</div>
-              <DeltaList rows={c.metrics} caution={loadDiffers ? (m) => /latency/.test(m) : undefined} />
+      {sides.isError ? <ErrorState error={sides.error} /> : !sides.data ? <div className="skeleton h-28" /> : (
+        <Replay cases={cases} baseId={c.baseline_run.id} candId={c.candidate_run.id} />
+      )}
+
+      <div className="grid gap-x-10 gap-y-12 xl:grid-cols-2">
+        {sides.data ? <Changed cases={cases} c={c} baseTrials={sides.data[0]} candTrials={sides.data[1]} /> : <div className="skeleton h-60" />}
+        <Card title="Every metric" meta={<SampleSize n={c.n_shared_cases} unit="paired" />}
+          help={<>
+            <p>The change in each check, with its 95% interval from resampling questions. A line clear of the zero mark is a real change; one crossing zero could be noise.</p>
+            <p>Hatched rows were scored by the word-overlap heuristic, not a model: a cheap signal that cannot see paraphrase. Re-grade both runs with a grading model to judge meaning.</p>
+            <p>Speed, tokens and cost below are measured once, with no interval: the arrow is which way the number moved, the colour whether that is better or worse.</p>
+          </>}
+          actions={<Segmented size="sm" value={view} onChange={setView} options={[{ id: 'picture', label: 'Picture' }, { id: 'table', label: 'Table' }]} />}>
+          {view === 'picture' ? (
+            <div className="space-y-6">
+              <ForestPlot rows={rateRows} isHeuristic={isHeuristic} />
+              <div>
+                <div className="t-label mb-1.5"><Term k="point_estimate">Measured once</Term></div>
+                <DeltaList rows={c.metrics} caution={loadDiffers ? (m) => /latency/.test(m) : undefined} />
+              </div>
             </div>
-          </div>
-        ) : <MetricTable rows={c.metrics} />}
-      </Card>
-
-      {c.causes && <CompareCauses fixed={c.causes.fixed} broke={c.causes.broke} baseline={c.baseline_run.id} candidate={c.candidate_run.id} />}
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Card title={<span className="text-bad-ink">Regressed: passed more often before ({c.regressions.length})</span>} padded={false}>
-          <CaseList items={c.regressions} c={c} kind="regression" />
-        </Card>
-        <Card title={<span className="text-good-ink">Improved: pass more often now ({c.improvements.length})</span>} padded={false}>
-          <CaseList items={c.improvements} c={c} kind="improvement" />
+          ) : <MetricTable rows={c.metrics} />}
         </Card>
       </div>
 
-      <Card title="Pass rate by category">
-        <PairedBars data={c.by_category.map((r) => ({ group: r.category, baseline: r.baseline, candidate: r.candidate, n: r.n }))} />
-        <Table className="mt-3">
-          <thead><tr><th>Category</th><th className="text-right">Cases</th><th className="text-right">Baseline</th><th className="text-right">Candidate</th><th className="text-right">Change</th></tr></thead>
-          <tbody>
+      {c.causes && <CompareCauses fixed={c.causes.fixed} broke={c.causes.broke} baseline={c.baseline_run.id} candidate={c.candidate_run.id} />}
+
+      {diffs.length > 1 && <Bootstrap diffs={diffs} nQuestions={diffs.length} />}
+      {nPaired > 0 && <Power flipShare={flipShare} n0={diffs.length || c.n_shared_cases} />}
+
+      <div className="grid gap-x-10 gap-y-12 xl:grid-cols-2">
+        <Card title="Pass rate by category" help={<><p>Each category's pass rate in both runs: the blue dot is #{c.baseline_run.id}, the orange dot #{c.candidate_run.id}.</p><p>Small categories move a lot from one question: read the question count before the change.</p></>}>
+          <ul className="divide-y divide-line">
             {c.by_category.map((r) => (
-              <tr key={r.category}>
-                <td>{r.category}</td><td className="num text-right">{r.n}</td><td className="num text-right">{pct(r.baseline)}</td><td className="num text-right">{pct(r.candidate)}</td>
-                <td className={clsx('num text-right font-medium', (r.delta ?? 0) > 0 && 'text-good-ink', (r.delta ?? 0) < 0 && 'text-bad-ink')}>{r.delta === null ? 'n/a' : `${r.delta > 0 ? '+' : ''}${(r.delta * 100).toFixed(1)}pp`}</td>
-              </tr>
+              <li key={r.category} className="flex items-center gap-3 py-2">
+                <span className="min-w-0 flex-1 truncate text-sm">{r.category.replace(/_/g, ' ')}</span>
+                <SampleSize n={r.n} min={10} />
+                <span className="num w-24 text-right font-mono text-xs text-ink-3">{pct(r.baseline, 0)} → {pct(r.candidate, 0)}</span>
+                <span className="max-sm:hidden"><Dumbbell a={r.baseline} b={r.candidate} /></span>
+                <span className={clsx('num w-16 text-right font-mono text-sm', (r.delta ?? 0) > 0 && 'text-good-ink', (r.delta ?? 0) < 0 && 'text-bad-ink', !r.delta && 'text-ink-3')}>
+                  {r.delta === null ? 'n/a' : `${r.delta > 0 ? '+' : r.delta < 0 ? '−' : ''}${Math.abs(r.delta * 100).toFixed(1)}pp`}
+                </span>
+              </li>
             ))}
-          </tbody>
-        </Table>
-        <p className="mt-2 text-xs text-ink-3">Small categories move a lot from one question: read the case count before the change.</p>
-      </Card>
-      {c.score_changes.length > 0 && (
-        <Card title={`Large score changes (|change| >= 0.25, ${c.score_changes.length})`} padded={false}>
-          <Table>
-            <thead><tr><th>Case</th><th>Check</th><th className="text-right">Baseline</th><th className="text-right">Candidate</th></tr></thead>
-            <tbody>{c.score_changes.slice(0, 50).map((s) => <tr key={s.case_id + s.evaluator_id} className={clsx(isHeuristic(s.evaluator_id) && 'hatched')}><td className="font-mono text-xs">{s.case_id}</td><td>{s.evaluator_id}</td><td className="num text-right">{s.baseline.toFixed(3)}</td><td className="num text-right">{s.candidate.toFixed(3)}</td></tr>)}</tbody>
-          </Table>
+          </ul>
         </Card>
-      )}
-    </div>
-  )
-}
-
-function CaseList({ items, c, kind }: { items: CaseChange[]; c: Comparison; kind: 'regression' | 'improvement' }) {
-  const [open, setOpen] = useState<string | null>(null)
-  if (!items.length) return <p className="p-4 text-sm text-ink-3">None.</p>
-  return (
-    <ul className="divide-y divide-line">
-      {items.map((x) => (
-        <li key={x.case_id}>
-          <button type="button" onClick={() => setOpen(open === x.case_id ? null : x.case_id)} aria-expanded={open === x.case_id}
-            className="flex w-full items-start gap-2 px-4 py-2.5 text-left hover:bg-surface-2">
-            <ChevronRight className={clsx('mt-0.5 size-4 shrink-0 text-ink-3 transition-transform', open === x.case_id && 'rotate-90')} />
-            <span className="min-w-0 flex-1">
-              <span className="flex items-center gap-2 text-sm"><span className="font-mono text-xs">{x.case_id}</span><span className="truncate">{x.title}</span><Badge className="ml-auto">{x.category}</Badge></span>
-              <span className="num mt-0.5 block text-xs text-ink-2">
-                pass rate {pct(x.baseline_pass_rate, 0)} → <span className={kind === 'regression' ? 'text-bad-ink' : 'text-good-ink'}>{pct(x.candidate_pass_rate, 0)}</span>
-                {kind === 'regression' && x.candidate_failure_types.length > 0 && <> - now: {x.candidate_failure_types.map((f) => FAILURE_LABELS[f] ?? f).join(', ')}</>}
-                {kind === 'improvement' && x.baseline_failure_types.length > 0 && <> - was: {x.baseline_failure_types.map((f) => FAILURE_LABELS[f] ?? f).join(', ')}</>}
-              </span>
-            </span>
-          </button>
-          <AnimatePresence initial={false}>
-            {open === x.case_id && (
-              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                <SideBySide caseId={x.case_id} c={c} />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </li>
-      ))}
-    </ul>
-  )
-}
-
-/** The same question in both runs: answers next to each other, with each side's failing checks. */
-function SideBySide({ caseId, c }: { caseId: string; c: Comparison }) {
-  const sides = [c.baseline_run, c.candidate_run]
-  const trials = useQuery({
-    queryKey: ['side-by-side', c.baseline_run.id, c.candidate_run.id],
-    queryFn: async () => Promise.all(sides.map((r) => api.get<TrialRow[]>(`/api/runs/${r.id}/trials`))),
-  })
-  const detail = useQuery({
-    queryKey: ['side-by-side-case', caseId, c.baseline_run.id, c.candidate_run.id],
-    queryFn: async () => {
-      const [a, b] = trials.data!
-      const pick = (ts: TrialRow[]) => ts.filter((t) => t.case_id === caseId).sort((x, y) => (x.status === 'passed' ? 1 : 0) - (y.status === 'passed' ? 1 : 0))
-      return [pick(a), pick(b)]
-    },
-    enabled: !!trials.data,
-  })
-  if (!detail.data) return <div className="px-4 pb-4"><div className="skeleton h-24" /></div>
-  return (
-    <div className="grid gap-3 bg-surface-2/50 px-4 py-3 md:grid-cols-2">
-      {detail.data.map((ts, i) => (
-        <div key={i} className="min-w-0 rounded-lg border border-line bg-surface p-3">
-          <div className="mb-1.5 flex items-center gap-2 text-xs">
-            <span className={clsx('size-2 rounded-sm', i === 0 ? 'bg-series-1' : 'bg-series-2')} />
-            <span className="font-medium">{i === 0 ? 'Baseline' : 'Candidate'} #{sides[i].id}</span>
-            <DotStrip statuses={ts.map((t) => t.status)} />
-            {ts[0] && <Link to={`/trials/${ts[0].id}`} className="ml-auto text-accent-ink hover:underline">open try</Link>}
-          </div>
-          {ts[0] ? (
-            <>
-              <div className="line-clamp-6 whitespace-pre-wrap text-sm leading-relaxed"><HighlightedAnswer text={ts[0].answer} good={[]} bad={[]} /></div>
-              <div className="mt-2 flex flex-wrap gap-1">
-                {ts[0].status === 'passed' ? <Badge tone="good"><Check className="size-3" />all checks passed</Badge> : ts[0].failed_evaluators.map((e) => <Badge key={e} tone="bad"><X className="size-3" />{e}</Badge>)}
-              </div>
-            </>
-          ) : <p className="text-xs text-ink-3">Not in this run.</p>}
-        </div>
-      ))}
+        {c.score_changes.length > 0 && (
+          <Card title="Large score changes" meta={c.score_changes.length} help={<><p>Single checks whose score moved by 0.25 or more on a question, in either direction.</p><p>Hatched rows were scored by the word-overlap heuristic.</p></>}>
+            <div className="scroll-thin max-h-[420px] overflow-y-auto">
+              <Table>
+                <thead><tr><th>Question</th><th>Check</th><th className="text-right">Baseline</th><th className="text-right">Candidate</th></tr></thead>
+                <tbody>{c.score_changes.slice(0, 50).map((s) => (
+                  <tr key={s.case_id + s.evaluator_id} data-case={s.case_id} className={clsx(isHeuristic(s.evaluator_id) && 'hatched')}>
+                    <td className="font-mono text-xs">{s.case_id}</td><td>{s.evaluator_id}</td>
+                    <td className="num text-right font-mono">{s.baseline.toFixed(3)}</td>
+                    <td className={clsx('num text-right font-mono', s.candidate > s.baseline ? 'text-good-ink' : 'text-bad-ink')}>{s.candidate.toFixed(3)}</td>
+                  </tr>
+                ))}</tbody>
+              </Table>
+            </div>
+          </Card>
+        )}
+      </div>
     </div>
   )
 }

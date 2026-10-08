@@ -216,6 +216,8 @@ async def run_bakeoff(bakeoff_id: int) -> None:
     try:
         for (cfg, judge), name in zip(judges, names, strict=True):
             labels, human, ms, cost, unknown = [], [], [], 0.0, 0
+            scores: list[float | None] = []
+            reasons: list[str] = []
             for _trial_id, case, result, human_label in items:
                 ctx = EvalContext(judge=judge, pricing=pricing)
                 t0 = time.perf_counter()
@@ -227,12 +229,15 @@ async def run_bakeoff(bakeoff_id: int) -> None:
                 if verdict not in ("PASS", "FAIL"):
                     unknown += 1
                 labels.append(verdict)
+                scores.append(sc.score)
+                reasons.append((sc.explanation or "")[:300])
                 human.append(human_label)
                 with factory() as s:
                     svc.get(s, m.JudgeBakeoff, bakeoff_id).progress_done += 1
                 await asyncio.sleep(0)
             agg = binary_agreement(human, labels).as_dict()
             results.append({"judge": cfg, "name": name, "agreement": agg, "labels": labels, "unknown": unknown,
+                            "scores": scores, "reasons": reasons,
                             "median_ms": round(statistics.median(ms)) if ms else None,
                             "cost_usd": cost, "n": len(items)})
         pairwise = []
