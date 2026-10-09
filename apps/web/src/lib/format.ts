@@ -1,20 +1,38 @@
-// Number formatting in one place, so every screen says "n/a" the same way.
+// Number and date formatting in one place, so every screen says "n/a", "340 ms" and "9 Oct 2026"
+// the same way. Units are spaced; a minus is U+2212 (−); every date uses one locale.
 
+/** The one marker for "nothing to show" (not reported, not measured). */
 export const NA = 'n/a'
 
+/** The one locale for dates and numbers. */
+export const LOCALE = 'en-GB'
+
+const MINUS = '−'
+const bad = (v: number | null | undefined): v is null | undefined => v === null || v === undefined || Number.isNaN(v)
+
 export function pct(v: number | null | undefined, digits = 1): string {
-  return v === null || v === undefined || Number.isNaN(v) ? NA : `${(v * 100).toFixed(digits)}%`
+  return bad(v) ? NA : `${(v * 100).toFixed(digits)}%`
 }
 
+/** A change in percentage points: "+23.6 pp", "−2.0 pp", "0.0 pp". One decimal by default. */
 export function pp(v: number | null | undefined, digits = 1): string {
-  if (v === null || v === undefined) return NA
-  const s = (v * 100).toFixed(digits)
-  return `${v > 0 ? '+' : ''}${s}pp`
+  if (bad(v)) return NA
+  const x = Number((v * 100).toFixed(digits))
+  const body = Math.abs(x).toFixed(digits)
+  return `${x > 0 ? '+' : x < 0 ? MINUS : ''}${body} pp`
 }
 
-export function ms(v: number | null | undefined): string {
-  if (v === null || v === undefined) return NA
-  return v >= 1000 ? `${(v / 1000).toFixed(2)}s` : `${Math.round(v)}ms`
+/** Seconds with a spaced unit: "1.2 s". Pass seconds, not milliseconds (see ``ms``). */
+export function seconds(v: number | null | undefined, digits = 1): string {
+  return bad(v) ? NA : `${v.toFixed(digits)} s`
+}
+
+/** Milliseconds with a spaced unit: "340 ms", and from a second up "1.2 s". ``signed`` adds + or − for a change. */
+export function ms(v: number | null | undefined, signed = false): string {
+  if (bad(v)) return NA
+  const sign = signed ? (v > 0 ? '+' : v < 0 ? MINUS : '') : v < 0 ? MINUS : ''
+  const a = Math.abs(v)
+  return `${sign}${a >= 1000 ? seconds(a / 1000) : `${Math.round(a)} ms`}`
 }
 
 export function usd(v: number | null | undefined): string {
@@ -24,21 +42,39 @@ export function usd(v: number | null | undefined): string {
 }
 
 export function num(v: number | null | undefined, digits = 0): string {
-  return v === null || v === undefined ? NA : v.toLocaleString(undefined, { maximumFractionDigits: digits })
+  return bad(v) ? NA : v.toLocaleString(LOCALE, { maximumFractionDigits: digits })
 }
 
 export function score(v: number | null | undefined): string {
-  return v === null || v === undefined ? NA : v.toFixed(3)
+  return bad(v) ? NA : v.toFixed(3)
 }
 
 export function relative(v: number | null | undefined): string {
-  return v === null || v === undefined ? NA : `${v > 0 ? '+' : ''}${(v * 100).toFixed(1)}%`
+  return bad(v) ? NA : `${v > 0 ? '+' : ''}${(v * 100).toFixed(1)}%`
 }
 
-export function when(iso: string | null | undefined): string {
-  if (!iso) return NA
+const parse = (iso: string | null | undefined): Date | null => {
+  if (!iso) return null
   const d = new Date(iso)
-  return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
+/** "9 Oct 2026": a day. */
+export function fmtDay(iso: string | null | undefined): string {
+  const d = parse(iso)
+  return d ? d.toLocaleDateString(LOCALE, { day: 'numeric', month: 'short', year: 'numeric' }) : NA
+}
+
+/** "9 Oct 2026, 14:05": a moment. */
+export function fmtDate(iso: string | null | undefined): string {
+  const d = parse(iso)
+  return d ? d.toLocaleString(LOCALE, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : NA
+}
+
+/** "9 Oct, 14:05": a moment, short (no year), for tables and tooltips. */
+export function when(iso: string | null | undefined): string {
+  const d = parse(iso)
+  return d ? d.toLocaleString(LOCALE, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }) : NA
 }
 
 export function duration(start: string | null, end: string | null): string {
@@ -71,7 +107,7 @@ export const FAILURE_LABELS: Record<string, string> = {
 
 /** "1 run", "2 runs": real plurals, never "(s)". */
 export function plural(n: number, word: string, pluralWord?: string): string {
-  return `${n.toLocaleString()} ${n === 1 ? word : pluralWord ?? `${word}s`}`
+  return `${n.toLocaleString(LOCALE)} ${n === 1 ? word : pluralWord ?? `${word}s`}`
 }
 
 /** A span of seconds in plain words: "45 seconds", "12 minutes", "29 hours". */

@@ -25,6 +25,11 @@
   --accent-ink: oklch(0.43 0.08 188);
   --accent-wash: oklch(0.945 0.03 188);
   --on-accent: oklch(0.99 0 0);
+  --on-solid: oklch(0.99 0 0);
+  --on-swatch: oklch(0.99 0 0);
+  --scrim: oklch(0.2 0.02 200 / 0.42);
+  --btn-shadow-solid: inset 0 -2px 0 oklch(0 0 0 / 0.2), inset 0 1px 0 oklch(1 0 0 / 0.22);
+  --btn-shadow-raised: inset 0 -1.5px 0 color-mix(in srgb, var(--ink) 7%, transparent);
   --series-1: oklch(0.58 0.14 255);
   --series-2: oklch(0.66 0.16 45);
   --good: oklch(0.6 0.15 150);
@@ -48,6 +53,47 @@
   --shadow-pop: 0 18px 50px -18px oklch(0.2 0.02 200 / 0.35), 0 2px 6px oklch(0.2 0.02 200 / 0.08);
   --row-py: 0.5rem;
   --card-p: 1rem;
+
+  /* Motion: UI 120-250 ms. Reduced motion zeroes the CSS transitions (see the end of this file). */
+  --dur-fast: 120ms;
+  --dur-ui: 180ms;
+  --dur-slow: 250ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Layering, lowest to highest. Use z-(--z-name); never a bare z-[NN]. */
+  --z-sticky: 10; /* sticky table heads and first columns */
+  --z-bar: 20; /* sticky sub-bars (a page's own toolbar) */
+  --z-nav: 30; /* the top bar */
+  --z-menu: 40; /* popover menus, floating action bars */
+  --z-modal: 60; /* dialogs, the tour, the command palette, with their scrim */
+  --z-pop: 70; /* help and term tooltips (they open from inside a dialog too) */
+  --z-toast: 80; /* toasts and transient notices */
+  --z-stamp: 90; /* the full-screen gate stamp */
+
+  /* Likely cause of a failure: one colour each, the same everywhere. The last three are the
+     "not the bot's fault" causes, each its own quiet tone. */
+  --cause-l: 0.62;
+  --cause-c: 0.11;
+  --cause-search-missed: oklch(0.62 0.12 235);
+  --cause-model-missed: oklch(0.6 0.14 290);
+  --cause-made-up: oklch(0.6 0.19 27);
+  --cause-answered-out-of-scope: oklch(0.7 0.15 55);
+  --cause-tool-problem: oklch(0.58 0.15 330);
+  --cause-declined-wrongly: oklch(0.66 0.12 190);
+  --cause-wrong-citation: oklch(0.66 0.13 110);
+  --cause-off-topic: oklch(0.6 0.015 200);
+  --cause-test-suspect: oklch(0.56 0.07 70);
+  --cause-cant-tell: oklch(0.76 0.025 280);
+
+  /* The colours a chatbot can choose (its mark). Fixed in both themes; labels on them are --on-swatch. */
+  --swatch-teal: oklch(0.62 0.11 190);
+  --swatch-blue: oklch(0.58 0.15 255);
+  --swatch-violet: oklch(0.56 0.16 295);
+  --swatch-rose: oklch(0.6 0.17 5);
+  --swatch-amber: oklch(0.7 0.14 80);
+  --swatch-green: oklch(0.6 0.14 150);
+  --swatch-slate: oklch(0.5 0.02 220);
+  --swatch-orange: oklch(0.63 0.16 45);
 }
 
 :root[data-theme="dark"] {
@@ -66,6 +112,8 @@
   --accent-ink: oklch(0.82 0.1 186);
   --accent-wash: oklch(0.27 0.04 186);
   --on-accent: oklch(0.18 0.02 186);
+  --on-solid: oklch(0.16 0.02 150);
+  --scrim: oklch(0 0 0 / 0.58);
   --series-1: oklch(0.7 0.13 255);
   --series-2: oklch(0.75 0.14 50);
   --good: oklch(0.74 0.16 150);
@@ -87,6 +135,18 @@
   --grain-opacity: 0.06;
   --shadow: 0 1px 0 oklch(0 0 0 / 0.3), 0 10px 30px -14px oklch(0 0 0 / 0.6);
   --shadow-pop: 0 20px 60px -16px oklch(0 0 0 / 0.75);
+
+  --cause-l: 0.72;
+  --cause-search-missed: oklch(0.72 0.12 235);
+  --cause-model-missed: oklch(0.72 0.14 290);
+  --cause-made-up: oklch(0.7 0.18 27);
+  --cause-answered-out-of-scope: oklch(0.78 0.14 55);
+  --cause-tool-problem: oklch(0.7 0.15 330);
+  --cause-declined-wrongly: oklch(0.76 0.12 190);
+  --cause-wrong-citation: oklch(0.76 0.13 110);
+  --cause-off-topic: oklch(0.7 0.015 200);
+  --cause-test-suspect: oklch(0.66 0.07 70);
+  --cause-cant-tell: oklch(0.82 0.025 280);
 }
 
 :root[data-density="compact"] {
@@ -109,6 +169,9 @@
   --color-accent-ink: var(--accent-ink);
   --color-accent-wash: var(--accent-wash);
   --color-on-accent: var(--on-accent);
+  --color-on-solid: var(--on-solid);
+  --color-on-swatch: var(--on-swatch);
+  --color-scrim: var(--scrim);
   --color-series-1: var(--series-1);
   --color-series-2: var(--series-2);
   --color-good: var(--good);
@@ -153,6 +216,8 @@
   --text-fig-xl--line-height: 1;
   --shadow-card: var(--shadow);
   --shadow-pop: var(--shadow-pop);
+  --shadow-btn-solid: var(--btn-shadow-solid);
+  --shadow-btn-raised: var(--btn-shadow-raised);
 }
 
 html,
@@ -340,9 +405,39 @@ pre.code {
   );
 }
 
-/* The same on a coloured fill (matrix cells). */
+/* The same on a coloured fill (matrix cells). `.hatched` is for neutral surfaces (page, card,
+   a figure); `.hatched-fill` is for stripes laid over a state colour. `.hatched-light` is the old
+   name for it. */
+.hatched-fill,
 .hatched-light {
   background-image: repeating-linear-gradient(-45deg, rgb(255 255 255 / 0.55) 0 2px, transparent 2px 5px);
+}
+
+/* Shared surfaces and controls (components layer: a utility class on the element still wins). */
+@layer components {
+  .scrim {
+    background: var(--scrim);
+    backdrop-filter: blur(2px);
+  }
+  /* One radius for every modal surface: Dialog, the command palette, the shortcut sheet, the tour. */
+  .modal-surface {
+    border-radius: 1rem;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    box-shadow: var(--shadow-pop);
+  }
+  /* A native <select> with the OS chevron removed and a token-coloured one drawn instead. */
+  .select-ctl {
+    appearance: none;
+    background-image:
+      linear-gradient(45deg, transparent 50%, var(--ink-3) 50%),
+      linear-gradient(135deg, var(--ink-3) 50%, transparent 50%);
+    background-position:
+      calc(100% - 15px) 55%,
+      calc(100% - 10px) 55%;
+    background-size: 5px 5px;
+    background-repeat: no-repeat;
+  }
 }
 
 /* Linked highlight: hover a question anywhere and it lights everywhere (data-case). */
@@ -481,6 +576,28 @@ tr.hl {
   }
 }
 
+/* Reduced motion also stops looping pings and zeroes every CSS transition (a 300 ms colour or
+   width change included). Spinners stay: they say "working", not "look here". */
+:root[data-motion="reduced"] .animate-ping {
+  animation: none;
+}
+:root[data-motion="reduced"] *,
+:root[data-motion="reduced"] *::before,
+:root[data-motion="reduced"] *::after {
+  transition-duration: 1ms !important;
+  transition-delay: 0ms !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-ping {
+    animation: none;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 1ms !important;
+    transition-delay: 0ms !important;
+  }
+}
 
 /* A row picked with j/k. */
 .kb-active {

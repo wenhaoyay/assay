@@ -80,22 +80,22 @@ export function Tour({ open, onClose }: { open: boolean; onClose: () => void }) 
   return (
     <AnimatePresence>
       {open && (
-        <motion.div className="fixed inset-0 z-[90]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        <motion.div className="fixed inset-0 z-(--z-modal)" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
           {rect ? (
             <motion.div className="pointer-events-none fixed rounded-xl ring-2 ring-accent"
-              style={{ boxShadow: '0 0 0 9999px rgb(0 0 0 / 0.45)' }}
+              style={{ boxShadow: '0 0 0 9999px var(--scrim)' }}
               initial={false}
               animate={{ left: rect.left - pad, top: rect.top - pad, width: rect.width + pad * 2, height: Math.min(rect.height + pad * 2, window.innerHeight * 0.7) }}
               transition={{ type: 'spring', stiffness: 260, damping: 30 }} />
-          ) : <div className="fixed inset-0 bg-black/45" />}
+          ) : <div className="fixed inset-0 bg-scrim" />}
           <motion.div key={i} role="dialog" aria-label={step.title}
             initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 400, damping: 32 }}
-            className="fixed w-[380px] rounded-2xl border border-line bg-surface p-4 shadow-pop" style={{ top: bubbleTop, left: bubbleLeft }}>
+            className="modal-surface fixed w-[380px] p-4" style={{ top: bubbleTop, left: bubbleLeft }}>
             <div className="mb-1 flex items-center justify-between">
               <span className="t-label text-accent-ink">Tour · <span className="font-mono">{i + 1}</span> of <span className="font-mono">{steps.length}</span></span>
               <button type="button" onClick={onClose} aria-label="End tour" className="text-ink-3 hover:text-ink"><X className="size-4" /></button>
             </div>
-            <h3 className="text-h font-semibold">{step.title}</h3>
+            <h3 className="t-h">{step.title}</h3>
             <p className="mt-1 text-sm text-ink-2">{step.body}</p>
             <div className="mt-3 flex items-center gap-2">
               <div className="flex gap-1">{steps.map((_, k) => <span key={k} className={k === i ? 'h-1.5 w-4 rounded-full bg-accent' : 'size-1.5 rounded-full bg-line-strong'} />)}</div>

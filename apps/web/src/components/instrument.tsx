@@ -11,32 +11,50 @@ import { useMotionOn } from '../lib/prefs'
 // Colours with a meaning
 // --------------------------------------------------------------------------------------
 
-/** Pass rate 0..1 as a colour, red through amber to green (mixed in OKLCH by the browser). */
-export function rateColor(v: number | null | undefined): string {
-  if (v === null || v === undefined || Number.isNaN(v)) return 'var(--untested)'
-  return v >= 0.5
-    ? `color-mix(in oklch, var(--good) ${Math.round((v - 0.5) * 200)}%, var(--warn))`
-    : `color-mix(in oklch, var(--warn) ${Math.round(v * 200)}%, var(--bad))`
+export type RateBand = 'pass' | 'flaky' | 'fail' | 'none'
+
+/** A pass rate at or above this is "pass"; below RATE_FAIL is "fail"; between is "flaky". */
+export const RATE_PASS = 0.8
+export const RATE_FAIL = 0.5
+
+/** Which of the three bands a pass rate (0..1) falls in; ``none`` when there is no rate. */
+export function rateBand(v: number | null | undefined): RateBand {
+  if (v === null || v === undefined || Number.isNaN(v)) return 'none'
+  return v >= RATE_PASS ? 'pass' : v >= RATE_FAIL ? 'flaky' : 'fail'
 }
 
-/** A fixed colour per likely cause of a failure (the same everywhere). */
-export const CAUSE_COLORS: Record<string, string> = {
-  search_missed: 'oklch(0.62 0.12 235)',
-  model_missed: 'oklch(0.6 0.14 290)',
-  made_up: 'oklch(0.6 0.19 27)',
-  answered_out_of_scope: 'oklch(0.7 0.15 55)',
-  tool_problem: 'oklch(0.58 0.15 330)',
-  declined_wrongly: 'oklch(0.66 0.12 190)',
-  wrong_citation: 'oklch(0.66 0.13 110)',
-  off_topic: 'oklch(0.62 0.02 200)',
-  test_suspect: 'oklch(0.62 0.02 200)',
-  cant_tell: 'oklch(0.62 0.02 200)',
+const BAND_VAR: Record<RateBand, string> = { pass: 'var(--good)', flaky: 'var(--flaky)', fail: 'var(--bad)', none: 'var(--untested)' }
+
+/**
+ * Pass rate 0..1 as one of three state colours (pass / flaky / fail), never a blend: a colour that
+ * is neither green nor amber nor red reads as a fourth state. Pair it with ``RateLegend``.
+ */
+export function rateColor(v: number | null | undefined): string {
+  return BAND_VAR[rateBand(v)]
 }
+
+/** The key to ``rateColor``: three swatches with their ranges (and "not scored" when asked). */
+export function RateLegend({ className, none = false }: { className?: string; none?: boolean }) {
+  const item = (c: string, text: string) => <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-sm" style={{ background: c }} aria-hidden />{text}</span>
+  const lo = Math.round(RATE_FAIL * 100)
+  const hi = Math.round(RATE_PASS * 100)
+  return (
+    <div className={clsx('flex flex-wrap items-center gap-x-3.5 gap-y-1 text-xs text-ink-3', className)} data-testid="rate-legend">
+      {item(BAND_VAR.pass, `pass ${hi}% or more`)}{item(BAND_VAR.flaky, `flaky ${lo}% to ${hi - 1}%`)}{item(BAND_VAR.fail, `fail under ${lo}%`)}{none && item(BAND_VAR.none, 'not scored')}
+    </div>
+  )
+}
+
+/** A fixed colour per likely cause of a failure (the same everywhere): tokens in index.css. */
+export const CAUSE_COLORS: Record<string, string> = Object.fromEntries(
+  ['search_missed', 'model_missed', 'made_up', 'answered_out_of_scope', 'tool_problem', 'declined_wrongly', 'wrong_citation', 'off_topic', 'test_suspect', 'cant_tell']
+    .map((k) => [k, `var(--cause-${k.replace(/_/g, '-')})`]),
+)
 export function causeColor(cause: string | null | undefined): string {
   if (!cause) return 'var(--untested)'
   if (CAUSE_COLORS[cause]) return CAUSE_COLORS[cause]
   const h = ([...cause].reduce((a, ch) => a + ch.charCodeAt(0), 0) * 47) % 360
-  return `oklch(0.62 0.11 ${h})`
+  return `oklch(var(--cause-l) var(--cause-c) ${h})`
 }
 
 // --------------------------------------------------------------------------------------
@@ -54,7 +72,7 @@ export function cellState(c: Pick<Cell, 'passed' | 'total'> | undefined | null):
   if (!c || !c.total) return 'none'
   return c.passed === c.total ? 'pass' : c.passed === 0 ? 'fail' : 'flaky'
 }
-const STATE_BG: Record<CellState, string> = { pass: 'bg-good', fail: 'bg-bad', flaky: 'bg-flaky', none: 'bg-untested' }
+const STATE_BG: Record<CellState, string> = { pass: 'bg-good', fail: 'bg-bad', flaky: 'bg-flaky', none: 'bg-untested' } // flaky is amber everywhere (--flaky)
 const STATE_TEXT: Record<CellState, string> = { pass: 'passed every try', fail: 'failed every try', flaky: 'flaky', none: 'not asked' }
 
 /**
@@ -81,7 +99,7 @@ export function Fingerprint({ cells, size = 'md', hrefFor, vt, className, flippe
         const title = `${c.title ? c.title + ' · ' : ''}${c.id}: ${st === 'flaky' ? `${c.passed}/${c.total} tries passed` : STATE_TEXT[st]}`
         const dot = (
           <span data-case={c.id} title={title}
-            className={clsx('block rounded-full transition-transform duration-150 hover:scale-150', STATE_BG[st], flipped?.has(c.id) && 'fp-flip')}
+            className={clsx('block rounded-full transition-transform duration-(--dur-ui) hover:scale-150', STATE_BG[st], flipped?.has(c.id) && 'fp-flip')}
             style={{ width: px, height: px }} />
         )
         const href = hrefFor?.(c.id)
@@ -239,7 +257,7 @@ export function Delta({ value, format, higherIsBetter = true, noise = 0.005, suf
 export function Receipt({ title, sub, children, className }: { title: ReactNode; sub?: ReactNode; children: ReactNode; className?: string }) {
   return (
     <div className={clsx('receipt', className)} data-testid="receipt">
-      <div className="t-verdict text-center">{title}</div>
+      <div className="t-h text-center">{title}</div>
       {sub && <div className="mt-0.5 text-center text-xs text-ink-3">{sub}</div>}
       <hr />
       {children}

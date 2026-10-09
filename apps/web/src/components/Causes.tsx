@@ -51,10 +51,6 @@ export function CauseBadge({ v, className }: { v: Pick<Verdict, 'label' | 'kind'
   )
 }
 
-export function CauseHelp() {
-  return <Help title="How Assay finds the cause" wide><CauseHelpBody /></Help>
-}
-
 function CauseHelpBody() {
   return (
     <>

@@ -28,11 +28,12 @@ export function ExploreTab({ runId }: { runId: number }) {
     const main = document.getElementById('main')
     if (main) main.scrollTo({ top: el.getBoundingClientRect().top - main.getBoundingClientRect().top + main.scrollTop - 110, behavior: 'smooth' })
     else el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    el.animate?.([{ backgroundColor: 'color-mix(in oklch, var(--accent) 10%, transparent)' }, { backgroundColor: 'transparent' }], { duration: 1200 })
+    const still = document.documentElement.dataset.motion === 'reduced' || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    if (!still) el.animate?.([{ backgroundColor: 'color-mix(in srgb, var(--accent) 10%, transparent)' }, { backgroundColor: 'transparent' }], { duration: 1200 })
   }
   return (
     <div data-testid="explore">
-      <div className="sticky top-[52px] z-20 -mx-1 mb-6 flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line bg-page/90 px-1 py-2 backdrop-blur">
+      <div className="sticky top-[52px] z-(--z-bar) -mx-1 mb-6 flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line bg-page/90 px-1 py-2 backdrop-blur">
         {NAV.map(([id, label], i) => (
           <span key={id} className="flex items-center gap-3">
             {i > 0 && <span className="text-ink-3">·</span>}

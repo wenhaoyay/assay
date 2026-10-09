@@ -201,7 +201,7 @@ function Stepper({ step, onStep }: { step: number; onStep: (i: number) => void }
           <button type="button" onClick={() => onStep(i)} disabled={i > step}
             className={clsx('flex items-center gap-2 rounded-full border px-3 py-1 text-sm transition-colors',
               i === step ? 'border-accent bg-accent-wash font-medium text-accent-ink' : i < step ? 'border-good/40 text-good-ink' : 'border-line text-ink-3')}>
-            <span className={clsx('flex size-5 items-center justify-center rounded-full font-mono text-label font-semibold', i === step ? 'bg-accent text-on-accent' : i < step ? 'bg-good text-white' : 'bg-surface-3 text-ink-3')}>
+            <span className={clsx('flex size-5 items-center justify-center rounded-full font-mono text-label font-semibold', i === step ? 'bg-accent text-on-accent' : i < step ? 'bg-good text-on-solid' : 'bg-surface-3 text-ink-3')}>
               {i < step ? <Check className="size-3" /> : i + 1}
             </span>
             {s}
@@ -323,7 +323,7 @@ function StepRequest({ route, adapter, cfg, setCfg }: { route: Route; adapter: '
           <p>Copy a real request to your bot as curl and Assay reads the address, headers and body from it, finds where the question goes, and offers to store any key securely.</p>
           <p>Chrome / Edge DevTools → Network → right-click the request → Copy → Copy as cURL (bash).</p>
         </>}>
-          <Textarea rows={6} value={curl} onChange={(e) => setCurl(e.target.value)} placeholder={"curl 'https://my-bot.example.com/api/chat' \\\n  -H 'Authorization: Bearer sk-...' \\\n  -H 'Content-Type: application/json' \\\n  --data-raw '{\"question\":\"How do I reset it?\"}'"} aria-label="curl command" />
+          <Textarea mono rows={6} value={curl} onChange={(e) => setCurl(e.target.value)} placeholder={"curl 'https://my-bot.example.com/api/chat' \\\n  -H 'Authorization: Bearer sk-...' \\\n  -H 'Content-Type: application/json' \\\n  --data-raw '{\"question\":\"How do I reset it?\"}'"} aria-label="curl command" />
           <div className="mt-2 flex items-center gap-2">
             <Button variant="primary" loading={parse.isPending} disabled={curl.trim().length < 6} onClick={() => parse.mutate()}><Wand2 className="size-3.5" />Read it</Button>
             <span className="text-xs text-ink-2">DevTools → Network → Copy as cURL (bash)</span>
@@ -349,7 +349,7 @@ function StepRequest({ route, adapter, cfg, setCfg }: { route: Route; adapter: '
         </div>
         <div className="mt-3">
           <Field label={<LabelHelp label="Body (JSON)" title="Placeholders in the body"><p><code>{'{{input.message}}'}</code> the question, <code>{'{{uuid}}'}</code> a fresh id per call, <code>{'{{input.fields.x}}'}</code> a per-case field.</p></LabelHelp>} error={bodyErr ?? undefined}>
-            <Textarea rows={7} value={bodyText} spellCheck={false} onChange={(e) => { setBodyText(e.target.value); try { set('body', JSON.parse(e.target.value)); setBodyErr(null) } catch { setBodyErr('Not valid JSON yet') } }} />
+            <Textarea mono rows={7} value={bodyText} spellCheck={false} onChange={(e) => { setBodyText(e.target.value); try { set('body', JSON.parse(e.target.value)); setBodyErr(null) } catch { setBodyErr('Not valid JSON yet') } }} />
           </Field>
         </div>
         {field('method') === 'GET' && Object.keys((cfg.body as object) ?? {}).length > 0 && (
@@ -879,7 +879,7 @@ function AdvancedPanel({ adapter, cfg, setCfg }: { adapter: string; cfg: Cfg; se
         <p>The record of this connection. Edits here update the steps, and the other way round.</p>
         <p>Same format as YAML experiment files and <code>local/targets/*.yaml</code>.</p>
       </>}>
-        <Textarea rows={26} value={text} spellCheck={false} onBlur={() => setDraft(null)}
+        <Textarea mono rows={26} value={text} spellCheck={false} onBlur={() => setDraft(null)}
           onChange={(e) => { setDraft(e.target.value); try { const v = JSON.parse(e.target.value); setCfg(() => v); setErr(null) } catch { setErr('Not valid JSON yet - the steps keep the last valid version.') } }} />
         {err && <p className="mt-1 text-xs text-warn-ink">{err}</p>}
       </Card>

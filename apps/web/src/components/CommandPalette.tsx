@@ -30,7 +30,7 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 import { usePrefs } from '../lib/prefs'
 import type { SearchResults } from '../lib/types'
-import { Kbd } from './ui'
+import { HelpGlyph, Kbd } from './ui'
 
 interface Item {
   id: string
@@ -130,12 +130,12 @@ export function CommandPalette({ open, onClose, onShortcuts, onTour }: { open: b
   return (
     <AnimatePresence>
       {open && (
-        <motion.div className="fixed inset-0 z-[70] flex items-start justify-center bg-ink/25 p-4 pt-[12vh] backdrop-blur-[2px]"
+        <motion.div className="scrim fixed inset-0 z-(--z-modal) flex items-start justify-center p-4 pt-[12vh]"
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }} onMouseDown={onClose}>
           <motion.div role="dialog" aria-label="Command palette" onMouseDown={(e) => e.stopPropagation()}
             initial={{ opacity: 0, y: -8, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.98 }}
             transition={{ type: 'spring', stiffness: 500, damping: 36 }}
-            className="w-full max-w-xl overflow-hidden rounded-xl border border-line bg-surface shadow-pop">
+            className="modal-surface w-full max-w-xl overflow-hidden">
             <div className="flex items-center gap-2 border-b border-line px-4">
               <Search className="size-4 text-ink-3" aria-hidden />
               <input ref={input} value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKey}
@@ -198,22 +198,17 @@ export const SHORTCUTS: { group: string; keys: string[]; label: string }[] = [
   { group: 'Calibration', keys: ['U'], label: 'Label UNKNOWN' },
 ]
 
-/** The circled ? as it appears beside headings (a picture of it, not a working one). */
-function HelpGlyph() {
-  return <span aria-label="the circled question mark" className="inline-flex size-[18px] items-center justify-center rounded-full border-[1.5px] border-line-strong text-label font-semibold leading-none text-ink-3">?</span>
-}
-
 export function ShortcutSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const groups = [...new Set(SHORTCUTS.map((s) => s.group))]
   return (
     <AnimatePresence>
       {open && (
-        <motion.div className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/25 p-4 backdrop-blur-[2px]"
+        <motion.div className="scrim fixed inset-0 z-(--z-modal) flex items-center justify-center p-4"
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={onClose}>
           <motion.div role="dialog" aria-label="Keyboard shortcuts" onMouseDown={(e) => e.stopPropagation()}
             initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.97 }}
-            className="w-full max-w-2xl rounded-xl border border-line bg-surface p-5 shadow-pop">
-            <div className="mb-4 flex items-center justify-between border-b border-line pb-2.5"><h2 className="text-h font-semibold tracking-tight">Keyboard shortcuts</h2><Kbd>Esc</Kbd></div>
+            className="modal-surface w-full max-w-2xl p-5">
+            <div className="mb-4 flex items-center justify-between border-b border-line pb-2.5"><h2 className="t-h">Keyboard shortcuts</h2><Kbd>Esc</Kbd></div>
             <div className="grid gap-x-8 gap-y-4 sm:grid-cols-2">
               {groups.map((g) => (
                 <div key={g}>

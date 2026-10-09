@@ -1,5 +1,5 @@
 // Plain-English meanings of the terms Assay shows. The terms stay on screen; these appear on
-// hover (always) and inline when "Explain" is on.
+// hover, wherever the term appears (`<Term k="...">`).
 
 export const GLOSSARY: Record<string, { term: string; plain: string }> = {
   pass_rate: { term: 'Pass rate', plain: 'Share of test questions the bot got right on every gating check. Averaged per question first, so repeating a question does not count twice.' },

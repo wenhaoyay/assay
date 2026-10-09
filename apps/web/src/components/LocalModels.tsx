@@ -94,7 +94,7 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
       <ol className="mb-4 flex flex-wrap gap-2">
         {steps.map((s, i) => (
           <li key={s.label} className={clsx('flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs', s.done ? 'border-good/40 text-good-ink' : 'border-line text-ink-3')}>
-            <span className={clsx('flex size-4 items-center justify-center rounded-full font-mono text-label font-semibold', s.done ? 'bg-good text-white' : 'bg-surface-3')}>{s.done ? <Check className="size-2.5" /> : i + 1}</span>{s.label}
+            <span className={clsx('flex size-4 items-center justify-center rounded-full font-mono text-label font-semibold', s.done ? 'bg-good text-on-solid' : 'bg-surface-3')}>{s.done ? <Check className="size-2.5" /> : i + 1}</span>{s.label}
           </li>
         ))}
       </ol>

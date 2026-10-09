@@ -1,4 +1,6 @@
-// UI primitives (the role shadcn/ui would play), styled with the token classes.
+// UI primitives (the role shadcn/ui would play), styled with the token classes. The reference for
+// what to use when is the "Components" section of docs/design.md. Form-ish pieces (Checkbox,
+// FileInput, Chip, TextLink, Menu, SelectCard) live in ./form.
 import clsx from 'clsx'
 import { AlertTriangle, Check, CircleSlash, Info, Loader2, X } from 'lucide-react'
 import { animate, motion, useInView, useMotionValue, useTransform } from 'motion/react'
@@ -9,6 +11,8 @@ import {
   useState,
   useSyncExternalStore,
   type ButtonHTMLAttributes,
+  type CSSProperties,
+  type HTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
   type SelectHTMLAttributes,
@@ -19,6 +23,13 @@ import { ApiError } from '../lib/api'
 import { GLOSSARY, type GlossaryKey } from '../lib/glossary'
 import { LONG_SECONDS, spanOf } from '../lib/format'
 import { useMotionOn } from '../lib/prefs'
+
+/** Motion durations in seconds, the JS twin of --dur-fast / --dur-ui / --dur-slow in index.css. */
+export const DUR = { fast: 0.12, ui: 0.18, slow: 0.25 } as const
+
+const BTN_PRIMARY = 'bg-accent text-on-accent shadow-btn-solid hover:bg-accent-strong'
+const BTN_SECONDARY = 'border border-line-strong bg-surface text-ink shadow-btn-raised hover:bg-surface-2'
+const BTN_GHOST = 'text-ink-2 hover:bg-surface-2 hover:text-ink'
 
 export function Button({
   variant = 'secondary',
@@ -38,14 +49,14 @@ export function Button({
       {...rest}
       disabled={rest.disabled || loading}
       className={clsx(
-        'inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-[background-color,box-shadow,transform] duration-150 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50',
+        'inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-[background-color,box-shadow,transform] duration-(--dur-ui) active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50',
         size === 'sm' ? 'h-7 px-2.5 text-xs' : size === 'lg' ? 'h-10 px-4 text-base' : 'h-8 px-3 text-sm',
-        variant === 'primary' && 'bg-accent text-on-accent shadow-[inset_0_-2px_0_rgb(0_0_0/0.2),inset_0_1px_0_rgb(255_255_255/0.22)] hover:bg-accent-strong',
-        variant === 'secondary' && 'border border-line-strong bg-surface text-ink shadow-[inset_0_-1.5px_0_color-mix(in_srgb,var(--ink)_7%,transparent)] hover:bg-surface-2',
-        variant === 'ghost' && 'text-ink-2 hover:bg-surface-2 hover:text-ink',
+        variant === 'primary' && BTN_PRIMARY,
+        variant === 'secondary' && BTN_SECONDARY,
+        variant === 'ghost' && BTN_GHOST,
         variant === 'danger' && 'border border-bad/40 bg-surface text-bad-ink hover:bg-bad-wash',
-        variant === 'good' && 'bg-good text-white hover:bg-good/85',
-        variant === 'bad' && 'bg-bad text-white hover:bg-bad/85',
+        variant === 'good' && 'bg-good text-on-solid hover:bg-good/85',
+        variant === 'bad' && 'bg-bad text-on-solid hover:bg-bad/85',
         className,
       )}
     >
@@ -58,18 +69,58 @@ export function Button({
 /** A link styled as a button (for navigation that should look like an action). */
 export const linkButton = (variant: 'primary' | 'secondary' | 'ghost' = 'secondary', size: 'sm' | 'md' = 'md') =>
   clsx(
-    'inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-colors',
+    'inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-colors duration-(--dur-ui)',
     size === 'sm' ? 'h-7 px-2.5 text-xs' : 'h-8 px-3 text-sm',
-    variant === 'primary' && 'bg-accent text-on-accent shadow-[inset_0_-2px_0_rgb(0_0_0/0.2),inset_0_1px_0_rgb(255_255_255/0.22)] hover:bg-accent-strong',
-    variant === 'secondary' && 'border border-line-strong bg-surface text-ink shadow-[inset_0_-1.5px_0_color-mix(in_srgb,var(--ink)_7%,transparent)] hover:bg-surface-2',
-    variant === 'ghost' && 'text-ink-2 hover:bg-surface-2 hover:text-ink',
+    variant === 'primary' && BTN_PRIMARY,
+    variant === 'secondary' && BTN_SECONDARY,
+    variant === 'ghost' && BTN_GHOST,
   )
 
 /**
- * A section: a heading over a rule, no box. What it shows lives behind a circled ? (``help``, or
- * the older ``subtitle`` prop), never as a grey subtitle: subtitles read as clutter. ``meta`` is
- * a small figure beside the heading (a count); ``boxed`` keeps a panel for content that needs one
- * (forms, cards in a grid, side panels).
+ * The heading row of every section, boxed or not: the title (18/600, never truncated), the circled
+ * ? (``help``: what it shows, how to use it, any caveat), an optional count or sample chip
+ * (``meta``), and the actions at the right, which wrap below the title on a narrow screen. No
+ * caption beside the title: it goes in the ? or in the content. ``rule`` draws the line under it.
+ */
+export function SectionHead({ title, help, meta, actions, rule = false, as: Tag = 'h2', className }: {
+  title?: ReactNode
+  help?: ReactNode
+  meta?: ReactNode
+  actions?: ReactNode
+  rule?: boolean
+  as?: 'h1' | 'h2' | 'h3'
+  className?: string
+}) {
+  return (
+    <header className={clsx('flex min-h-10 flex-wrap items-center justify-between gap-x-3 gap-y-2', rule && 'border-b border-line pb-2.5', className)}>
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+        {title && <Tag className="t-h min-w-0">{title}</Tag>}
+        {help && <Help title={typeof title === 'string' ? title : 'About this'}>{help}</Help>}
+        {meta && <span className="num whitespace-nowrap font-mono text-xs text-ink-3">{meta}</span>}
+      </div>
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+    </header>
+  )
+}
+
+/**
+ * The boxed surface: one radius, one border, one shadow, padding from --card-p (the density
+ * setting). Use it for forms, cards in a grid and side panels; never hand-roll
+ * ``rounded-xl border bg-surface shadow-card``. ``padded={false}`` for a table or list that runs
+ * to the edge. No hover movement: a clickable panel changes colour, it does not lift.
+ */
+export function Panel({ children, className, padded = true, ...rest }: HTMLAttributes<HTMLDivElement> & { padded?: boolean }) {
+  return (
+    <div {...rest} className={clsx('rounded-xl border border-line bg-surface shadow-card', padded && 'p-[var(--card-p)]', className)}>
+      {children}
+    </div>
+  )
+}
+
+/**
+ * A section: a heading row (``SectionHead``) over a rule, no box. What it shows lives behind the
+ * circled ? (``help``), never as a grey subtitle. ``meta`` is a count or ``<SampleSize>`` beside the
+ * heading; ``boxed`` keeps a panel for content that needs one (forms, cards in a grid, side panels).
  */
 export function Card({ title, actions, children, className, padded = true, subtitle, help, meta, boxed = false, id }: {
   title?: ReactNode
@@ -77,22 +128,16 @@ export function Card({ title, actions, children, className, padded = true, subti
   children: ReactNode
   className?: string
   padded?: boolean
+  /** @deprecated Use ``help``: a subtitle is routed to the ? anyway. */
   subtitle?: ReactNode
   help?: ReactNode
   meta?: ReactNode
   boxed?: boolean
   id?: string
 }) {
-  const explain = help ?? subtitle
   const heading = (title || actions) && (
-    <header className={clsx('flex min-h-10 items-center justify-between gap-3 border-b border-line', boxed ? 'px-4 py-2.5' : 'pb-2.5')}>
-      <div className="flex min-w-0 items-center gap-2">
-        {title && <h2 className={clsx('truncate font-semibold tracking-tight', boxed ? 'text-base' : 'text-h')}>{title}</h2>}
-        {explain && <Help title={typeof title === 'string' ? title : 'About this'}>{explain}</Help>}
-        {meta && <span className="num whitespace-nowrap font-mono text-xs text-ink-3">{meta}</span>}
-      </div>
-      <div className="flex shrink-0 items-center gap-2">{actions}</div>
-    </header>
+    <SectionHead title={title} help={help ?? subtitle} meta={meta} actions={actions} rule
+      className={boxed ? 'px-[var(--card-p)] py-2.5' : undefined} />
   )
   if (boxed) {
     return (
@@ -110,7 +155,31 @@ export function Card({ title, actions, children, className, padded = true, subti
   )
 }
 
-type Tone = 'neutral' | 'good' | 'bad' | 'warn' | 'info' | 'error' | 'accent'
+/**
+ * Badge tones. The eight STATES have one look each everywhere (design.md "States"): `pass`,
+ * `fail`, `flaky` (amber), `unscored` (solid grey), `unmeasured` (dashed outline: not measured /
+ * not applicable), `error` (violet), `heuristic` (hatched: a word-overlap score, not a grading
+ * model's verdict) and `cancelled` (quiet outline). `good` / `bad` / `warn` are the older names of
+ * pass / fail / flaky; `neutral` / `info` / `accent` are plain labels, not states.
+ */
+export type Tone = 'neutral' | 'info' | 'accent' | 'good' | 'bad' | 'warn' | 'pass' | 'fail' | 'flaky' | 'unscored' | 'unmeasured' | 'error' | 'heuristic' | 'cancelled'
+
+const TONE: Record<Tone, string> = {
+  neutral: 'bg-surface-2 text-ink-2',
+  info: 'bg-info-wash text-accent-ink',
+  accent: 'bg-accent-wash text-accent-ink',
+  good: 'bg-good-wash text-good-ink',
+  pass: 'bg-good-wash text-good-ink',
+  bad: 'bg-bad-wash text-bad-ink',
+  fail: 'bg-bad-wash text-bad-ink',
+  warn: 'bg-warn-wash text-warn-ink',
+  flaky: 'bg-warn-wash text-warn-ink',
+  unscored: 'bg-untested text-ink',
+  unmeasured: 'border border-dashed border-line-strong text-ink-3',
+  error: 'bg-error-wash text-error-ink',
+  heuristic: 'hatched border border-line-strong text-ink-2',
+  cancelled: 'border border-line text-ink-3',
+}
 
 export function Badge({ tone = 'neutral', children, className, title }: {
   tone?: Tone
@@ -119,52 +188,75 @@ export function Badge({ tone = 'neutral', children, className, title }: {
   title?: string
 }) {
   return (
-    <span
-      title={title}
-      className={clsx(
-        'inline-flex h-5 items-center gap-1 whitespace-nowrap rounded-full px-2 text-xs font-medium',
-        tone === 'neutral' && 'bg-surface-2 text-ink-2',
-        tone === 'good' && 'bg-good-wash text-good-ink',
-        tone === 'bad' && 'bg-bad-wash text-bad-ink',
-        tone === 'warn' && 'bg-warn-wash text-warn-ink',
-        tone === 'info' && 'bg-info-wash text-accent-ink',
-        tone === 'accent' && 'bg-accent-wash text-accent-ink',
-        tone === 'error' && 'bg-error-wash text-error-ink',
-        className,
-      )}
-    >
+    <span title={title} className={clsx('inline-flex h-5 items-center gap-1 whitespace-nowrap rounded-full px-2 text-xs font-medium', TONE[tone], className)}>
       {children}
     </span>
   )
 }
 
-const STATUS: Record<string, { tone: Tone; text: string; icon?: 'check' | 'x' | 'slash' | 'warn' }> = {
-  pass: { tone: 'good', text: 'Pass', icon: 'check' },
-  passed: { tone: 'good', text: 'Passed', icon: 'check' },
-  PASS: { tone: 'good', text: 'PASS', icon: 'check' },
-  fail: { tone: 'bad', text: 'Fail', icon: 'x' },
-  failed: { tone: 'bad', text: 'Failed', icon: 'x' },
-  FAIL: { tone: 'bad', text: 'FAIL', icon: 'x' },
+/** The states a mark (a dot, a cell, a badge) can be in. */
+export type StateName = 'pass' | 'fail' | 'flaky' | 'unscored' | 'error' | 'heuristic' | 'cancelled'
+
+/** Fill classes for a dot or cell in each state: use these, never `bg-red-500` or a hex. */
+export const STATE_DOT: Record<StateName, string> = {
+  pass: 'bg-good',
+  fail: 'bg-bad',
+  flaky: 'bg-flaky',
+  unscored: 'bg-untested',
+  error: 'bg-error',
+  heuristic: 'hatched border border-line-strong bg-surface-2',
+  cancelled: 'border border-untested',
+}
+
+/** A trial or run status word ("passed", "failed", "PASS"...) as one of the states. */
+export function stateOf(status: string | null | undefined): StateName {
+  switch ((status ?? '').toLowerCase()) {
+    case 'pass': case 'passed': case 'completed': case 'approved': return 'pass'
+    case 'fail': case 'failed': return 'fail'
+    case 'flaky': return 'flaky'
+    case 'error': case 'completed_with_errors': return 'error'
+    case 'heuristic': return 'heuristic'
+    case 'cancelled': case 'canceled': return 'cancelled'
+    default: return 'unscored'
+  }
+}
+
+/** A round mark in one of the states (a flaky one is amber, an unscored one solid grey). */
+export function StateDot({ state, size = 8, title, className }: { state: StateName; size?: number; title?: string; className?: string }) {
+  return <span title={title} className={clsx('inline-block shrink-0 rounded-full', STATE_DOT[state], className)} style={{ width: size, height: size }} />
+}
+
+type Icon = 'check' | 'x' | 'slash' | 'warn'
+// Status words are sentence case ("Pass", "Incomplete"); capitals belong to the gate stamp alone.
+const STATUS: Record<string, { tone: Tone; text: string; icon?: Icon }> = {
+  pass: { tone: 'pass', text: 'Pass', icon: 'check' },
+  passed: { tone: 'pass', text: 'Passed', icon: 'check' },
+  PASS: { tone: 'pass', text: 'Pass', icon: 'check' },
+  fail: { tone: 'fail', text: 'Fail', icon: 'x' },
+  failed: { tone: 'fail', text: 'Failed', icon: 'x' },
+  FAIL: { tone: 'fail', text: 'Fail', icon: 'x' },
   error: { tone: 'error', text: 'Error', icon: 'warn' },
-  unknown: { tone: 'warn', text: 'Unknown' },
-  UNKNOWN: { tone: 'warn', text: 'UNKNOWN' },
-  not_applicable: { tone: 'neutral', text: 'N/A', icon: 'slash' },
-  not_evaluated: { tone: 'neutral', text: 'Not evaluated', icon: 'slash' },
-  NOT_EVALUATED: { tone: 'neutral', text: 'Not evaluated', icon: 'slash' },
-  INCOMPLETE: { tone: 'warn', text: 'INCOMPLETE', icon: 'warn' },
-  unscored: { tone: 'neutral', text: 'Unscored' },
-  cancelled: { tone: 'neutral', text: 'Cancelled', icon: 'slash' },
+  unknown: { tone: 'flaky', text: 'Unknown' },
+  UNKNOWN: { tone: 'flaky', text: 'Unknown' },
+  not_applicable: { tone: 'unmeasured', text: 'N/A', icon: 'slash' },
+  not_evaluated: { tone: 'unmeasured', text: 'Not evaluated', icon: 'slash' },
+  NOT_EVALUATED: { tone: 'unmeasured', text: 'Not evaluated', icon: 'slash' },
+  not_measured: { tone: 'unmeasured', text: 'Not measured', icon: 'slash' },
+  INCOMPLETE: { tone: 'flaky', text: 'Incomplete', icon: 'warn' },
+  unscored: { tone: 'unscored', text: 'Unscored' },
+  heuristic: { tone: 'heuristic', text: 'Heuristic' },
+  cancelled: { tone: 'cancelled', text: 'Cancelled', icon: 'slash' },
   queued: { tone: 'info', text: 'Queued' },
   running: { tone: 'info', text: 'Running' },
-  cancelling: { tone: 'warn', text: 'Stopping…' },
-  completed: { tone: 'good', text: 'Completed', icon: 'check' },
-  completed_with_errors: { tone: 'warn', text: 'Completed with errors', icon: 'warn' },
+  cancelling: { tone: 'flaky', text: 'Stopping…' },
+  completed: { tone: 'pass', text: 'Completed', icon: 'check' },
+  completed_with_errors: { tone: 'flaky', text: 'Completed with errors', icon: 'warn' },
   draft: { tone: 'info', text: 'Draft' },
   frozen: { tone: 'neutral', text: 'Frozen' },
-  unreviewed: { tone: 'warn', text: 'Unreviewed' },
-  approved: { tone: 'good', text: 'Approved', icon: 'check' },
+  unreviewed: { tone: 'flaky', text: 'Unreviewed' },
+  approved: { tone: 'pass', text: 'Approved', icon: 'check' },
   rejected: { tone: 'neutral', text: 'Rejected', icon: 'x' },
-  flaky: { tone: 'warn', text: 'Flaky', icon: 'warn' },
+  flaky: { tone: 'flaky', text: 'Flaky', icon: 'warn' },
 }
 
 export function StatusBadge({ status, className }: { status: string; className?: string }) {
@@ -209,12 +301,14 @@ export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={clsx(control, width(props.className), 'h-8', props.className)} />
 }
 
-export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea {...props} className={clsx(control, width(props.className), 'py-2 font-mono text-xs leading-relaxed', props.className)} />
+/** Multi-line text. Sans by default (sentences); `mono` for JSON, a curl command or other code. */
+export function Textarea({ mono = false, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement> & { mono?: boolean }) {
+  return <textarea {...props} className={clsx(control, width(props.className), 'py-2 leading-relaxed', mono && 'font-mono text-xs', props.className)} />
 }
 
+/** A native select with the OS chevron replaced by a token-coloured one. */
 export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select {...props} className={clsx(control, width(props.className), 'h-8 pr-7', props.className)} />
+  return <select {...props} className={clsx(control, 'select-ctl', width(props.className), 'h-8 pr-7', props.className)} />
 }
 
 export function Toggle({ checked, onChange, label, hint, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: ReactNode; hint?: ReactNode; disabled?: boolean }) {
@@ -227,10 +321,10 @@ export function Toggle({ checked, onChange, label, hint, disabled }: { checked: 
         aria-label={typeof label === 'string' ? label : undefined}
         disabled={disabled}
         onClick={() => onChange(!checked)}
-        className={clsx('relative mt-0.5 inline-flex h-5 w-9 shrink-0 rounded-full transition-colors disabled:cursor-wait disabled:opacity-60', checked ? 'bg-accent' : 'bg-line-strong')}
+        className={clsx('relative mt-0.5 inline-flex h-5 w-9 shrink-0 rounded-full transition-colors duration-(--dur-ui) disabled:cursor-wait disabled:opacity-60', checked ? 'bg-accent' : 'bg-line-strong')}
       >
         <motion.span layout transition={{ type: 'spring', stiffness: 600, damping: 35 }}
-          className={clsx('absolute top-0.5 size-4 rounded-full bg-white shadow', checked ? 'right-0.5' : 'left-0.5')} />
+          className={clsx('absolute top-0.5 size-4 rounded-full bg-on-solid shadow', checked ? 'right-0.5' : 'left-0.5')} />
       </button>
       <span>
         <span className="text-sm font-medium">{label}</span>
@@ -268,7 +362,8 @@ export function Tabs<T extends string>({ tabs, value, onChange }: {
   )
 }
 
-export function Segmented<T extends string>({ options, value, onChange, size = 'md', label }: {
+/** One segmented control: a pill track with a sliding thumb. `sm` (the default) beside controls and in toolbars; `md` when it stands alone. */
+export function Segmented<T extends string>({ options, value, onChange, size = 'sm', label }: {
   options: { id: T; label: ReactNode }[]
   value: T
   onChange: (v: T) => void
@@ -319,7 +414,7 @@ export function ErrorState({ error, retry }: { error: unknown; retry?: () => voi
       {e?.details?.length ? (
         <ul className="mt-1 list-disc space-y-0.5 pl-4 font-mono text-xs">
           {e.details.slice(0, 20).map((d) => <li key={d}>{d}</li>)}
-          {e.details.length > 20 && <li>... and {e.details.length - 20} more</li>}
+          {e.details.length > 20 && <li>… and {e.details.length - 20} more</li>}
         </ul>
       ) : null}
       {retry && <Button size="sm" className="mt-2" onClick={retry}>Try again</Button>}
@@ -327,13 +422,27 @@ export function ErrorState({ error, retry }: { error: unknown; retry?: () => voi
   )
 }
 
+const SKELETON = {
+  line: 'h-4', // a line of text
+  title: 'h-5 w-1/3', // a section heading
+  heading: 'h-7 w-64', // a page title
+  figure: 'h-24', // one figure in a row of figures
+  chart: 'h-40', // a small chart
+  block: 'h-64', // a table or a large chart
+} as const
+
+/** A placeholder shaped like the content. One look (shimmer), a few named heights. */
+export function Skeleton({ size = 'line', className, style }: { size?: keyof typeof SKELETON; className?: string; style?: CSSProperties }) {
+  return <div className={clsx('skeleton', SKELETON[size], className)} style={style} aria-hidden />
+}
+
 /** Loading placeholder shaped like the content (a spinner on a blank page tells you nothing). */
 export function Loading({ label = 'Loading', rows = 4 }: { label?: string; rows?: number }) {
   return (
     <div className="space-y-3 p-4" role="status" aria-label={label}>
-      <span className="sr-only">{label}...</span>
-      <div className="skeleton h-5 w-1/3" />
-      {Array.from({ length: rows }, (_, i) => <div key={i} className="skeleton h-4" style={{ width: `${92 - i * 9}%` }} />)}
+      <span className="sr-only">{label}…</span>
+      <Skeleton size="title" />
+      {Array.from({ length: rows }, (_, i) => <Skeleton key={i} style={{ width: `${92 - i * 9}%` }} />)}
     </div>
   )
 }
@@ -341,9 +450,9 @@ export function Loading({ label = 'Loading', rows = 4 }: { label?: string; rows?
 export function PageSkeleton() {
   return (
     <div className="space-y-5" role="status" aria-label="Loading">
-      <div className="skeleton h-7 w-64" />
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-24" />)}</div>
-      <div className="skeleton h-64" />
+      <Skeleton size="heading" />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{[0, 1, 2, 3].map((i) => <Skeleton key={i} size="figure" />)}</div>
+      <Skeleton size="block" />
     </div>
   )
 }
@@ -358,11 +467,15 @@ export function GaugeArt({ size = 64 }: { size?: number }) {
   )
 }
 
+/**
+ * Nothing here yet: a plain title with no full stop ("No datasets yet"), one sentence of
+ * explanation (children), one action. The gauge line is the default picture.
+ */
 export function Empty({ title, children, action, icon }: { title: string; children?: ReactNode; action?: ReactNode; icon?: ReactNode }) {
   return (
     <div className="flex flex-col items-start gap-2 rounded-xl border-[1.5px] border-dashed border-line-strong p-6">
       <div className="mb-1 text-ink-3">{icon ?? <GaugeArt size={56} />}</div>
-      <div className="text-base font-semibold">{title}</div>
+      <div className="text-base font-semibold">{title.replace(/\.$/, '')}</div>
       {children && <div className="max-w-2xl text-sm text-ink-2">{children}</div>}
       {action && <div className="mt-1">{action}</div>}
     </div>
@@ -417,7 +530,7 @@ export function Figs({ children, className }: { children: ReactNode; className?:
 }
 
 /** One figure: a small-caps label, the number in mono, a line under it. Put several in <Figs>. */
-export function Stat({ label, value, sub, title, tone, hatched, numeric, format, explain, help, delta }: {
+export function Stat({ label, value, sub, title, tone, hatched, numeric, format, help, delta }: {
   label: ReactNode
   value?: ReactNode
   sub?: ReactNode
@@ -426,14 +539,12 @@ export function Stat({ label, value, sub, title, tone, hatched, numeric, format,
   hatched?: boolean
   numeric?: number | null
   format?: (v: number | null) => string
-  explain?: ReactNode
   help?: ReactNode
   delta?: ReactNode
 }) {
-  const h = help ?? explain
   return (
     <div className={clsx('min-w-0 px-4 py-3.5 first:pl-0 max-lg:first:pl-4', hatched && 'hatched')} title={title}>
-      <div className="t-label flex items-center gap-1">{label}{h && <Help title={typeof label === 'string' ? label : 'About this figure'}>{h}</Help>}</div>
+      <div className="t-label flex items-center gap-1">{label}{help && <Help title={typeof label === 'string' ? label : 'About this figure'}>{help}</Help>}</div>
       <div className={clsx('t-fig mt-2 break-words', tone === 'good' && 'text-good-ink', tone === 'bad' && 'text-bad-ink')}>
         {numeric !== undefined && format ? <CountUp value={numeric} format={format} /> : value}
       </div>
@@ -475,11 +586,6 @@ export function PageHeader({ title, description, help, actions, eyebrow, childre
   )
 }
 
-/** Retired: explanations now live behind a circled ? (``Help``). Renders nothing. */
-export function Explain(_props: { children: ReactNode; className?: string }) {
-  return null
-}
-
 /** A term with its plain meaning on hover (always available). */
 export function Term({ k, children }: { k: GlossaryKey; children?: ReactNode }) {
   const g = GLOSSARY[k]
@@ -496,8 +602,8 @@ export function Term({ k, children }: { k: GlossaryKey; children?: ReactNode }) 
         {children ?? g.term}
       </span>
       {pos && createPortal(
-        <motion.div role="tooltip" initial={{ opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.12 }}
-          className="pointer-events-none fixed z-[80] w-72 rounded-lg border border-line bg-surface p-3 text-xs font-normal normal-case tracking-normal shadow-pop"
+        <motion.div role="tooltip" initial={{ opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DUR.fast }}
+          className="pointer-events-none fixed z-(--z-pop) w-72 rounded-lg border border-line bg-surface p-3 text-xs font-normal normal-case tracking-normal shadow-pop"
           style={{ left: pos.x, top: pos.y }}>
           <div className="mb-0.5 font-semibold text-ink">{g.term}</div>
           <div className="text-ink-2">{g.plain}</div>
@@ -508,14 +614,13 @@ export function Term({ k, children }: { k: GlossaryKey; children?: ReactNode }) 
   )
 }
 
-/** Pass/fail dots for the trials of one case: three dots, the third hollow red = third try failed. */
+/** Pass/fail dots for the tries of one question: one dot per try (green pass, red fail, violet error, hollow not run). */
 export function DotStrip({ statuses, size = 8, title }: { statuses: string[]; size?: number; title?: string }) {
   const passed = statuses.filter((s) => s === 'passed').length
   return (
     <span className="inline-flex items-center gap-[3px]" title={title ?? `${passed} of ${statuses.length} passed`} aria-label={`${passed} of ${statuses.length} passed`}>
       {statuses.map((s, i) => (
-        <span key={i} className={clsx('rounded-full', s === 'passed' ? 'bg-good' : s === 'failed' ? 'bg-bad' : s === 'error' ? 'bg-error' : 'border border-untested')}
-          style={{ width: size, height: size }} />
+        <StateDot key={i} state={s === 'passed' ? 'pass' : s === 'failed' ? 'fail' : s === 'error' ? 'error' : 'cancelled'} size={size} />
       ))}
     </span>
   )
@@ -542,9 +647,10 @@ export function ProgressBar({ value, tone = 'accent', className }: { value: numb
   )
 }
 
-/** The colour names a chatbot can choose. */
+/** The colour names a chatbot can choose (values are --swatch-* tokens, safe in any `style`). */
 export const PROJECT_COLORS: Record<string, string> = {
-  teal: '#0f9b96', blue: '#2a78d6', violet: '#7c5cd6', rose: '#d64f7a', amber: '#d89a0b', green: '#2f9e57', slate: '#5f6b72', orange: '#e0682f',
+  teal: 'var(--swatch-teal)', blue: 'var(--swatch-blue)', violet: 'var(--swatch-violet)', rose: 'var(--swatch-rose)',
+  amber: 'var(--swatch-amber)', green: 'var(--swatch-green)', slate: 'var(--swatch-slate)', orange: 'var(--swatch-orange)',
 }
 
 export function projectColor(name: string, color?: string): string {
@@ -557,11 +663,18 @@ export function ProjectMark({ name, color, size = 28 }: { name: string; color?: 
   const c = projectColor(name, color)
   const initials = name.split(/[\s-]+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('')
   return (
-    <span className="inline-flex shrink-0 items-center justify-center rounded-lg font-semibold text-white shadow-sm"
+    <span className="inline-flex shrink-0 items-center justify-center rounded-lg font-semibold text-on-swatch shadow-sm"
       style={{ width: size, height: size, background: `linear-gradient(135deg, ${c}, color-mix(in srgb, ${c} 68%, black))`, fontSize: size * 0.38 }}>
       {initials || '?'}
     </span>
   )
+}
+
+const GLYPH = 'inline-flex size-[18px] shrink-0 select-none items-center justify-center rounded-full border-[1.5px] align-middle font-sans text-label font-semibold not-italic leading-none tracking-normal'
+
+/** The circled ? as a picture (for a sentence that mentions it); the working one is `Help`. */
+export function HelpGlyph() {
+  return <span aria-label="the circled question mark" className={clsx(GLYPH, 'border-line-strong text-ink-3')}>?</span>
 }
 
 /**
@@ -613,15 +726,15 @@ export function Help({ title, children, label = 'What is this?', wide = false }:
       <span ref={ref} role="button" tabIndex={0} aria-label={label} aria-expanded={!!pos} onClick={click}
         onMouseEnter={hoverOpen} onMouseLeave={hoverClose} onFocus={place} onBlur={() => { if (!pinned) setPos(null) }}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') click(e) }}
-        className={clsx('inline-flex size-[18px] shrink-0 cursor-help select-none items-center justify-center rounded-full border-[1.5px] align-middle font-sans text-label font-semibold not-italic leading-none tracking-normal transition-colors',
+        className={clsx(GLYPH, 'cursor-help transition-colors duration-(--dur-fast)',
           pos ? 'border-accent bg-accent-wash text-accent-ink' : 'border-line-strong text-ink-3 hover:border-accent hover:text-accent-ink')}>
         ?
       </span>
       {pos && createPortal(
         <motion.div ref={pop} role="tooltip" aria-label={typeof title === 'string' ? title : label}
-          initial={{ opacity: 0, y: pos.up ? 4 : -4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.14 }}
+          initial={{ opacity: 0, y: pos.up ? 4 : -4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DUR.fast }}
           onMouseEnter={() => window.clearTimeout(timer.current)} onMouseLeave={hoverClose}
-          className="fixed z-[85] rounded-xl border border-line bg-surface p-3.5 font-sans text-sm font-normal normal-case not-italic leading-relaxed tracking-normal text-ink-2 shadow-pop [&_p+p]:mt-2"
+          className="fixed z-(--z-pop) rounded-xl border border-line bg-surface p-3.5 font-sans text-sm font-normal normal-case not-italic leading-relaxed tracking-normal text-ink-2 shadow-pop [&_p+p]:mt-2"
           style={{ left: pos.x, top: pos.up ? undefined : pos.y, bottom: pos.up ? window.innerHeight - pos.y : undefined, width: w, maxWidth: 'calc(100vw - 16px)' }}>
           {title && (
             <div className="mb-1.5 flex items-start gap-2">
@@ -637,24 +750,54 @@ export function Help({ title, children, label = 'What is this?', wide = false }:
   )
 }
 
-/** A centred dialog over a dimmed page. Esc or the backdrop closes it. */
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+/**
+ * A centred dialog over a dimmed page. Focus moves in when it opens (to `data-autofocus`, else the
+ * first control, else the close button), Tab stays inside, Esc or the backdrop closes it, and
+ * focus goes back to what opened it. Put the one primary action last in a right-aligned row.
+ */
 export function Dialog({ open, onClose, title, children, width = 560 }: { open: boolean; onClose: () => void; title: ReactNode; children: ReactNode; width?: number }) {
+  const titleId = useId()
+  const panel = useRef<HTMLDivElement>(null)
+  const body = useRef<HTMLDivElement>(null)
+  const close = useRef(onClose)
+  useEffect(() => { close.current = onClose })
   useEffect(() => {
     if (!open) return
-    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const el = panel.current
+    if (!el) return
+    const returnTo = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const items = () => [...el.querySelectorAll<HTMLElement>(FOCUSABLE)]
+    if (!el.contains(document.activeElement)) {
+      const first = body.current?.querySelector<HTMLElement>('[data-autofocus]') ?? body.current?.querySelector<HTMLElement>(FOCUSABLE) ?? items()[0] ?? el
+      first.focus()
+    }
+    const key = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { close.current(); return }
+      if (e.key !== 'Tab') return
+      const f = items()
+      if (!f.length) { e.preventDefault(); el.focus(); return }
+      const a = document.activeElement
+      if (e.shiftKey && (a === f[0] || !el.contains(a))) { e.preventDefault(); f[f.length - 1].focus() }
+      else if (!e.shiftKey && (a === f[f.length - 1] || !el.contains(a))) { e.preventDefault(); f[0].focus() }
+    }
     document.addEventListener('keydown', key)
-    return () => document.removeEventListener('keydown', key)
-  }, [open, onClose])
+    return () => {
+      document.removeEventListener('keydown', key)
+      if (returnTo?.isConnected) returnTo.focus()
+    }
+  }, [open])
   if (!open) return null
   return createPortal(
-    <div className="fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-[8vh]" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <motion.div role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined} initial={{ opacity: 0, y: 8, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.16 }}
-        className="w-full rounded-2xl border border-line bg-surface shadow-pop" style={{ maxWidth: width }}>
+    <div className="scrim fixed inset-0 z-(--z-modal) flex items-start justify-center overflow-y-auto p-4 pt-[8vh]" onMouseDown={(e) => { if (e.target === e.currentTarget) close.current() }}>
+      <motion.div ref={panel} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} initial={{ opacity: 0, y: 8, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: DUR.ui }}
+        className="modal-surface w-full outline-none" style={{ maxWidth: width }}>
         <div className="flex items-center gap-2 border-b border-line px-4 py-3">
-          <div className="flex-1 text-h font-semibold">{title}</div>
+          <div id={titleId} className="t-h flex-1">{title}</div>
           <button type="button" aria-label="Close" onClick={onClose} className="rounded-md p-1 text-ink-3 hover:bg-surface-2 hover:text-ink"><X className="size-4" /></button>
         </div>
-        <div className="p-4">{children}</div>
+        <div ref={body} className="p-4">{children}</div>
       </motion.div>
     </div>,
     document.body,
@@ -689,9 +832,9 @@ export function Toaster() {
   const items = useSyncExternalStore((cb) => { toastListeners.add(cb); return () => { toastListeners.delete(cb) } }, () => toasts)
   const motionOn = useMotionOn()
   return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-[120] flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2" data-testid="toaster">
+    <div className="pointer-events-none fixed bottom-4 right-4 z-(--z-toast) flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2" data-testid="toaster">
       {items.map((t) => (
-        <motion.div key={t.id} role={t.tone === 'bad' ? 'alert' : 'status'} initial={motionOn ? { opacity: 0, y: 8 } : false} animate={{ opacity: 1, y: 0 }} transition={{ duration: motionOn ? 0.16 : 0 }}
+        <motion.div key={t.id} role={t.tone === 'bad' ? 'alert' : 'status'} initial={motionOn ? { opacity: 0, y: 8 } : false} animate={{ opacity: 1, y: 0 }} transition={{ duration: motionOn ? DUR.ui : 0 }}
           className={clsx('pointer-events-auto flex items-start gap-2 rounded-lg border bg-surface px-3 py-2.5 text-sm shadow-pop', t.tone === 'bad' ? 'border-bad/40' : t.tone === 'good' ? 'border-good/40' : 'border-line-strong')}>
           {t.tone === 'bad' ? <AlertTriangle className="mt-0.5 size-4 shrink-0 text-bad-ink" aria-hidden /> : <Info className="mt-0.5 size-4 shrink-0 text-accent-ink" aria-hidden />}
           <span className="min-w-0 flex-1">{t.message}</span>

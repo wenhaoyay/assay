@@ -92,7 +92,7 @@ function Sidebar({ live }: { live: boolean }) {
   const projects = useQuery({ queryKey: ['projects'], queryFn: () => api.get<Project[]>('/api/projects') })
   const prefs = usePrefs()
   return (
-    <aside className="flex w-56 shrink-0 flex-col border-r border-line bg-[color-mix(in_oklch,var(--page)_70%,var(--surface-2))] max-md:w-14">
+    <aside className="flex w-56 shrink-0 flex-col border-r border-line bg-[color-mix(in_srgb,var(--page)_70%,var(--surface-2))] max-md:w-14">
       <Logo live={live} />
       <nav className="scroll-thin flex-1 overflow-y-auto px-2.5 pb-3" aria-label="Main">
         {GROUPS.map((g, gi) => (
@@ -135,7 +135,7 @@ function Sidebar({ live }: { live: boolean }) {
 function TopBar({ onPalette, onShortcuts }: { onPalette: () => void; onShortcuts: () => void }) {
   const crumbs = useCrumbsValue()
   return (
-    <div data-topbar className="sticky top-0 z-30 flex h-[52px] items-center gap-2.5 border-b border-line bg-page/80 px-8 backdrop-blur-md max-sm:px-4">
+    <div data-topbar className="sticky top-0 z-(--z-nav) flex h-[52px] items-center gap-2.5 border-b border-line bg-page/80 px-8 backdrop-blur-md max-sm:px-4">
       <nav aria-label="Breadcrumb" className="flex min-w-0 flex-1 items-center gap-1.5 text-sm text-ink-3">
         {crumbs.map((c, i) => (
           <Fragment key={i}>
@@ -149,7 +149,7 @@ function TopBar({ onPalette, onShortcuts }: { onPalette: () => void; onShortcuts
         ))}
       </nav>
       <button type="button" onClick={onPalette} data-tour="palette"
-        className="flex h-8 w-60 items-center gap-2 rounded-lg border border-line bg-surface px-2.5 text-sm text-ink-3 shadow-[inset_0_-1.5px_0_color-mix(in_oklch,var(--ink)_5%,transparent)] transition-colors duration-150 hover:border-line-strong hover:text-ink-2 max-lg:w-auto">
+        className="flex h-8 w-60 items-center gap-2 rounded-lg border border-line bg-surface px-2.5 text-sm text-ink-3 shadow-btn-raised transition-colors duration-(--dur-ui) hover:border-line-strong hover:text-ink-2 max-lg:w-auto">
         <Search className="size-3.5" aria-hidden /><span className="flex-1 truncate whitespace-nowrap text-left max-lg:hidden">Search or command</span>
         <span className="flex gap-0.5 max-lg:hidden"><Kbd>Ctrl</Kbd><Kbd>K</Kbd></span>
       </button>
