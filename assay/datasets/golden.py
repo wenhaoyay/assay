@@ -24,10 +24,10 @@ from assay.schemas import TestCase
 
 GENERIC = {
     "the", "a", "an", "and", "or", "of", "to", "in", "is", "it", "yes", "no", "you", "your", "we", "our", "can",
-    "please", "thanks", "answer", "question", "help", "system", "information", "data", "process", "sap", "use",
+    "please", "thanks", "answer", "question", "help", "system", "information", "data", "process", "acme", "use",
 }
 
-_CODE = re.compile(r"\b(?=[A-Z0-9-]*\d)(?=[A-Z0-9-]*[A-Z])[A-Z0-9][A-Z0-9-]{1,}\b")  # ZP17, PV7000, SMM1, T-20
+_CODE = re.compile(r"\b(?=[A-Z0-9-]*\d)(?=[A-Z0-9-]*[A-Z])[A-Z0-9][A-Z0-9-]{1,}\b")  # RMA-17, PV7000, SMM1, T-20
 _NUM_UNIT = re.compile(r"\b\d[\d,.]*[\s-]?(?:%|percent|days?|weeks?|months?|years?|hours?|minutes?|mins?|h|kg|g|mm|cm|m|nm|°c|usd|sgd|\$)\b", re.I)
 _NUMBER = re.compile(r"(?<![\w.])\d{2,}(?:[.,]\d+)?(?!\w)(?!\.\d)")
 _ACRONYM = re.compile(r"\b[A-Z]{3,6}\b")
@@ -117,7 +117,7 @@ def lint(cases: list[TestCase], documents: list[str] | None = None,
 KIND_MIX = [  # share of a set, and how a case is recognised
     ("lookup", "Simple lookups", 0.40),
     ("multi_source", "Need two or more sources", 0.20),
-    ("specific", "Depend on a field (plant, region, product)", 0.15),
+    ("specific", "Depend on a field (region, product)", 0.15),
     ("refusal", "Should be declined", 0.15),
     ("confusable", "Easy to confuse", 0.10),
 ]
@@ -131,7 +131,7 @@ def case_kind(c: TestCase) -> str:
         return "confusable"
     if len(c.expected.relevant_documents) >= 2 or tags & {"multi_source", "multi_document", "multi-source", "multi"}:
         return "multi_source"
-    if c.input.fields or tags & {"specific", "plant", "region", "office"}:
+    if c.input.fields or tags & {"specific", "product", "region", "office"}:
         return "specific"
     return "lookup"
 

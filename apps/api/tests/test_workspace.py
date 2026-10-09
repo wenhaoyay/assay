@@ -326,9 +326,9 @@ def test_rate_limited_answers_can_be_reasked(client):
 def test_dry_run_typed_questions_and_load_check(client):
     c = client
     cfg = {"callable": "slow_target:run", "options": {"sleep": 0.05}}
-    r = c.post("/api/connect/dry-run", json={"adapter": "python", "config": cfg, "questions": ["Hi?", "What is ZP17?"],
+    r = c.post("/api/connect/dry-run", json={"adapter": "python", "config": cfg, "questions": ["Hi?", "What is RMA-17?"],
                                              "load_check": True}).json()
-    assert [x["question"] for x in r["calls"]] == ["Hi?", "What is ZP17?"]
+    assert [x["question"] for x in r["calls"]] == ["Hi?", "What is RMA-17?"]
     assert r["load"]["n"] == 2 and r["load"]["verdict"] in ("copes", "slows", "queues")
     assert r["per_answer_cost_usd"] is None
 
@@ -365,20 +365,20 @@ def test_golden_set_helpers(client):
     assert cov["total"] == 58 and {k["id"] for k in cov["kinds"]} >= {"lookup", "refusal"}
     # Weak cases are named.
     ds = c.post("/api/datasets", json={"project_id": s["project_id"], "name": "weak", "cases": [
-        {"id": "a", "input": {"message": "What is ZP17?"}, "expected": {"answer": {"must_mention": ["the"], "regex": [".*"]}}},
-        {"id": "b", "input": {"message": "what is ZP17"}},
+        {"id": "a", "input": {"message": "What is RMA-17?"}, "expected": {"answer": {"must_mention": ["the"], "regex": [".*"]}}},
+        {"id": "b", "input": {"message": "what is RMA-17"}},
     ]}).json()
     kinds = {i["kind"] for i in c.get(f"/api/dataset-versions/{ds['latest']['id']}/lint").json()["issues"]}
     assert {"too_generic", "match_all", "duplicate", "no_expectations"} <= kinds
     # Suggested must-mention phrases come from the answer.
-    terms = c.post("/api/suggest-terms", json={"text": "SCRS uses REM profile ZP17 with a 60-day period."}).json()["terms"]
-    assert "ZP17" in terms and "60-day" in terms
+    terms = c.post("/api/suggest-terms", json={"text": "X200 uses returns policy RMA-17 with a 60-day period."}).json()["terms"]
+    assert "RMA-17" in terms and "60-day" in terms
     # Real questions are grouped by how often they were asked.
-    hist = b'{"question": "What is ZP17?"}\n{"question": "what is zp17"}\n{"question": "How long is the warranty?"}\n'
+    hist = b'{"question": "What is RMA-17?"}\n{"question": "what is rma-17"}\n{"question": "How long is the warranty?"}\n'
     g = c.post("/api/questions/group", files={"file": ("history.jsonl", hist, "application/json")}).json()
     assert g["n_questions"] == 3 and g["groups"][0]["count"] == 2
     # Drafts from the prompt kit land in the review queue, unreviewed.
-    drafts = b"Question,Must mention (comma-separated)\nWhich profile does SCRS use?,ZP17\n"
+    drafts = b"Question,Must mention (comma-separated)\nWhich policy does X200 use?,RMA-17\n"
     r = c.post(f"/api/datasets/{ds['id']}/candidates/import", files={"file": ("drafts.csv", drafts, "text/csv")}).json()
     assert r["created"] == 1
     cand = c.get(f"/api/datasets/{ds['id']}/candidates?status=unreviewed").json()

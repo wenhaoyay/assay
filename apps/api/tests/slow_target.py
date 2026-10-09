@@ -22,4 +22,4 @@ async def busy(test_input, options, ctx):
 async def knows(test_input, options, ctx):
     """Answers the two diagnosis questions correctly, citing its first source."""
     await asyncio.sleep(0.005)
-    return {"answer": "SCRS uses ZP17 [1], and corrections are allowed within 60 days [1].", "latency_ms": 5}
+    return {"answer": "X200 uses RMA-17 [1], and corrections are allowed within 60 days [1].", "latency_ms": 5}

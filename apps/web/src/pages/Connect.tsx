@@ -716,7 +716,7 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved, reply, tes
                   {projects.map((p) => <option key={p.id} value={p.id}>{projectOption(p)}</option>)}
                 </Select>
               )
-              : <Input className="w-80" placeholder="e.g. Production Planning Assistant" value={newProject} onChange={(e) => setNewProject(e.target.value)} aria-label="New chatbot name" />}
+              : <Input className="w-80" placeholder="e.g. Acme Support Bot" value={newProject} onChange={(e) => setNewProject(e.target.value)} aria-label="New chatbot name" />}
             <ConnectionHelp />
           </div>
         </Card>

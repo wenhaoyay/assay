@@ -12,7 +12,7 @@ wrong) the specific terms of the reference answer. Each is looked for in the pas
 read and in the documents uploaded to Assay. When the evidence does not decide it, the
 verdict is ``cant_tell`` rather than a guess.
 
-Every verdict carries its evidence, written for a person: "'ZP17' was in [8] Blueprint, p. 173,
+Every verdict carries its evidence, written for a person: "'RMA-17' was in [8] Acme Help Centre, p. 173,
 but not in the answer".
 """
 

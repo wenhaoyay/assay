@@ -87,7 +87,7 @@ export function DatasetAdd({ projectId: fixedProject, defaultProjectId = '', onD
           <Input placeholder="Name, e.g. First questions" value={name} onChange={(e) => setName(e.target.value)} aria-label="Dataset name" />
           <div className="text-xs font-medium text-ink-2"><LabelHelp label="Questions, one per line" title="Questions without expectations"><p>Each line becomes a question with no expectations yet: rule checks show “not applicable” until you add what a correct answer must say (open the dataset afterwards).</p></LabelHelp></div>
           <Textarea rows={5} value={typed} onChange={(e) => setTyped(e.target.value)} aria-label="Questions, one per line"
-            placeholder={'One question per line, the way users ask:\nWhich REM profile does SCRS use?\nWhat does material status Z3 block?'} />
+            placeholder={'One question per line, the way users ask:\nWhich returns policy does X200 use?\nWhat does return code RMA-17 mean?'} />
         </>
       )}
       {mode === 'empty' && <Input placeholder="Name of the new, empty dataset" value={name} onChange={(e) => setName(e.target.value)} aria-label="Dataset name" />}

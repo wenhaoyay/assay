@@ -272,7 +272,7 @@ export function NotesCard({ projectId }: { projectId: number }) {
   const n = notes.data?.length ?? 0
   return (
     <Card title="Your notes on failures"
-      help={<><p>Reading failures and writing one line on each (“ignores the plant”, “too formal”) finds problems no check was written for. Grouping the notes and counting them shows which problem is biggest: the practice evaluation teams call error analysis.</p>{n ? <p>{plural(n, 'note')} across this chatbot’s runs.</p> : null}</>}
+      help={<><p>Reading failures and writing one line on each (“ignores the region”, “too formal”) finds problems no check was written for. Grouping the notes and counting them shows which problem is biggest: the practice evaluation teams call error analysis.</p>{n ? <p>{plural(n, 'note')} across this chatbot’s runs.</p> : null}</>}
       meta={n ? plural(n, 'note') : undefined}>
       <div data-testid="notes-card">
       {notes.isLoading ? <Skeleton size="figure" /> : n === 0 ? (

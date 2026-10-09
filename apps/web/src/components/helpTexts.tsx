@@ -27,8 +27,8 @@ export function ConnectionHelp() {
     <Help title="Chatbot, connection, version" wide>
       <p>Assay files a bot at three levels, like a filing cabinet:</p>
       <ul className="list-disc space-y-1 pl-4">
-        <li><b className="font-semibold">Chatbot</b>: the product as a whole, e.g. <i>Production Planning Assistant</i>. It holds the datasets, gates and runs.</li>
-        <li><b className="font-semibold">Connection</b>: one place you can reach it, with its address and setup, e.g. <i>PP - local dev (:8120)</i>, <i>PP - test copy</i>, <i>PP - server</i>. Compare them to see whether the deployed bot behaves like your copy.</li>
+        <li><b className="font-semibold">Chatbot</b>: the product as a whole, e.g. <i>Acme Support Bot</i>. It holds the datasets, gates and runs.</li>
+        <li><b className="font-semibold">Connection</b>: one place you can reach it, with its address and setup, e.g. <i>Acme - local dev (:8120)</i>, <i>Acme - test copy</i>, <i>Acme - server</i>. Compare them to see whether the deployed bot behaves like your copy.</li>
         <li><b className="font-semibold">Version</b>: what is inside the connection right now: model, prompt, retriever. When you change those, save a new <i>version</i> of the same connection, not a new connection; the chatbot’s page then compares versions.</li>
       </ul>
     </Help>

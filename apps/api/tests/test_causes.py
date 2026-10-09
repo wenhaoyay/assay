@@ -16,8 +16,8 @@ from test_api import wait  # noqa: E402
 from assay import diagnosis as dx  # noqa: E402
 
 CASES = [
-    {"id": "rem", "question": "Which REM profile does SCRS use?",
-     "expected": {"answer": {"must_mention": ["ZP17"]}}},
+    {"id": "returns", "question": "Which returns policy does X200 use?",
+     "expected": {"answer": {"must_mention": ["RMA-17"]}}},
     {"id": "window", "question": "How long can a goods receipt be corrected?",
      "expected": {"answer": {"must_mention": ["60 days"]}}},
 ]
@@ -45,11 +45,11 @@ def _fail(eid, explanation=""):
 
 
 def test_rules_place_a_missing_fact():
-    read = {"answer": "SCRS uses a profile [1].", "retrieved_documents": [
-        {"id": "bbp", "title": "PP Blueprint", "label": "p. 173", "n": 1, "text": "Plant 2400 uses ZP17 for backflush."}]}
-    case = _case({"must_mention": ["ZP17"]})
+    read = {"answer": "X200 uses a profile [1].", "retrieved_documents": [
+        {"id": "bbp", "title": "Acme Help Centre", "label": "p. 173", "n": 1, "text": "Region 2400 uses RMA-17 with a restocking fee."}]}
+    case = _case({"must_mention": ["RMA-17"]})
     v = dx.diagnose("failed", case, read, [_fail("must_mention")])
-    assert v["cause"] == "model_missed" and "[1] PP Blueprint, p. 173" in v["evidence"][0]
+    assert v["cause"] == "model_missed" and "[1] Acme Help Centre, p. 173" in v["evidence"][0]
     # Not in what it read, but in an uploaded document: search missed it.
     case2 = _case({"must_mention": ["60 days"]})
     v = dx.diagnose("failed", case2, read, [_fail("must_mention")], documents=[("ops.pdf", "Corrections within 60 days.")])
@@ -80,7 +80,7 @@ def test_rules_for_claims_citations_scope_and_errors():
     assert v["cause"] == "answered_out_of_scope"
     assert dx.diagnose("error", None, {"error": "HTTP 429: Too Many Requests"}, [])["cause"] == "too_busy"
     assert dx.diagnose("failed", _case(), read, [_fail("latency")])["cause"] == "too_slow"
-    assert dx.diagnose("failed", _case(), read, [], off_topic="SSO")["cause"] == "off_topic"
+    assert dx.diagnose("failed", _case(), read, [], off_topic="Billing")["cause"] == "off_topic"
     # A person's choice wins; a model's explanation only fills in what the rules could not place.
     rule = dx.verdict("cant_tell", ["e"])
     assert dx.resolve(rule, "made_up", None)["source"] == "you"
@@ -92,20 +92,20 @@ def test_stream_replies_suggest_sources_and_citations():
     from assay.adapters.connect import suggest_mapping
     from assay.adapters.http import normalize
 
-    collected = {"answer": "SCRS uses ZP17 [2].", "done": {"conversation_id": "abc"},
+    collected = {"answer": "X200 uses RMA-17 [2].", "done": {"conversation_id": "abc"},
                  "sources": {"type": "sources", "sources": [
-                     {"n": 1, "type": "lookup", "code": "2400", "doc_id": "bbp", "title": "MRP areas", "label": "p. 173",
-                      "rows": [["2400", "SCRS Bike"]]},
-                     {"n": 2, "type": "passage", "id": "c9", "doc_id": "bbp", "doc_title": "PP Blueprint", "title": "REM",
-                      "label": "p. 88", "date": "2024-06-12", "text": "SCRS: ZP17", "score": 31.5}]}}
+                     {"n": 1, "type": "lookup", "code": "2400", "doc_id": "bbp", "title": "Service regions", "label": "p. 173",
+                      "rows": [["2400", "X200 Router"]]},
+                     {"n": 2, "type": "passage", "id": "c9", "doc_id": "bbp", "doc_title": "Acme Help Centre", "title": "Returns",
+                      "label": "p. 88", "date": "2024-06-12", "text": "X200: RMA-17", "score": 31.5}]}}
     m = suggest_mapping(collected)["mapping"]
     assert m["retrieved_documents"]["path"] == "sources.sources"
     assert m["retrieved_documents"]["each"]["id"] == "doc_id|id" and "date" in m["retrieved_documents"]["each"]
     assert m["citations_from_markers"]["key"] == "n"
     r = normalize(collected, m)
     assert [d.model_extra["n"] for d in r.retrieved_documents] == [1, 2]
-    assert r.retrieved_documents[0].text == "2400 | SCRS Bike"  # a table's rows, read as text
-    assert r.citations[0].model_extra["n"] == 2 and r.citations[0].title == "PP Blueprint"
+    assert r.retrieved_documents[0].text == "2400 | X200 Router"  # a table's rows, read as text
+    assert r.citations[0].model_extra["n"] == 2 and r.citations[0].title == "Acme Help Centre"
 
 
 async def _eval(eid, case, result):
@@ -119,16 +119,16 @@ async def _eval(eid, case, result):
 
 @pytest.mark.asyncio
 async def test_checks_ignore_citation_markers_and_label_content_patterns():
-    src = [{"id": "t", "text": "Use plant 2400.", "date": "2007-12-27"}]
-    ok = await _eval("numbers_grounded", _case(), {"answer": "Use plant 2400 [8][11], per the 2007 training.",
+    src = [{"id": "t", "text": "Use region 2400.", "date": "2007-12-27"}]
+    ok = await _eval("numbers_grounded", _case(), {"answer": "Use region 2400 [8][11], per the 2007 training.",
                                                     "retrieved_documents": src})
     assert ok.status == "pass", ok.explanation
     content = await _eval("regex", _case({"regex": ["(?i)which (site|office)"]}), {"answer": "Hello"})
     assert content.status == "fail" and content.failure_type == "incomplete_response"
     form = await _eval("regex", _case({"regex": [r"^\d+$"]}), {"answer": "Hello"})
     assert form.failure_type == "malformed_output"
-    found = await _eval("search_found_it", _case({"must_mention": ["ZP17|ZP-17", "60 days"]}),
-                        {"answer": "", "retrieved_documents": [{"id": "a", "text": "Profile ZP17."}]})
+    found = await _eval("search_found_it", _case({"must_mention": ["RMA-17|RMA 17", "60 days"]}),
+                        {"answer": "", "retrieved_documents": [{"id": "a", "text": "Profile RMA-17."}]})
     assert found.status == "fail" and found.evidence == ["60 days"]
     assert (await _eval("search_found_it", _case({"must_mention": ["x"]}), {"answer": ""})).status == "not_evaluated"
 
@@ -172,14 +172,14 @@ def test_causes_reading_sources_and_rereading_a_run(client):
     assert len(causes["unplaced"]) == 2
 
     # Make it a web connection whose stored replies carry sources (as a streamed bot's would).
-    passages = {"rem": "SCRS backflushes with profile ZP17.", "window": "Corrections are made in dialog mode."}
+    passages = {"returns": "X200 is returned under policy RMA-17.", "window": "Corrections are made on the returns page."}
     with db.session() as s:
         s.get(m.Target, t["id"]).adapter = "http"
         tv = s.get(m.TargetVersion, t["latest_version"]["id"])
         tv.config = {"base_url": "http://localhost:1", "endpoint": "/ask", "response": {"answer": "answer"}}
         for tr in s.scalars(select(m.Trial).where(m.Trial.run_id == run["id"])):
             tr.raw = {"_events": ["sources", "delta"], "answer": tr.answer,
-                      "sources": {"sources": [{"n": 1, "doc_id": "bbp", "doc_title": "PP Blueprint", "label": "p. 9",
+                      "sources": {"sources": [{"n": 1, "doc_id": "bbp", "doc_title": "Acme Help Centre", "label": "p. 9",
                                                "text": passages[tr.case_key]}]}}
     reading = c.get(f"/api/targets/{t['id']}/reading").json()
     assert reading["supported"] and not reading["same"]
@@ -194,7 +194,7 @@ def test_causes_reading_sources_and_rereading_a_run(client):
     causes = c.get(f"/api/runs/{reread['id']}/causes").json()
     assert causes["sources_reported"] is True
     by_case = causes["by_case"]
-    assert by_case["rem"] == "model_missed"
+    assert by_case["returns"] == "model_missed"
     assert by_case["window"] == "search_missed"
     # An uploaded document with the fact tells "search missed it" from "not in the documents".
     c.post(f"/api/datasets/{ds['id']}/documents", files={"file": ("ops.txt", b"Corrections within 60 days.", "text/plain")})
@@ -221,22 +221,22 @@ def test_causes_reading_sources_and_rereading_a_run(client):
 def test_other_chatbots_questions_and_notes(client):
     c = client
     ds, t = _setup(c)
-    other = c.post("/api/projects", json={"name": "SSO Assistant"}).json()
-    sso = c.post("/api/datasets", json={"project_id": other["id"], "name": "sso-golden", "cases": [
+    other = c.post("/api/projects", json={"name": "Billing Bot"}).json()
+    billing = c.post("/api/datasets", json={"project_id": other["id"], "name": "billing-golden", "cases": [
         {"id": "office", "input": {"message": "How many open claims do I have?"},
          "expected": {"answer": {"regex": ["(?i)which office"]}}}]}).json()
     body = {"project_id": 1, "name": "mix", "target_version_id": t["latest_version"]["id"],
-            "dataset_version_id": sso["latest"]["id"], "evaluators": ["regex"]}
+            "dataset_version_id": billing["latest"]["id"], "evaluators": ["regex"]}
     refused = c.post("/api/runs/start", json=body)
-    assert refused.status_code == 409 and "SSO Assistant" in refused.json()["detail"]
+    assert refused.status_code == 409 and "Billing Bot" in refused.json()["detail"]
     run = wait(c, c.post("/api/runs/start", json={**body, "allow_other_chatbot": True}).json()["id"])
     causes = c.get(f"/api/runs/{run['id']}/causes").json()
-    assert causes["off_topic"] == "SSO Assistant" and causes["causes"][0]["cause"] == "off_topic"
+    assert causes["off_topic"] == "Billing Bot" and causes["causes"][0]["cause"] == "off_topic"
 
     # Notes on failures, grouped without a model.
     plain = _start(c, t, ds, "notes")
     trials = c.get(f"/api/runs/{plain['id']}/trials").json()
-    for tr, note in zip(trials, ["ignores the plant code", "ignores the plant again"], strict=True):
+    for tr, note in zip(trials, ["ignores the region code", "ignores the region again"], strict=True):
         c.put(f"/api/trials/{tr['id']}/failure", json={"failure_types": None, "note": note})
     notes = c.get("/api/projects/1/notes").json()
     assert len(notes) == 2

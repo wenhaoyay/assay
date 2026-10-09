@@ -591,7 +591,7 @@ function PlainMatchers({ onAdd }: { onAdd: (pattern: string) => void }) {
         <Select className="w-48" value={kind} onChange={(e) => setKind(e.target.value as typeof kind)} aria-label="Rule kind">
           <option value="any">contains any of</option><option value="word">contains the whole word</option><option value="number">contains the exact number</option>
         </Select>
-        <Input className="w-56" value={text} onChange={(e) => setText(e.target.value)} placeholder={kind === 'any' ? 'EOL, end of life' : kind === 'number' ? '91' : 'backflush'} aria-label="Rule text" onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); make() } }} />
+        <Input className="w-56" value={text} onChange={(e) => setText(e.target.value)} placeholder={kind === 'any' ? 'EOL, end of life' : kind === 'number' ? '91' : 'restocking fee'} aria-label="Rule text" onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); make() } }} />
         <Button size="sm" disabled={!text.trim()} onClick={make}>Add rule</Button>
       </div>
 

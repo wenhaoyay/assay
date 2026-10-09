@@ -154,7 +154,7 @@ function CoverageCard({ versionId }: { versionId: number }) {
   return (
     <Card title="Coverage" meta={c ? plural(c.total, 'question') : undefined} help={<>
       <p>Kinds of question in this dataset, against a suggested mix{c ? ` for ${Math.max(20, c.total)} questions` : ''}.</p>
-      <p>Kinds come from each question: “should decline” means a refusal; two or more needed documents, multi-source; a per-question field (plant, region), specific; a tag “confusable”, easy to confuse.</p>
+      <p>Kinds come from each question: “should decline” means a refusal; two or more needed documents, multi-source; a per-question field (region, product), specific; a tag “confusable”, easy to confuse.</p>
     </>}>
       {!c ? <Loading rows={3} /> : (
         <div className="space-y-2">
@@ -334,11 +334,11 @@ Your job: write ${n} questions. Each is a question a real user might ask, plus w
 Rules (follow all of them)
 1. Use only the attached documents. If the documents do not state something, do not write a question about it. Never use outside knowledge.
 2. For every answerable question, copy the exact sentence from the document that proves the answer into "evidence_quote", and give the document name and page or section in "source" and "source_page".
-3. "Must mention" means short exact phrases a correct answer cannot avoid: codes (e.g. ZP17), numbers with units, names, key terms. 1 to 4 phrases per question. Not whole sentences. Not common words like "the", "system" or "SAP". Do not repeat words that are already in the question.
+3. "Must mention" means short exact phrases a correct answer cannot avoid: codes (e.g. RMA-17), numbers with units, names, key terms. 1 to 4 phrases per question. Not whole sentences. Not common words like "the", "system" or "Acme". Do not repeat words that are already in the question.
 4. Write the questions the way real users talk: short, sometimes informal, a few with small typos. Do not copy section headings.
 5. Use this mix of kinds (category column):
 ${Object.entries(mix).map(([k, v]) => `   - ${v} x ${k}`).join('\n')}
-   lookup = one fact from one passage; multi_source = needs facts from two places combined; specific = the answer depends on a plant/region/product (name it in the question); refusal = a plausible question the documents do NOT answer, where the right response is to say so (leave must mention empty, set "Should refuse?" to yes); confusable = about one item that is easy to confuse with a similar one.
+   lookup = one fact from one passage; multi_source = needs facts from two places combined; specific = the answer depends on a region/product (name it in the question); refusal = a plausible question the documents do NOT answer, where the right response is to say so (leave must mention empty, set "Should refuse?" to yes); confusable = about one item that is easy to confuse with a similar one.
 6. Self-check before you answer: for each question, confirm the evidence quote really contains every must-mention phrase. Drop any question that fails this check.
 
 Output: a CSV only, no commentary, with exactly this header row:
@@ -370,7 +370,7 @@ function PromptKit({ dataset, project }: { dataset: Dataset; project?: Project }
         <li>Upload it below: the questions enter the <span className="font-semibold">review queue</span> as AI-drafted, and only those you approve join the dataset.</li>
       </ol>
       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_120px]">
-        <Field label="What the chatbot answers about"><Input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="e.g. SAP production planning at our plants" /></Field>
+        <Field label="What the chatbot answers about"><Input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="e.g. orders, returns and warranty for Acme devices" /></Field>
         <Field label="Questions"><Select value={n} onChange={(e) => setN(Number(e.target.value))}>{[10, 20, 30, 50].map((x) => <option key={x}>{x}</option>)}</Select></Field>
       </div>
       <Textarea rows={12} readOnly value={prompt} aria-label="Prompt" />
@@ -462,7 +462,7 @@ function Interview({ version, onEdited }: { version: DatasetVersion; onEdited: (
     <div className="space-y-3" onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) save() }}>
       <p className="text-sm text-ink-2">For someone who knows the subject: one question at a time, no YAML. <Kbd>Ctrl</Kbd>+<Kbd>Enter</Kbd> saves and starts the next.{count ? <b className="ml-1 text-good-ink">{count} saved</b> : null}</p>
       <Field label="A question users ask"><Input autoFocus value={q} onChange={(e) => setQ(e.target.value)} aria-label="Interview question" /></Field>
-      <Field label="What must a correct answer say? (comma-separated)"><Input value={must} onChange={(e) => setMust(e.target.value)} aria-label="Must say" placeholder="e.g. ZP17, backflush" /></Field>
+      <Field label="What must a correct answer say? (comma-separated)"><Input value={must} onChange={(e) => setMust(e.target.value)} aria-label="Must say" placeholder="e.g. RMA-17, restocking fee" /></Field>
       <TermChips text={`${q} ${must}`} picked={chips} onToggle={(t) => setChips((c) => (c.includes(t) ? c.filter((x) => x !== t) : [...c, t]))} exclude={split(must)} />
       <Field label="What must it never say? (optional)"><Input value={never} onChange={(e) => setNever(e.target.value)} aria-label="Never say" placeholder="e.g. ZPP3" /></Field>
       <Checkbox checked={refuse} onChange={setRefuse} label="The chatbot should decline this one (out of scope)" />

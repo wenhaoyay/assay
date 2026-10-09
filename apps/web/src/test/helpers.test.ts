@@ -38,10 +38,10 @@ describe('connect wizard helpers', () => {
 
 describe('prompt kit', () => {
   it('names the bot, the documents, the mix and the import columns', () => {
-    const p = buildPrompt({ bot: 'PP Assistant', domain: 'SAP production planning', docs: ['Blueprint v28.pdf'], n: 20,
+    const p = buildPrompt({ bot: 'Acme Support Bot', domain: 'orders, returns and warranty for Acme devices', docs: ['Acme Help Centre.pdf'], n: 20,
       mix: { lookup: 8, multi_source: 4, specific: 3, refusal: 3, confusable: 2 } })
-    expect(p).toContain('"PP Assistant"')
-    expect(p).toContain('- Blueprint v28.pdf')
+    expect(p).toContain('"Acme Support Bot"')
+    expect(p).toContain('- Acme Help Centre.pdf')
     expect(p).toContain('8 x lookup')
     expect(p).toContain('Question,Must mention (comma-separated),Must never say,Should refuse? (yes/no)')
     expect(p).toMatch(/Use only the attached documents/)
@@ -51,7 +51,7 @@ describe('prompt kit', () => {
 describe('patterns in plain words', () => {
   it('reads back the plain-word rules, and leaves real patterns as they are', () => {
     expect(describePattern(plainPattern('any', ['EOL', 'end of life']))).toBe('any of "EOL", "end of life"')
-    expect(describePattern(plainPattern('word', ['ZP17']))).toBe('the word "ZP17"')
+    expect(describePattern(plainPattern('word', ['RMA-17']))).toBe('the word "RMA-17"')
     expect(describePattern(plainPattern('number', ['91']))).toBe('the number 91')
     expect(describePattern('(?i)SSSC')).toBe('"SSSC"')
     expect(describePattern('(?i)(which|what)\s+(site|office)')).toBeNull()

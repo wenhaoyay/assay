@@ -44,8 +44,8 @@ It also flags:
   refuses such a mix unless you confirm it.
 - **Bot too busy** (rate limits, time-outs) and **the bot returned an error**: not answer quality.
 
-This is plain text matching: free, instant, and the evidence is shown ("'ZP17' was in [8] PP
-Blueprint v28, p. 173, but not in the answer"). When the evidence does not decide it, the
+This is plain text matching: free, instant, and the evidence is shown ("'RMA-17' was in [8] Acme
+Help Centre, p. 173, but not in the answer"). When the evidence does not decide it, the
 verdict is **Can't tell yet** rather than a guess.
 
 Two things make the verdicts sharper:
@@ -67,7 +67,7 @@ Two things make the verdicts sharper:
 
 ## Your notes, grouped
 
-Reading failures and writing one line on each ("ignores the plant", "too formal") finds
+Reading failures and writing one line on each ("ignores the region", "too formal") finds
 problems no check was written for. Write the note under *Kind of failure > Change > Why*.
 On the chatbot's page, *Your notes on failures* groups them into themes and counts them,
 either by shared words (free) or with a model you choose. The biggest theme is usually the
@@ -77,6 +77,6 @@ next thing to fix, and often the next check to write.
 
 Search changes are the ones you try most often, and asking a paid model for every answer to
 test them is expensive. If the bot can return what it would read without writing an answer
-(the PP Assistant has `POST /api/search`), connect that as its own connection and use the
+(if your bot has a search-only endpoint), connect that as its own connection and use the
 **Search only** preset on New run. Its check, *Search found it*, passes when every
 must-mention phrase is in the passages read; no document labels needed.

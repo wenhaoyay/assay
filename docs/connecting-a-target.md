@@ -99,7 +99,7 @@ normalized one, and lists the telemetry the mapping does not yet capture.
 ```
 
 Templates: `{{input.message}}`, `{{input.fields.<name>}}` (per-case fields such as an
-office or a plant code), `{{case}}`, `{{trial}}`, `{{uuid}}`, `{{hex16}}`. Use a fresh
+office or a region code), `{{case}}`, `{{trial}}`, `{{uuid}}`, `{{hex16}}`. Use a fresh
 `{{uuid}}` session per call so cases never share conversation history.
 
 Paths: `a.b.0.c`, `a.b[0].c`, alternatives `id|code`, wildcards `sources.*.id` (over a list
