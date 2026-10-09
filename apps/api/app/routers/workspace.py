@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from assay import local_models
 from assay.adapters import AdapterContext, build_adapter
 from assay.adapters import connect as cx
-from assay.errors import plain_error
+from assay.errors import plain_error, settings_error
 from assay.providers.catalog import CATALOG, list_models
 from assay.secrets import SecretError, keyring_available, list_stored
 from assay.secrets import delete as delete_secret
@@ -325,7 +325,7 @@ async def probe(body: ProbeIn) -> dict[str, Any]:
         except ValueError as exc:  # config or secret problems
             return {"ok": False, "error": str(exc), "explanation": cx.explain_error(str(exc))}
         except Exception as exc:
-            return {"ok": False, "error": f"Invalid configuration: {exc}"}
+            return {"ok": False, "error": settings_error(exc, "The connection settings are not valid.")}
         if raw.get("kind") == "json":
             raw["suggestion"] = cx.suggest_mapping(raw["json"])
             raw["json"] = redact(raw["json"])
@@ -349,14 +349,14 @@ async def normalize_test(body: NormalizeIn) -> dict[str, Any]:
     try:
         adapter = build_adapter(body.adapter, body.config)
     except Exception as exc:
-        return {"ok": False, "error": f"Invalid configuration: {exc}",
+        return {"ok": False, "error": settings_error(exc, "The connection settings are not valid."),
                 "explanation": "Check the base URL, endpoint, callable or mapping."}
     t0 = time.perf_counter()
     try:
         call = await adapter.call({"message": body.message, "history": [], "fields": {}},
                                   AdapterContext(case_id="connection-test"))
     except Exception as exc:
-        err = f"{type(exc).__name__}: {exc}"
+        err = plain_error(exc)
         return {"ok": False, "error": err, "explanation": cx.explain_error(err, body.config.get("timeout_s"))}
     finally:
         await adapter.aclose()
@@ -399,7 +399,7 @@ async def dry_run(body: DryRunIn, s: Session = Depends(get_session)) -> dict[str
     try:
         adapter = build_adapter(body.adapter, body.config)
     except Exception as exc:
-        raise HTTPException(422, f"Invalid configuration: {exc}") from exc
+        raise HTTPException(422, settings_error(exc, "The connection settings are not valid. Check the base URL, endpoint, callable or mapping.")) from exc
 
     async def ask(q: str) -> dict[str, Any]:
         t0 = time.perf_counter()
@@ -413,7 +413,7 @@ async def dry_run(body: DryRunIn, s: Session = Depends(get_session)) -> dict[str
                     "tokens": r.usage.total_tokens if r.usage else None, "cost_usd": cost,
                     "error": r.error, "cleanup": r.metadata.get("cleanup")}
         except Exception as exc:
-            err = f"{type(exc).__name__}: {exc}"
+            err = plain_error(exc)
             return {"question": q, "ok": False, "error": err, "explanation": cx.explain_error(err),
                     "elapsed_ms": round((time.perf_counter() - t0) * 1000)}
 
@@ -628,7 +628,7 @@ async def import_preview(file: UploadFile = File(...), limit: int = Form(20)) ->
         try:
             obj = json.loads(text)
         except json.JSONDecodeError as exc:
-            raise HTTPException(422, f"Not valid JSON: {exc}") from exc
+            raise HTTPException(422, "This file is not valid JSON.") from exc
         rows = (obj if isinstance(obj, list) else obj.get("records") or obj.get("data") or [obj])[: limit]
     else:
         for line in text.splitlines():

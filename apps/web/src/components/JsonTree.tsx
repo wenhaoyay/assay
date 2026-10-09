@@ -18,7 +18,7 @@ export function JsonTree({ data, onPick, marks = {}, picking = false }: {
 }
 
 function preview(v: unknown): string {
-  if (typeof v === 'string') return JSON.stringify(v.length > 90 ? `${v.slice(0, 90)}...` : v)
+  if (typeof v === 'string') return JSON.stringify(v.length > 90 ? `${v.slice(0, 90)}…` : v)
   return JSON.stringify(v)
 }
 
@@ -65,7 +65,7 @@ function Node({ k, v, path, depth, onPick, marks, picking }: {
         {tag}
       </div>
       {open && entries.map(([ck, cv]) => <Node key={ck} k={ck} v={cv} path={path ? `${path}.${ck}` : ck} depth={depth + 1} onPick={onPick} marks={marks} picking={picking} />)}
-      {open && more > 0 && <div className="text-ink-3" style={{ paddingLeft: (depth + 1) * 14 + 18 }}>... {more} more</div>}
+      {open && more > 0 && <div className="text-ink-3" style={{ paddingLeft: (depth + 1) * 14 + 18 }}>… {more} more</div>}
     </div>
   )
 }

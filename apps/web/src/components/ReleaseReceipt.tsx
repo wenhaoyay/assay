@@ -11,8 +11,8 @@ import { Stamp } from './viz'
 const LOWER_IS_BETTER = /latency|_ms$|cost|tokens/
 const NAMES: Record<string, string> = {
   overall_pass_rate: 'Pass rate', tool_accuracy: 'Tool accuracy', must_mention: 'Must-mention',
-  'recall_at_k.mean': 'Search recall', recall_at_k: 'Search recall', p95_latency_ms: 'p95 speed',
-  p50_latency_ms: 'p50 speed', average_cost_usd: 'Cost per answer', average_total_tokens: 'Tokens per answer',
+  'recall_at_k.mean': 'Search recall', recall_at_k: 'Search recall', p95_latency_ms: 'Speed (p95)',
+  p50_latency_ms: 'Speed (median)', average_cost_usd: 'Cost per answer', average_total_tokens: 'Tokens per answer',
 }
 const metricName = (m: string) => NAMES[m] ?? metricLabel(m.replace(/\.mean$/, ''))
 

@@ -27,7 +27,7 @@ from assay.datasets.golden import _CODE, suggest_terms
 # id: (label, who should act, what to change)
 CAUSES: dict[str, tuple[str, str, str]] = {
     "off_topic": ("Written for another chatbot", "run",
-                  "These questions belong to another chatbot. Run this chatbot's own question set."),
+                  "These questions belong to another chatbot. Run this chatbot's own dataset."),
     "too_busy": ("Bot too busy (rate limit or time-out)", "run",
                  "Not the bot's answer quality: re-ask these 1 or 2 at a time."),
     "bot_error": ("The bot returned an error", "bot",
@@ -59,12 +59,12 @@ CAUSES: dict[str, tuple[str, str, str]] = {
     "too_slow": ("Too slow or too costly", "bot",
                  "Read fewer or shorter passages, or use a faster model. Check first whether the run's load "
                  "(In parallel) inflated the timing."),
-    "suspect_test": ("Suspect test", "test",
+    "suspect_test": ("Suspect question", "test",
                      "Fails in every run whatever changes. Check the expected answer: it may be wrong or outdated."),
-    "cant_tell": ("Can't tell yet", "unknown", "Read the answer, or ask a grading model to explain it."),
+    "cant_tell": ("Can’t tell yet", "unknown", "Read the answer, or ask a grading model to explain it."),
 }
 ORDER = list(CAUSES)
-KINDS = {"run": "Not the bot: how the run was set up", "test": "Not the bot: the test itself",
+KINDS = {"run": "Not the bot: how the run was set up", "test": "Not the bot: the question itself",
          "content": "The documents", "bot": "The bot", "unknown": "Not placed yet"}
 
 NO_SOURCES_FIX = ("Assay cannot see what the bot read. Let the connection read the bot's sources "
@@ -189,8 +189,8 @@ def diagnose(status: str, case: dict[str, Any] | None, result: dict[str, Any] | 
     if status not in ("failed", "error"):
         return None
     if off_topic:
-        return verdict("off_topic", [f"This question set belongs to {off_topic}."],
-                       fix=f"These questions were written for {off_topic}. Run this chatbot's own question set.")
+        return verdict("off_topic", [f"This dataset belongs to {off_topic}."],
+                       fix=f"These questions were written for {off_topic}. Run this chatbot's own dataset.")
     result = result or {}
     if status == "error":
         err = str(result.get("error") or "")
@@ -208,7 +208,7 @@ def diagnose(status: str, case: dict[str, Any] | None, result: dict[str, Any] | 
     def finish(v: dict[str, Any]) -> dict[str, Any]:
         if always_fails:
             if v["cause"] in ("cant_tell", "not_in_documents"):
-                return verdict("suspect_test", ["Failed in every run of this question set."] + v["evidence"])
+                return verdict("suspect_test", ["Failed in every run of this dataset."] + v["evidence"])
             v["evidence"].append("This question has failed in every run: check the expected answer too.")
         return v
 

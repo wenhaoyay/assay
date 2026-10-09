@@ -39,7 +39,7 @@ def build_trace(test_input: dict[str, Any], call: TargetCall, pricing: Any = Non
     end = call.ended_at or start
     total_ms = r.latency_ms if r.latency_ms is not None else (end - start) * 1000
     end = start + total_ms / 1000
-    root = Span(span_id=_sid(), type=SpanType.TARGET_REQUEST, name="target request", start_time=start,
+    root = Span(span_id=_sid(), type=SpanType.TARGET_REQUEST, name="bot request", start_time=start,
                 end_time=end, duration_ms=total_ms, status="error" if r.error else "ok",
                 input_summary=_short(test_input.get("message", test_input)), output_summary=_short(r.answer),
                 usage=r.usage, error=r.error,

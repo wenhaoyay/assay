@@ -24,7 +24,7 @@ import { HighlightedAnswer } from './Trial'
 const DIMENSIONS = ['correctness', 'groundedness', 'relevance', 'completeness', 'instruction_adherence', 'appropriate_refusal']
 const SAMPLE = 30 // labels per dimension for a judgement that is more than anecdote
 
-/** You (rows) against the judge (columns), one tile per pair, one dot per label. */
+/** You (rows) against the grading model (columns), one tile per pair, one dot per label. */
 export function ConfusionMatrix({ a }: { a: Agreement }) {
   return <TwoByTwo a={a} />
 }
@@ -32,22 +32,22 @@ export function ConfusionMatrix({ a }: { a: Agreement }) {
 const KAPPA_HELP = (
   <>
     <p>Kappa corrects accuracy for agreement expected by chance: around 0.4 is moderate, above 0.6 substantial, above 0.8 near-perfect. With few samples the estimate is unstable: the ± is a rough 95% interval.</p>
-    <p>Above the trust line (0.6), and sure of it, the judge's grades can run unattended. Below it, keep a person in the loop.</p>
+    <p>Above the trust line (0.6), and sure of it, the grading model’s grades can run unattended. Below it, keep a person in the loop.</p>
   </>
 )
 
 export function AgreementPanel({ s }: { s: CalibrationStats }) {
   const a = s.agreement
-  if (a.n === 0) return <Empty title="Uncalibrated">No labels from you yet for {s.dimension.replace(/_/g, ' ')}{s.judge_filter ? ` with ${s.judge_filter}` : ''}. Until there are, treat this judge's verdicts as unvalidated.</Empty>
+  if (a.n === 0) return <Empty title="Uncalibrated">No labels from you yet for {s.dimension.replace(/_/g, ' ')}{s.judge_filter ? ` with ${s.judge_filter}` : ''}. Until there are, treat this grading model’s verdicts as unvalidated.</Empty>
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-2"><Badge tone="pass">{s.status}</Badge>{s.small_sample && <Badge tone="flaky">small sample - indicative only</Badge>}</div>
+      <div className="flex flex-wrap items-center gap-2"><Badge tone="pass">{s.status}</Badge>{s.small_sample && <Badge tone="flaky">Small sample: indicative only</Badge>}</div>
       <AgreementGauge a={a} small={s.small_sample} sampleNote={false} />
       <Figs>
         <Stat label="Samples" value={a.n} />
-        <Stat label="Accuracy" value={pct(a.accuracy)} help={<p>The share of answers where the judge gave the same verdict as you, before correcting for chance.</p>} />
+        <Stat label="Accuracy" value={pct(a.accuracy)} help={<p>The share of answers where the grading model gave the same verdict as you, before correcting for chance.</p>} />
         <Stat label="F1 (fail class)" value={pct(a.f1)} sub={`precision ${pct(a.precision)}, recall ${pct(a.recall)}`}
-          help={<p>FAIL is the class that matters: did the judge catch the bad answers you caught? Precision: of the answers it failed, how many you failed too. Recall: of the answers you failed, how many it caught.</p>} />
+          help={<p>Fail is the class that matters: did the grading model catch the bad answers you caught? Precision: of the answers it failed, how many you failed too. Recall: of the answers you failed, how many it caught.</p>} />
         <Stat label="Disagreements" value={s.disagreements.length} />
       </Figs>
       <TwoByTwo a={a} />
@@ -58,25 +58,25 @@ export function AgreementPanel({ s }: { s: CalibrationStats }) {
 export function CalibrationPage() {
   const [params, setParams] = useSearchParams()
   const tab = (params.get('tab') as 'label' | 'agreement' | 'bakeoff') ?? 'label'
-  useCrumbs([{ label: 'Judge trust' }, { label: 'Calibration' }], 'calibration')
+  useCrumbs([{ label: 'Grading' }, { label: 'Calibration' }], 'calibration')
   const [dimension, setDimension] = useState('correctness')
   const [judge, setJudge] = useState('')
   const stats = useQuery({ queryKey: ['calib-stats', dimension, judge], queryFn: () => api.get<CalibrationStats>(`/api/calibration/${dimension}/stats${qs({ judge: judge || undefined })}`) })
   return (
     <>
-      <PageHeader eyebrow="Judge trust" title={<>Can you trust <em>the judge</em>?</>}
+      <PageHeader eyebrow="Grading" title={<>Can you trust <em>the grading model</em>?</>}
         help={<>
-          <p>Label answers yourself; Assay measures how often each grading model agrees with you, beyond what chance would give (Cohen's kappa).</p>
-          <p>A model is shown as validated only once your labels exist - per model, so a new one starts uncalibrated. Above the trust line its grades can run unattended; below it, keep a person in the loop.</p>
-          <p>The dimension picks which kind of grade you are checking (correctness, groundedness...); the second list narrows the figures to one grading model.</p>
+          <p>Label answers yourself; Assay measures how often each grading model agrees with you, beyond what chance would give (Cohen’s kappa).</p>
+          <p>A model is shown as validated only once your labels exist: per model, so a new one starts uncalibrated. Above the trust line its grades can run unattended; below it, keep a person in the loop.</p>
+          <p>The dimension picks which kind of grade you are checking (correctness, groundedness and so on); the second list narrows the figures to one grading model.</p>
         </>}
         />
       <div className="space-y-6">
         <div className="flex flex-wrap items-end">
-          <Tabs className="min-w-0 flex-1 basis-80" tabs={[{ id: 'label', label: 'Label answers' }, { id: 'agreement', label: 'Agreement' }, { id: 'bakeoff', label: 'Judge bake-off' }]} value={tab} onChange={(t) => setParams({ tab: t })} />
+          <Tabs className="min-w-0 flex-1 basis-80" tabs={[{ id: 'label', label: 'Label answers' }, { id: 'agreement', label: 'Agreement' }, { id: 'bakeoff', label: 'Bake-off' }]} value={tab} onChange={(t) => setParams({ tab: t })} />
           <div className="flex flex-wrap items-center gap-2 border-b border-line pb-1.5 pl-6 max-sm:pl-0 max-sm:pt-3">
             <Select className="w-44" value={dimension} onChange={(e) => setDimension(e.target.value)} aria-label="Dimension">{DIMENSIONS.map((d) => <option key={d} value={d}>{d.replace(/_/g, ' ')}</option>)}</Select>
-            <Select className="w-60" value={judge} onChange={(e) => setJudge(e.target.value)} aria-label="Judge model">
+            <Select className="w-60" value={judge} onChange={(e) => setJudge(e.target.value)} aria-label="Grading model">
               <option value="">All grading models</option>
               {Object.entries(stats.data?.by_judge ?? {}).map(([j, n]) => <option key={j} value={j}>{j} ({n} labelled)</option>)}
             </Select>
@@ -138,7 +138,7 @@ function LabelTab({ dimension, stats }: { dimension: string; stats?: Calibration
   const card = (it: CalibrationItem) => (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <span className="t-label">Case <span className="font-mono normal-case tracking-normal" data-case={it.case_id}>{it.case_id}</span> · run <Link className="font-mono underline" to={`/runs/${it.run_id}`}>#{it.run_id}</Link> · try <span className="font-mono">{it.trial_index + 1}</span></span>
+        <span className="t-label">Question <span className="font-mono normal-case tracking-normal" data-case={it.case_id}>{it.case_id}</span> · run <Link className="font-mono underline" to={`/runs/${it.run_id}`}>#{it.run_id}</Link> · try <span className="font-mono">{it.trial_index + 1}</span></span>
         <span className="text-xs text-ink-2"><span className="num font-mono">{queue.length}</span> left</span>
       </div>
       <div className="text-lead font-medium text-ink">{it.question}</div>
@@ -148,11 +148,11 @@ function LabelTab({ dimension, stats }: { dimension: string; stats?: Calibration
       </div>
       {it.reference && <div><div className="t-label">Reference answer</div><div className="mt-1 rounded-lg bg-good-wash/50 px-3 py-2 text-sm">{it.reference}</div></div>}
       {it.context.length > 0 && (
-        <details className="group"><summary className="flex cursor-pointer items-center gap-1 text-xs font-medium text-accent-ink"><ChevronRight className="size-3.5 transition-transform group-open:rotate-90" />Retrieved context (<span className="font-mono">{it.context.length}</span>)</summary>
+        <details className="group"><summary className="flex cursor-pointer items-center gap-1 text-xs font-medium text-accent-ink"><ChevronRight className="size-3.5 transition-transform group-open:rotate-90" />Passages the bot read (<span className="font-mono">{it.context.length}</span>)</summary>
           <ul className="mt-2 space-y-2">{it.context.map((c) => <li key={c.id} className="rounded-lg border border-line p-2 text-xs"><div className="font-mono">{c.id}</div><div className="text-ink-2">{c.text}</div></li>)}</ul>
         </details>
       )}
-      {it.tool_calls && it.tool_calls.length > 0 && <div className="font-mono text-xs text-ink-2">{it.tool_calls.map((t, i) => <div key={i}>{t.name}({JSON.stringify(t.arguments)}) {'->'} {JSON.stringify(t.result)}</div>)}</div>}
+      {it.tool_calls && it.tool_calls.length > 0 && <div className="font-mono text-xs text-ink-2">{it.tool_calls.map((t, i) => <div key={i}>{t.name}({JSON.stringify(t.arguments)}) {'→'} {JSON.stringify(t.result)}</div>)}</div>}
     </div>
   )
 
@@ -177,7 +177,7 @@ function LabelTab({ dimension, stats }: { dimension: string; stats?: Calibration
         ) : <Panel className="min-h-[360px]" />}
       </AnimatePresence>
       <Dialog open={veiled} onClose={() => { if (annotator) setEditingName(false) }} width={400}
-        title={<LabelHelp label="Who is labelling?"><p>Labels are stored per person, so two people's judgements can be compared later. You only enter this once.</p></LabelHelp>}>
+        title={<LabelHelp label="Who is labelling?"><p>Labels are stored per person, so two people’s judgements can be compared later. You only enter this once.</p></LabelHelp>}>
         <div className="flex gap-2" data-testid="name-veil">
           <Input value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} placeholder="Your name" aria-label="Your name" data-autofocus className="min-w-0 flex-1"
             onKeyDown={(e) => { if (e.key === 'Enter') saveName() }} />
@@ -194,9 +194,9 @@ function LabelTab({ dimension, stats }: { dimension: string; stats?: Calibration
       <div className="min-w-0 space-y-6" data-tour="flashcard">
         <div className="space-y-3">
         <SectionHead rule title="Label answers" help={<>
-          <p>Real answers from your runs, graded by a judge. Judge each one yourself: <Kbd>P</Kbd> pass, <Kbd>F</Kbd> fail, <Kbd>U</Kbd> unsure. After each label you see what the judge said.</p>
-          <p>The judge's verdict stays hidden until you label, so it cannot anchor your judgement.</p>
-          <p>Label what a careful expert would say, not what you think the judge will say. Disagreements are the useful part: they show where the judge cannot be trusted.</p>
+          <p>Real answers from your runs, graded by a grading model. Decide each one yourself: <Kbd>P</Kbd> pass, <Kbd>F</Kbd> fail, <Kbd>U</Kbd> not sure. After each label you see what the grading model said.</p>
+          <p>The grading model’s verdict stays hidden until you label, so it cannot anchor your judgement.</p>
+          <p>Label what a careful expert would say, not what you think the grading model will say. Disagreements are the useful part: they show where the grading model cannot be trusted.</p>
           <p>{SAMPLE} labels per dimension make a sample worth reading; fewer are a hint.</p>
         </>}
           actions={<>
@@ -215,14 +215,14 @@ function LabelTab({ dimension, stats }: { dimension: string; stats?: Calibration
         {deck}
         {(current || veiled) && (
           <div className="space-y-3">
-            <SetupField label="Note (optional)" help={<p>Why you labelled it so. It shows beside the judge's reason wherever you two disagree.</p>}>
-              <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Why - helps when you look at disagreements" disabled={!can} />
+            <SetupField label="Note (optional)" help={<p>Why you labelled it so. It shows beside the grading model’s reason wherever you two disagree.</p>}>
+              <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Why (helps when you look at disagreements)" disabled={!can} />
             </SetupField>
             {label.isError && <ErrorState error={label.error} />}
             <div className="flex flex-wrap justify-center gap-2">
               <Button size="lg" className="min-w-32" disabled={!can} onClick={() => give('PASS')}><Check className="size-4 text-good-ink" />Pass <Kbd>P</Kbd></Button>
               <Button size="lg" className="min-w-32" disabled={!can} onClick={() => give('FAIL')}><X className="size-4 text-bad-ink" />Fail <Kbd>F</Kbd></Button>
-              <Button size="lg" variant="ghost" disabled={!can} onClick={() => give('UNKNOWN')}><HelpCircle className="size-4" />Unsure <Kbd>U</Kbd></Button>
+              <Button size="lg" variant="ghost" disabled={!can} onClick={() => give('UNKNOWN')}><HelpCircle className="size-4" />Not sure <Kbd>U</Kbd></Button>
             </div>
           </div>
         )}
@@ -238,8 +238,8 @@ function LabelTab({ dimension, stats }: { dimension: string; stats?: Calibration
             <motion.div initial={{ opacity: 0, y: 24, x: '-50%' }} animate={{ opacity: 1, y: 0, x: '-50%' }} exit={{ opacity: 0, y: 24, x: '-50%' }} transition={{ duration: DUR.slow }}
               className="fixed bottom-6 left-1/2 z-(--z-toast) max-w-[min(560px,calc(100vw-32px))] rounded-xl bg-ink px-4 py-2.5 text-sm text-page shadow-pop" role="status" data-testid="judge-toast">
               {judged.label === reveal.human
-                ? <>Judge agreed: <b className="font-semibold">{judged.label.toLowerCase()}</b></>
-                : <>Judge said <b className={clsx('font-semibold')}>{judged.label.toLowerCase()}</b>{judged.reason ? <>: “{judged.reason.length > 110 ? `${judged.reason.slice(0, 110)}…` : judged.reason}”</> : null}</>}
+                ? <>Grading model agreed: <b className="font-semibold">{judged.label.toLowerCase()}</b></>
+                : <>Grading model said <b className={clsx('font-semibold')}>{judged.label.toLowerCase()}</b>{judged.reason ? <>: “{judged.reason.length > 110 ? `${judged.reason.slice(0, 110)}…` : judged.reason}”</> : null}</>}
             </motion.div>
           )}
         </AnimatePresence>,
@@ -252,18 +252,18 @@ function LabelTab({ dimension, stats }: { dimension: string; stats?: Calibration
 function AgreementTab({ s }: { s: CalibrationStats }) {
   return (
     <div className="grid items-start gap-x-10 gap-y-12 xl:grid-cols-[minmax(0,1fr)_480px]">
-      <Card title={`You vs the judge · ${s.dimension.replace(/_/g, ' ')}${s.judge_filter ? ` · ${s.judge_filter}` : ''}`} help={KAPPA_HELP}><AgreementPanel s={s} /></Card>
-      <Card title="Where you and the judge disagree" meta={s.disagreements.length || undefined} padded={false}
+      <Card title={`You vs the grading model · ${s.dimension.replace(/_/g, ' ')}${s.judge_filter ? ` · ${s.judge_filter}` : ''}`} help={KAPPA_HELP}><AgreementPanel s={s} /></Card>
+      <Card title="Where you and the grading model disagree" meta={s.disagreements.length || undefined} padded={false}
         help={<>
-          <p>Every answer where your label and the judge's verdict differ, with the judge's reason and your note. These are the answers to read first: they show where the judge cannot be trusted.</p>
-          <p>Agreement is specific to a judge model and rubric version.{s.judges.length > 0 ? ` Judges in this sample: ${s.judges.map((j) => `${j.provider}/${j.model}`).join('; ')}.` : ''}</p>
+          <p>Every answer where your label and the grading model’s verdict differ, with the grading model’s reason and your note. These are the answers to read first: they show where the grading model cannot be trusted.</p>
+          <p>Agreement is specific to a grading model and rubric version.{s.judges.length > 0 ? ` Grading models in this sample: ${s.judges.map((j) => `${j.provider}/${j.model}`).join('; ')}.` : ''}</p>
         </>}>
         {s.disagreements.length === 0 ? <p className="py-4 text-sm text-ink-2">No disagreements yet.</p> : (
           <ul className="divide-y divide-line">
             {s.disagreements.map((d) => (
               <li key={d.trial_id} className="py-3 text-sm" data-case={d.case_id}>
-                <div className="flex flex-wrap items-center gap-2"><Link className="font-mono text-xs text-accent-ink hover:underline" to={`/trials/${d.trial_id}`}>{d.case_id}</Link><Badge tone={d.human === 'PASS' ? 'pass' : 'fail'}>you: {d.human.toLowerCase()}</Badge><Badge tone={d.judge === 'PASS' ? 'pass' : 'fail'}>judge: {d.judge.toLowerCase()}</Badge></div>
-                <div className="mt-1 text-ink-2">Judge: {d.judge_reason}</div>
+                <div className="flex flex-wrap items-center gap-2"><Link className="font-mono text-xs text-accent-ink hover:underline" to={`/trials/${d.trial_id}`}>{d.case_id}</Link><Badge tone={d.human === 'PASS' ? 'pass' : 'fail'}>you: {d.human.toLowerCase()}</Badge><Badge tone={d.judge === 'PASS' ? 'pass' : 'fail'}>grading model: {d.judge.toLowerCase()}</Badge></div>
+                <div className="mt-1 text-ink-2">Grading model: {d.judge_reason}</div>
                 {d.note && <div className="text-ink-2">You: {d.note}</div>}
               </li>
             ))}
@@ -305,9 +305,9 @@ function BakeoffTab({ dimension }: { dimension: string }) {
   return (
     <div className="space-y-12">
       <Card title="Which grading model agrees with you most?" meta={n ? `${n} labelled` : undefined} help={<>
-        <p>Each judge grades the {plural(n, `${dim} answer`)} you labelled; Assay compares their verdicts with yours, and with each other.</p>
-        <p>A local model on a CPU takes ~30 s per answer; cloud models cost money (see Settings for the per-100 price). Pick up to four.</p>
-        <p>Pick the cheapest judge whose agreement with you is close to the best. A judge that agrees with you no better than chance (kappa near 0) should not gate a release.</p>
+        <p>Each grading model grades the {plural(n, `${dim} answer`)} you labelled; Assay compares their verdicts with yours, and with each other.</p>
+        <p>A local model on a CPU takes about 30 s per answer; cloud models cost money (see Settings for the per-100 price). Pick up to four.</p>
+        <p>Pick the cheapest grading model whose agreement with you is close to the best. A grading model that agrees with you no better than chance (kappa near 0) should not gate a release.</p>
       </>}>
         {n === 0 ? <Notice tone="warn" title="Label some answers first">The bake-off needs your pass and fail labels. Label a few on the first tab.</Notice> : (
           <>
@@ -335,22 +335,22 @@ function BakeoffTab({ dimension }: { dimension: string }) {
             <ol className="list-decimal space-y-1 pl-4">
               <li>Label a few {dim} answers on the first tab (P pass, F fail). Thirty make a fair test.</li>
               <li>Tick the grading models to compare above: the free heuristic, a local model, a cloud one.</li>
-              <li>Run the bake-off. Each judge grades the answers you labelled; the table ranks them by agreement with you, and the chart shows where two judges split.</li>
+              <li>Run the bake-off. Each grading model grades the answers you labelled; the table ranks them by agreement with you, and the chart shows where two grading models split.</li>
             </ol>
           </Empty>
         )
       ) : (
         <>
           <Card title={`Results · ${shown.dimension.replace(/_/g, ' ')}`} meta={fmtDate(shown.created_at)} help={<>
-            <p>One row per judge, best agreement with you first. The crown marks the winner: highest kappa, cheapest on a tie. Heuristic (word-overlap) rows are hatched: it is not an LLM.</p>
-            <p>No verdict: answers the judge could not grade. Speed is the median time per answer; cost is the whole bake-off.</p>
+            <p>One row per grading model, best agreement with you first. The crown marks the winner: highest kappa, cheapest on a tie. Heuristic (word-overlap) rows are hatched: no model is involved.</p>
+            <p>No verdict: answers the grading model could not grade. Speed is the median time per answer; cost is the whole bake-off.</p>
           </>}>
             {shown.status === 'running' && <div className="mb-4"><div className="mb-1 text-xs text-ink-2">Grading <span className="num font-mono">{shown.progress_done}</span> of <span className="num font-mono">{shown.progress_total}</span></div><ProgressBar value={shown.progress_total ? shown.progress_done / shown.progress_total : 0} /></div>}
             {shown.status === 'failed' && <Notice tone="bad" title="The bake-off failed">{shown.error}</Notice>}
             {shown.results && (
               <>
                 <Table>
-                  <thead><tr><th className="t-label">Judge</th><th className="t-label"><Term k="kappa">Agreement (kappa)</Term></th><th className="t-label text-right">Accuracy</th><th className="t-label text-right">F1 (fail)</th><th className="t-label text-right">No verdict</th><th className="t-label text-right">Speed</th><th className="t-label text-right">Cost</th></tr></thead>
+                  <thead><tr><th className="t-label">Grading model</th><th className="t-label"><Term k="kappa">Agreement (kappa)</Term></th><th className="t-label text-right">Accuracy</th><th className="t-label text-right">F1 (fail)</th><th className="t-label text-right">No verdict</th><th className="t-label text-right">Speed</th><th className="t-label text-right">Cost</th></tr></thead>
                   <tbody>
                     {[...shown.results.judges].sort((a, b) => (b.agreement.kappa ?? -2) - (a.agreement.kappa ?? -2)).map((j, i) => (
                       <motion.tr key={j.name} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.08 }} className={clsx(j.name.startsWith('heuristic') && 'hatched')}>
@@ -375,7 +375,7 @@ function BakeoffTab({ dimension }: { dimension: string }) {
                 </Table>
                 {shown.results.pairwise.length > 0 && (
                   <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-ink-2">
-                    <span className="t-label">Judges agreeing with each other</span>
+                    <span className="t-label">Grading models agreeing with each other</span>
                     {shown.results.pairwise.map((p) => <Badge key={`${p.a}-${p.b}`}>{p.a} vs {p.b}: κ <span className="font-mono">{p.kappa === null ? 'n/a' : p.kappa.toFixed(2)}</span></Badge>)}
                   </div>
                 )}
@@ -383,13 +383,13 @@ function BakeoffTab({ dimension }: { dimension: string }) {
             )}
           </Card>
           {shown.results && (
-            <Card title="Where two graders split" help={<>
-              <p>The same answers, graded twice: one grader across, the other up (you can be one of them). Dots off the diagonal are where they disagree; amber means they disagree on pass or fail.</p>
+            <Card title="Where two grading models split" help={<>
+              <p>The same answers, graded twice: one grading model across, the other up (you can be one of them). Dots off the diagonal are where they disagree; amber means they disagree on pass or fail.</p>
               <p>Click a dot to read the answer and every verdict on it; the first disagreement opens by default. Disagreements are the first answers worth labelling yourself.</p>
-              <p>A bake-off stores each judge's verdict per answer, not a score or a reason, so the axes are verdict bands with a little jitter. The note under the verdicts is how the answer was graded when its run ran.</p>
+              <p>A bake-off stores each grading model’s verdict per answer, not a score or a reason, so the axes are verdict bands with a little jitter. The note under the verdicts is how the answer was graded when its run ran.</p>
             </>}>
               {hasPerItem(shown) ? <BakeoffScatter bakeoff={shown} dimension={dimension} />
-                : <p className="text-sm text-ink-2">This bake-off was saved before per-answer verdicts were kept. Run it again to see where the graders split.</p>}
+                : <p className="text-sm text-ink-2">This bake-off was saved before per-answer verdicts were kept. Run it again to see where the grading models split.</p>}
             </Card>
           )}
         </>

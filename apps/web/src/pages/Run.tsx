@@ -26,7 +26,7 @@ import { ScrollTabs } from '../components/Layout'
 import { api, qs } from '../lib/api'
 import { whereLabel } from '../lib/models'
 import { useCrumbs } from '../lib/crumbs'
-import { duration, FAILURE_LABELS, fmtDay, ms, num, pct, pp, score, usd, when } from '../lib/format'
+import { duration, FAILURE_LABELS, fmtDay, ms, num, pct, plural, pp, score, usd, when } from '../lib/format'
 import { isCompleted, isLive, questionsOf } from '../lib/runstate'
 import { useHotkey, useListNav } from '../lib/hotkeys'
 import { groupByCase, type CaseGroup } from '../lib/trials'
@@ -116,7 +116,7 @@ export function RunPage() {
   let needleNote: ReactNode
   if (active) {
     needle = <Needle mode="level" value={passSoFar ?? 0} gate={floor} tremble size={190} label="Pass rate so far" />
-    needleNote = <>pass rate so far{fin.length ? <>, <span className="num font-mono">{fin.length}</span> answers</> : null}</>
+    needleNote = <>Pass rate so far{fin.length ? <>, <span className="num font-mono">{fin.length}</span> answers</> : null}</>
   } else if (base && delta !== null && !r.off_topic) {
     const ci = overallCmp?.ci
     needle = <Needle mode="delta" value={delta} low={ci?.ci_low} high={ci?.ci_high} size={190} label={`Pass rate change vs run ${base.id}`} />
@@ -124,7 +124,7 @@ export function RunPage() {
       {ci && ci.ci_low !== null && ci.ci_high !== null && <>, interval <span className="num font-mono">{signedPp(ci.ci_low)}</span> to <span className="num font-mono">{signedPp(ci.ci_high)}</span></>}</>
   } else {
     needle = <Needle mode="level" value={s?.overall.value ?? null} gate={floor} size={190} label="Pass rate" />
-    needleNote = r.off_topic ? 'left out of trends' : prev ? null : 'first reading'
+    needleNote = r.off_topic ? 'Left out of trends' : prev ? null : 'First reading'
   }
 
   return (
@@ -140,10 +140,10 @@ export function RunPage() {
           </div>
           <h1 className="t-title mt-1.5" style={{ viewTransitionName: `run-title-${r.id}` }}>{v1}{v2 && <>, <em>{v2}</em></>}</h1>
           <p className="mt-2.5 max-w-3xl text-base text-ink-2">
-            Asked <span className="font-semibold text-ink"><span className="num">{questionsOf(r) ?? 'n/a'}</span> questions × <span className="num">{r.trials_per_case}</span> {r.trials_per_case === 1 ? 'try' : 'tries'}</span>{r.case_filter && ' (a reduced set)'} from{' '}
+            Asked <span className="font-semibold text-ink"><span className="num">{questionsOf(r) ?? 'n/a'}</span> questions × <span className="num">{r.trials_per_case}</span> {r.trials_per_case === 1 ? 'try' : 'tries'}</span>{r.case_filter && ' (reduced)'} from{' '}
             {r.dataset_id ? <Link className="font-mono text-sm hover:underline" to={`/datasets/${r.dataset_id}`}>{r.dataset} v{r.dataset_version}</Link> : <span className="font-mono text-sm">{r.dataset} v{r.dataset_version}</span>}
             , graded by checks{r.judge ? <> and {heur
-              ? <>the <Badge tone="heuristic">heuristic judge</Badge> (word overlap) <Help title="Heuristic judge"><p>Meaning checks (correctness, groundedness) were scored by word overlap with the reference, not by a grading model. Free and offline, but it cannot recognise paraphrase or negation, so those scores are hatched wherever they appear.</p><p>Re-grade the stored answers with a model in the Config tab.</p></Help></>
+              ? <>the <Badge tone="heuristic">Heuristic grading</Badge> (word overlap) <Help title="Heuristic grading"><p>Meaning checks (correctness, groundedness) were scored by word overlap with the reference, not by a grading model. Free and offline, but it cannot recognise paraphrase or negation, so those scores are hatched wherever they appear.</p><p>Re-grade the stored answers with a model in the Config tab.</p></Help></>
               : <span className="font-mono text-sm">{r.judge.provider}/{r.judge.model}</span>}</> : ' only'}.
             {' '}Connection <Link className="font-medium text-ink hover:underline" to={r.target_id ? `/targets/${r.target_id}` : '/targets'}>{r.target}</Link> <span className="font-mono text-sm">v{r.target_version}</span>.
             {r.source !== 'live' && <> {r.source === 'reevaluated' ? <>Re-graded from <Link className="font-mono underline" to={`/runs/${r.parent_run_id}`}>#{r.parent_run_id}</Link>.</> : <>Source: {r.source}.</>}</>}
@@ -160,7 +160,7 @@ export function RunPage() {
               <Fingerprint cells={cells} size="lg" vt={`fp-run-${r.id}`} hrefFor={(c) => (firstTry[c] ? `/trials/${firstTry[c]}` : null)} />
               <div className="mt-2 flex items-center gap-3">
                 <FingerprintLegend />
-                <Help title="The run's fingerprint"><p>One dot per question, in dataset order. Green passed every try, amber some, red none.</p><p>Hover a dot to light that question everywhere on the page; click it to open its answer.</p></Help>
+                <Help title="The run’s fingerprint"><p>One dot per question, in dataset order. Green passed every try, amber some, red none.</p><p>Hover a dot to light that question everywhere on the page; click it to open its answer.</p></Help>
               </div>
             </div>
           )}
@@ -174,8 +174,8 @@ export function RunPage() {
 
       {r.error && <div className="mb-4"><Notice tone="bad" title="Run failed">{r.error}</Notice></div>}
       {r.status === 'cancelled' && r.stop_reason !== 'budget' && r.stop_reason !== 'max_answers' && <div className="mb-4"><Notice tone="warn" title="Stopped">Stopped. Answers finished before the stop are kept; the rest are marked cancelled.</Notice></div>}
-      {r.stop_reason === 'budget' && <div className="mb-4"><Notice tone="warn" title="Stopped at the spend cap">Trials after the cap was reached were not run and are marked cancelled.</Notice></div>}
-      {r.stop_reason === 'max_answers' && <div className="mb-4"><Notice tone="warn" title="Stopped at the answer limit">The run reached its "Max answers" limit; the questions after it were not asked and are marked cancelled.</Notice></div>}
+      {r.stop_reason === 'budget' && <div className="mb-4"><Notice tone="warn" title="Stopped at the spend cap">Tries after the cap was reached were not run and are marked cancelled.</Notice></div>}
+      {r.stop_reason === 'max_answers' && <div className="mb-4"><Notice tone="warn" title="Stopped at the answer limit">The run reached its “Max answers” limit; the questions after it were not asked and are marked cancelled.</Notice></div>}
       {!active && (r.load_errors?.count ?? 0) > 0 && <LoadErrors r={r} />}
 
       {(active || justFinished) && (
@@ -200,9 +200,9 @@ export function RunPage() {
           <ScrollTabs
             tabs={[
               { id: 'summary', label: 'Summary' },
-              { id: 'cases', label: 'Cases' },
+              { id: 'cases', label: 'Questions' },
               { id: 'failures', label: <>Failures{nFailing ? <Badge tone="fail" className="ml-1.5 h-4 px-1.5 font-mono text-label">{nFailing}</Badge> : null}</> },
-              { id: 'explore', label: <>Explore<Badge tone="accent" className="ml-1.5 h-4 px-1.5 text-label">new</Badge></> },
+              { id: 'explore', label: <>Explore<Badge tone="accent" className="ml-1.5 h-4 px-1.5 text-label">New</Badge></> },
               { id: 'metrics', label: 'Metrics' },
               { id: 'traces', label: 'Traces' },
               { id: 'config', label: 'Config' },
@@ -294,7 +294,7 @@ function GateCard({ r }: { r: RunDetail }) {
   const gateName = gates.data?.find((g) => g.id === latest?.gate_id)?.name
   return (
     <Card title="Release gate"
-      help={<>{latest && <p>Checked against <b>{gateName ?? 'a gate'}</b>{latest.baseline_run_id ? `, with run #${latest.baseline_run_id} as the baseline` : ', with no baseline'}.</p>}<p>A gate is a set of rules a run must meet to ship: floors on figures (pass rate at least 70%) and limits on how far a figure may fall against a baseline run.</p><p>Each rule shows the run's figure against its limit. Check the run against another gate or baseline below.</p></>}
+      help={<>{latest && <p>Checked against <b>{gateName ?? 'a gate'}</b>{latest.baseline_run_id ? `, with run #${latest.baseline_run_id} as the baseline` : ', with no baseline'}.</p>}<p>A gate is a set of rules a run must meet to ship: floors on figures (pass rate at least 70%) and limits on how far a figure may fall against a baseline run.</p><p>Each rule shows the run’s figure against its limit. Check the run against another gate or baseline below.</p></>}
       >
       {latest ? (
         <div className="space-y-2">
@@ -312,15 +312,15 @@ function GateCard({ r }: { r: RunDetail }) {
               <span className="num pl-0.5 text-xs text-ink-2 sm:text-right">
                 {g.value === null ? (g.reason ?? 'n/a') : g.kind === 'relative'
                   ? <><PpDelta value={-g.value} /> vs baseline (max drop {pp1(g.limit)})</>
-                  : `${fmtMetric(g.metric, g.value)} ${g.rule === 'min' ? '>=' : '<='} ${fmtMetric(g.metric, g.limit)}`}
+                  : `${fmtMetric(g.metric, g.value)} ${g.rule === 'min' ? '≥' : '≤'} ${fmtMetric(g.metric, g.limit)}`}
               </span>
             </motion.div>
           ))}
-          {latest.status === 'INCOMPLETE' && <p className="pt-1 text-xs text-warn-ink">Some rules could not be evaluated, so this run is not a PASS.</p>}
+          {latest.status === 'INCOMPLETE' && <p className="pt-1 text-xs text-warn-ink">Some rules could not be evaluated, so this run is not a pass.</p>}
         </div>
       ) : <Empty title="No gate applied yet" />}
       <TextLink size="sm" className="mt-3" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-        <ChevronRight className={clsx('size-3.5 transition-transform duration-(--dur-fast)', open && 'rotate-90')} />{latest ? 'Check against another gate or baseline' : 'Apply a gate'}
+        <ChevronRight className={clsx('size-3.5 transition-transform duration-(--dur-fast)', open && 'rotate-90')} />{latest ? 'Apply another gate or baseline' : 'Apply a gate'}
       </TextLink>
       <AnimatePresence initial={false}>
         {open && (
@@ -328,7 +328,7 @@ function GateCard({ r }: { r: RunDetail }) {
             <div className="mt-2 grid grid-cols-[1fr_1fr_auto] items-end gap-2 rounded-lg bg-surface-2/60 p-3">
               <Field label="Gate"><Select value={gateId} onChange={(e) => setGateId(e.target.value ? Number(e.target.value) : '')}>{(gates.data ?? []).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</Select></Field>
               <Field label="Baseline run"><Select value={baseline} onChange={(e) => setBaseline(e.target.value ? Number(e.target.value) : '')}><option value="">None</option>{(runs.data ?? []).filter((x) => x.id !== r.id).map((x) => <option key={x.id} value={x.id}>#{x.id} {x.experiment}</option>)}</Select></Field>
-              <Button disabled={!gates.data?.length} loading={apply.isPending} onClick={() => apply.mutate()}>Check</Button>
+              <Button disabled={!gates.data?.length} loading={apply.isPending} onClick={() => apply.mutate()}>Apply gate</Button>
             </div>
             {apply.isError && <div className="mt-2"><ErrorState error={apply.error} /></div>}
           </motion.div>
@@ -345,11 +345,11 @@ function figures(m: Metrics): Fig[] {
   return [
     { key: 'overall_pass_rate', label: 'Pass rate', value: m.overall_pass_rate, text: (v) => pct(v), delta: (v, b) => v - b, fmtDelta: rate, higher: true, noise: 0.0005, missing: 'pass rate', help: null },
     { key: 'tool_accuracy', label: 'Tool accuracy', value: m.tool_accuracy, text: (v) => pct(v), delta: (v, b) => v - b, fmtDelta: rate, higher: true, noise: 0.0005, missing: 'tool accuracy (no question names the tool it needs)', help: <p>Right tool, right arguments, over the questions that need a tool.</p> },
-    { key: 'recall_at_k.mean', label: 'Search recall', value: m['recall_at_k.mean'], text: (v) => pct(v), delta: (v, b) => v - b, fmtDelta: rate, higher: true, noise: 0.0005, missing: 'search recall (the bot does not send the passages it read)', help: <p>Share of the documents a question needs that were among the passages the bot read (recall@k, averaged).</p> },
+    { key: 'recall_at_k.mean', label: 'Search recall', value: m['recall_at_k.mean'], text: (v) => pct(v), delta: (v, b) => v - b, fmtDelta: rate, higher: true, noise: 0.0005, missing: 'search recall (the bot does not send the passages it read)', help: <p>Share of the documents a question needs that were among the passages the bot read (search recall, averaged).</p> },
     { key: 'must_mention', label: 'Must-mention', value: m.must_mention, text: (v) => pct(v), delta: (v, b) => v - b, fmtDelta: rate, higher: true, noise: 0.0005, missing: 'must-mention (no question lists phrases an answer must contain)', help: <p>Answers that contain every phrase the question says a correct answer must mention.</p> },
-    { key: 'p95_latency_ms', label: 'p95 speed', value: m.p95_latency_ms, text: (v) => ms(v), delta: (v, b) => v - b, fmtDelta: (a) => ms(a), higher: false, noise: 30, missing: 'speed', help: <p>95 in 100 answers arrived faster than this. Median: {ms(m.p50_latency_ms)}.</p> },
-    { key: 'average_total_tokens', label: 'Tokens', value: m.average_total_tokens, text: (v) => num(v), delta: (v, b) => v - b, fmtDelta: (a, _d, b) => `${b ? Math.round((a / b) * 100) : 0}%`, higher: false, noise: 5, missing: 'tokens (the bot does not report its usage)', help: <p>Tokens the bot reported per answer, prompt and reply together.</p> },
-    { key: 'average_cost_usd', label: 'Cost / answer', value: m.average_cost_usd, text: (v) => usd(v), delta: (v, b) => v - b, fmtDelta: (a) => usd(a), higher: false, noise: 1e-6, missing: 'cost (no reported usage, or no price for the model)', help: <p>From the reported tokens and the price table in Settings.</p> },
+    { key: 'p95_latency_ms', label: 'Speed (p95)', value: m.p95_latency_ms, text: (v) => ms(v), delta: (v, b) => v - b, fmtDelta: (a) => ms(a), higher: false, noise: 30, missing: 'speed', help: <p>The slowest 5% of answers took this long or more. Median: {ms(m.p50_latency_ms)}.</p> },
+    { key: 'average_total_tokens', label: 'Tokens per answer', value: m.average_total_tokens, text: (v) => num(v), delta: (v, b) => v - b, fmtDelta: (a, _d, b) => `${b ? Math.round((a / b) * 100) : 0}%`, higher: false, noise: 5, missing: 'tokens (the bot does not report its usage)', help: <p>Tokens the bot reported per answer, prompt and reply together.</p> },
+    { key: 'average_cost_usd', label: 'Cost per answer', value: m.average_cost_usd, text: (v) => usd(v), delta: (v, b) => v - b, fmtDelta: (a) => usd(a), higher: false, noise: 1e-6, missing: 'cost (no reported usage, or no price for the model)', help: <p>From the reported tokens and the price table in Settings.</p> },
   ]
 }
 
@@ -389,7 +389,7 @@ function SummaryTab({ r, s, base, cmpCats }: { r: RunDetail; s: RunSummary; base
             <Lightbulb className="size-3.5 shrink-0" />
             Not measured: {[...missing.map((f) => f.missing), ...(heur ? ['correctness and groundedness by a grading model (this run used the word-overlap heuristic)'] : [])].join('; ')}.
             {missing.length > 0 && r.target_id && <TextLink size="sm" to={`/targets/${r.target_id}#reading`} viewTransition>How to turn it on</TextLink>}
-            {heur && <TextLink size="sm" to="?tab=config">Re-grade with a model</TextLink>}
+            {heur && <TextLink size="sm" to="?tab=config">Re-grade with a grading model</TextLink>}
           </p>
         )}
       </div>
@@ -425,7 +425,7 @@ function SummaryTab({ r, s, base, cmpCats }: { r: RunDetail; s: RunSummary; base
           )}
         </Card>
       </div>
-      <Card title="Where failures start" help={<p>Failures counted by the pipeline stage where they begin: retrieval, tools, the answer, grounding, speed and cost. Click a stage to see its failures.</p>}>
+      <Card title="Where failures start" help={<p>Failures counted by the pipeline stage where they begin: search, tools, the answer, grounding, speed and cost. Click a stage to see its failures.</p>}>
         {stages.data ? <StagePipeline stages={stages.data.stages} onPick={(st) => nav(`?tab=failures&stage=${st.id}`)} /> : <Skeleton size="figure" />}
       </Card>
       <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-ink-3">Started {when(r.started_at)}, took {duration(r.started_at, r.finished_at)}. Grading cost {usd(s.metrics.total_judge_cost_usd)}{heur ? ' (heuristic: free)' : ''}.
@@ -509,18 +509,18 @@ function CasesTab({ runId }: { runId: number }) {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-2">
-        <SearchBox value={search} onChange={setSearch} placeholder="Search id or question" label="Search cases" />
+        <SearchBox value={search} onChange={setSearch} placeholder="Search id or question" label="Search questions" />
         <Segmented size="sm" label="State" value={state || 'all'} onChange={(v) => set('state', v === 'all' ? '' : v)} options={[
           { id: 'all', label: `All ${groups.length}` }, { id: 'failed', label: `Failing ${count('failed')}` }, { id: 'flaky', label: `Flaky ${count('flaky')}` }, { id: 'passed', label: `Passing ${count('passed')}` },
         ]} />
         <Select className="w-44" value={category} onChange={(e) => set('category', e.target.value)} aria-label="Category filter">
           <option value="">All categories</option>{cats.map((c) => <option key={c}>{c}</option>)}
         </Select>
-        {caseId && <Chip selected onClick={() => set('case', '')}>Case {caseId} ×</Chip>}
+        {caseId && <Chip selected onClick={() => set('case', '')}>Question {caseId} ×</Chip>}
         <Help title="Every question"><p>One row per question with a dot per try. Flaky questions pass some tries and fail others. J and K move between rows, Enter opens the answer.</p></Help>
         <span className="ml-auto flex items-center gap-1.5"><SampleSize n={rows.length} min={0} unit="questions" /><SampleSize n={q.data?.length ?? 0} min={0} unit="tries" /></span>
       </div>
-      {q.isLoading ? <Loading /> : q.isError ? <ErrorState error={q.error} /> : rows.length === 0 ? <Empty title="No question matches" /> : <CaseTable groups={rows} highlight={caseId || null} causes={causes.data?.by_trial} />}
+      {q.isLoading ? <Loading /> : q.isError ? <ErrorState error={q.error} /> : rows.length === 0 ? <Empty title="No questions match" action={<Button onClick={() => { setSearch(''); setParams((p) => { p.delete('state'); p.delete('category'); p.delete('case'); return p }) }}>Clear filters</Button>} /> : <CaseTable groups={rows} highlight={caseId || null} causes={causes.data?.by_trial} />}
     </div>
   )
 }
@@ -586,7 +586,7 @@ function FailuresTab({ runId, s, baseId }: { runId: number; s: RunSummary; baseI
         <Table>
           <thead><tr><th className="t-label w-[38%]">Question</th><th className="t-label">Tries</th><th className="t-label">Likely cause</th>{baseId && <th className="t-label text-right">#{baseId} → now</th>}<th className="t-label text-right">Speed</th></tr></thead>
           <tbody>
-            {rows.length === 0 && <tr><td colSpan={5}><div className="flex flex-col items-center gap-2 py-8 text-ink-3"><GaugeArt size={48} />No failing question matches. Suspiciously quiet.</div></td></tr>}
+            {rows.length === 0 && <tr><td colSpan={5}><div className="flex flex-col items-center gap-2 py-8 text-ink-3"><GaugeArt size={48} />No failing questions match. Suspiciously quiet.</div></td></tr>}
             {rows.map(({ g, v, rate, b }, i) => {
               const col = v ? causeColor(v.cause) : 'transparent'
               const failedN = g.decided - g.passed
@@ -616,7 +616,7 @@ function FailuresTab({ runId, s, baseId }: { runId: number; s: RunSummary; baseI
                   </td>
                   {baseId && (
                     <td className="whitespace-nowrap text-right text-xs">
-                      {b === null ? <Badge tone="info">new</Badge> : Math.abs(b - rate) < 1e-9 ? null
+                      {b === null ? <Badge tone="info">New</Badge> : Math.abs(b - rate) < 1e-9 ? null
                         : <span className="num font-mono">{pct(b, 0)} → {pct(rate, 0)} <Delta value={rate - b} format={() => ''} /></span>}
                     </td>
                   )}
@@ -631,8 +631,8 @@ function FailuresTab({ runId, s, baseId }: { runId: number; s: RunSummary; baseI
   )
 }
 
-const KIND_LABEL: Record<string, string> = { deterministic: 'Objective checks', retrieval: 'Retrieval', agent: 'Agent / tools', performance: 'Latency and cost', llm_judge: 'Meaning (grading model)' }
-const METRICS_HELP = <><p>Pass rates count only tries where the check reached a verdict.</p><p>"Not applicable": the question does not ask for it. "Not evaluated": the bot did not report what the check needs.</p></>
+const KIND_LABEL: Record<string, string> = { deterministic: 'Objective checks', retrieval: 'Search', agent: 'Tools and agents', performance: 'Speed and cost', llm_judge: 'Meaning (grading model)' }
+const METRICS_HELP = <><p>Pass rates count only tries where the check reached a verdict.</p><p>“Not applicable”: the question does not ask for it. “Not evaluated”: the bot did not report what the check needs.</p></>
 
 function MetricsTab({ s, heuristic }: { s: RunSummary; heuristic: boolean }) {
   const evs = useQuery({ queryKey: ['evaluators'], queryFn: () => api.get<{ evaluators: EvaluatorInfo[] }>('/api/evaluators') })
@@ -640,14 +640,14 @@ function MetricsTab({ s, heuristic }: { s: RunSummary; heuristic: boolean }) {
   const kinds = [...new Set(Object.values(s.evaluators).map((m) => m.kind))]
   const fmtMean = (id: string, v: number | null) => (v === null ? 'n/a' : id === 'latency' ? ms(v) : id === 'token_budget' ? num(v) : id === 'cost_budget' ? usd(v) : v.toFixed(2))
   const skipped = (c: Partial<Record<string, number>>) => {
-    const parts = [[c.not_applicable, 'not applicable'], [c.not_evaluated, 'not evaluated'], [c.unknown, 'unknown'], [c.error, 'error']].filter(([n]) => n) as [number, string][]
+    const parts = [[c.not_applicable, 'not applicable'], [c.not_evaluated, 'not evaluated'], [c.unknown, 'not sure'], [c.error, 'error']].filter(([n]) => n) as [number, string][]
     return parts.length ? parts.map(([n, w]) => `${n} ${w}`).join(', ') : '-'
   }
   return (
     <div className="space-y-12">
       {kinds.map((kind) => (
         <Card key={kind} title={KIND_LABEL[kind] ?? kind} padded={false}
-          help={<>{kind === 'llm_judge' && heuristic && <p>This run used the heuristic judge: these are word-overlap scores, hatched, not a model's reading of meaning.</p>}{METRICS_HELP}</>}>
+          help={<>{kind === 'llm_judge' && heuristic && <p>This run used heuristic grading: these are word-overlap scores, hatched, not a model’s reading of meaning.</p>}{METRICS_HELP}</>}>
           <Table>
             <thead><tr><th className="t-label">Check</th><th className="t-label text-right">Pass rate</th><th className="t-label"><Term k="ci">95% interval</Term></th><th className="t-label text-right">Mean score</th><th className="t-label text-right">Decided</th><th className="t-label">Skipped</th></tr></thead>
             <tbody>
@@ -659,8 +659,8 @@ function MetricsTab({ s, heuristic }: { s: RunSummary; heuristic: boolean }) {
                       <span className="font-medium">{info[id]?.name ?? id}</span>
                       {!m.gating && <span className="ml-1 text-xs text-ink-3">(<Term k="gating">diagnostic</Term>)</span>}
                       <span className="ml-1.5 font-mono text-label text-ink-3">v{m.version}</span>
-                      {heur && <Badge tone="heuristic" className="ml-2">heuristic</Badge>}
-                      {info[id]?.calibration && <div className="text-xs text-ink-3">{heur ? 'heuristic judge' : info[id].calibration!.status}</div>}
+                      {heur && <Badge tone="heuristic" className="ml-2">Heuristic</Badge>}
+                      {info[id]?.calibration && <div className="text-xs text-ink-3">{heur ? 'heuristic grading' : info[id].calibration!.status}</div>}
                     </td>
                     <td className="num text-right font-mono">{pct(m.pass_rate)}</td>
                     <td><IntervalBar value={m.pass_rate} low={m.ci_low} high={m.ci_high} axis /></td>
@@ -692,7 +692,7 @@ function TracesTab({ runId }: { runId: number }) {
     <div className="grid items-start gap-x-10 gap-y-12 lg:grid-cols-[320px_minmax(0,1fr)]">
       <Card title="Tries" meta={<SampleSize n={shown.length} unit="tries" />}
         help={<p>Every try of the run. Click one, or move with J and K, to see its trace; Enter opens the answer.</p>}
-        actions={<Checkbox checked={onlyFailing} onChange={setOnlyFailing} label="failing only" className="text-xs" />}>
+        actions={<Checkbox checked={onlyFailing} onChange={setOnlyFailing} label="Failing only" className="text-xs" />}>
         <ul className="scroll-thin max-h-[680px] overflow-y-auto border-t border-line">
           {shown.map((t, i) => (
             <li key={t.id}>
@@ -704,7 +704,7 @@ function TracesTab({ runId }: { runId: number }) {
           ))}
         </ul>
       </Card>
-      <Card className="lg:sticky lg:top-4" title={trial.data ? <>Trace · <span className="font-mono">{trial.data.case_id}</span> try {trial.data.trial_index + 1}</> : 'Trace'} actions={pick && <Button size="sm" onClick={() => nav(`/trials/${pick}`, { viewTransition: true })}>Open trial</Button>}>
+      <Card className="lg:sticky lg:top-4" title={trial.data ? <>Trace · <span className="font-mono">{trial.data.case_id}</span> try {trial.data.trial_index + 1}</> : 'Trace'} actions={pick && <Button size="sm" onClick={() => nav(`/trials/${pick}`, { viewTransition: true })}>Open try</Button>}>
         {pick === null ? <Empty title="No tries recorded" /> : trial.isLoading ? <Loading /> : trial.data?.trace ? (
           <div className="space-y-3">
             <div className="text-lead"><span className="t-label mr-2">Question</span>{trial.data.question}</div>
@@ -766,9 +766,9 @@ function LoadErrors({ r }: { r: RunDetail }) {
   })
   return (
     <div className="mb-4">
-      <Notice tone="warn" title={`${e.count} answer${e.count === 1 ? '' : 's'} failed with "rate limited" or timed out${r.concurrency ? ` at ${r.concurrency} at a time` : ''}`}
+      <Notice tone="warn" title={`${plural(e.count, 'answer')} failed with “rate limited” or timed out${r.concurrency ? ` at ${r.concurrency} at a time` : ''}`}
         action={<Button size="sm" loading={reask.isPending} onClick={() => reask.mutate()}>Re-ask {e.case_ids.length} at {lower} at a time</Button>}>
-        These are probably not the bot's fault: too many questions arrived at once. They count as errors in this run's pass rate. Re-asking them fewer at a time starts a small new run with just those questions.
+        These are probably not the bot’s fault: too many questions arrived at once. They count as errors in this run’s pass rate. Re-asking them fewer at a time starts a small new run with just those questions.
         {reask.isError && <div className="mt-2"><ErrorState error={reask.error} /></div>}
       </Notice>
     </div>

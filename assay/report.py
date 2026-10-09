@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from assay.textutil import plural
+
 UNITS = {"rate": "pp", "score": "", "latency": "ms", "count": "", "cost": "$"}
 
 
@@ -46,13 +48,13 @@ def direction(row: dict[str, Any]) -> str:
 
 def markdown_summary(comparison: dict[str, Any] | None, gate: dict[str, Any] | None, run: dict[str, Any]) -> str:
     lines = ["## Assay evaluation", ""]
-    lines.append(f"Run **#{run['id']}** - {run.get('experiment') or ''} - target `{run.get('target')}` "
-                 f"v{run.get('target_version')} - dataset `{run.get('dataset')}` v{run.get('dataset_version')} "
-                 f"- {run.get('n_cases')} cases x {run.get('trials_per_case')} trial(s)")
+    lines.append(f"Run **#{run['id']}**: {run.get('experiment') or ''}, connection `{run.get('target')}` "
+                 f"v{run.get('target_version')}, dataset `{run.get('dataset')}` v{run.get('dataset_version')}, "
+                 f"{plural(run.get('n_cases') or 0, 'question')} × {plural(run.get('trials_per_case') or 1, 'try', 'tries')}")
     judge = run.get("judge")
     if judge:
-        lines.append(f"Judge: {judge.get('provider')}/{judge.get('model')}"
-                     + (" (heuristic, not an LLM)" if judge.get("provider") == "heuristic" else ""))
+        lines.append(f"Grading model: {judge.get('provider')}/{judge.get('model')}"
+                     + (" (heuristic, no model involved)" if judge.get("provider") == "heuristic" else ""))
     lines.append("")
     if comparison:
         lines += ["| | Metric | Baseline | Candidate | Delta | 95% CI (paired) |", "|---|---|---|---|---|---|"]
@@ -64,12 +66,12 @@ def markdown_summary(comparison: dict[str, Any] | None, gate: dict[str, Any] | N
             lines.append(f"| {mark} | {r['label']} | {fmt_value(r['unit'], r['baseline'])} | "
                          f"{fmt_value(r['unit'], r['candidate'])} | {fmt_delta(r)} | {ci_s} |")
         mc = comparison["mcnemar"]
-        lines += ["", f"Paired cases: {comparison['n_shared_cases']}. Improved: {len(comparison['improvements'])}, "
+        lines += ["", f"Paired questions: {comparison['n_shared_cases']}. Improved: {len(comparison['improvements'])}, "
                       f"regressed: {len(comparison['regressions'])}. McNemar exact p = "
-                      + (f"{mc['p_value']:.3f}" if mc.get("p_value") is not None else "n/a (no discordant cases)")
+                      + (f"{mc['p_value']:.3f}" if mc.get("p_value") is not None else "n/a (no questions changed result)")
                       + ". An interval that includes 0 means the difference is within noise at this sample size."]
         if comparison["regressions"]:
-            lines += ["", "**Regressed cases**", ""]
+            lines += ["", "**Regressed questions**", ""]
             for c in comparison["regressions"][:15]:
                 lines.append(f"- `{c['case_id']}` {c.get('title') or ''} - "
                              f"{(c['baseline_pass_rate'] or 0) * 100:.0f}% -> {(c['candidate_pass_rate'] or 0) * 100:.0f}% "

@@ -34,6 +34,7 @@ from assay.adapters.http import (
     resolve_secret,
 )
 from assay.adapters.mapping import get_path
+from assay.errors import reach_error
 
 # --------------------------------------------------------------------------------------
 # The standard reply shape
@@ -41,7 +42,7 @@ from assay.adapters.mapping import get_path
 
 STANDARD_SHAPE_EXAMPLE: dict[str, Any] = {
     "answer": "Device Alpha has a 24-month warranty [warranty].",
-    "sources": [{"id": "warranty", "title": "Warranty policy", "text": "Every device ...", "score": 0.82}],
+    "sources": [{"id": "warranty", "title": "Warranty policy", "text": "Every device …", "score": 0.82}],
     "citations": ["warranty"],
     "tool_calls": [{"name": "lookup_order", "arguments": {"order_id": "18372"}, "result": {"status": "active"},
                     "status": "success"}],
@@ -237,8 +238,8 @@ async def probe(config: dict[str, Any], message: str) -> dict[str, Any]:
             else:
                 resp = await client.post(url, params=params, json=render(cfg.body, scope), headers=headers)
     except (httpx.TimeoutException, httpx.TransportError) as exc:
-        return {"ok": False, "url": url, "error": f"{type(exc).__name__} calling {url}",
-                "explanation": explain_error(f"{type(exc).__name__} calling {url}", timeout_s=cfg.timeout_s)}
+        sentence = reach_error(exc, url)
+        return {"ok": False, "url": url, "error": sentence, "explanation": explain_error(sentence, timeout_s=cfg.timeout_s)}
     elapsed = round((time.perf_counter() - t0) * 1000, 1)
     ctype = resp.headers.get("content-type", "")
     out: dict[str, Any] = {"ok": resp.status_code < 400, "url": url, "status": resp.status_code,
@@ -515,9 +516,9 @@ def explain_error(error: str | None, timeout_s: float | None = None) -> str | No
         return "The bot is rate-limiting. Lower the number of questions sent in parallel."
     if re.search(r"http 5\d\d", e):
         return "The bot crashed while answering (a server error on its side). Check its logs."
-    if "connecterror" in e or "connecttimeout" in e or "connection" in e or "transport" in e:
+    if "could not connect" in e or "connecterror" in e or "connection" in e or "transport" in e:
         return "Could not connect. Is the bot running, and is the base URL (host and port) right?"
-    if "timeout" in e:
+    if "timeout" in e or "timed out" in e:
         return f"No reply within {int(timeout_s or 60)} s. Is the bot running, and is it slow on its first call?"
     if "is not set" in e:
         return "A secret this connection needs is not set. Add it in Settings > Models & keys."

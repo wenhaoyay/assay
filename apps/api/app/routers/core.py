@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from assay.adapters import AdapterContext, TransientTargetError, build_adapter
+from assay.errors import plain_error, settings_error
 from assay.evaluators import DEFAULT_EVALUATORS, JUDGE_EVALUATORS, all_evaluators
 from assay.evaluators.llm_judge.judge import load_rubric
 from assay.providers import ChatMessage, ProviderError, ProviderSpec, build_provider
@@ -79,7 +80,7 @@ def _validate_config(adapter: str, config: dict[str, Any]) -> None:
         if adapter != "replay":
             build_adapter(adapter, config)
     except Exception as exc:
-        raise HTTPException(422, f"Invalid {adapter} target config: {exc}") from exc
+        raise HTTPException(422, settings_error(exc, f"The {adapter} connection settings are not valid. Check the address, the request and how the reply is read.")) from exc
 
 
 @router.get("/targets")
@@ -128,7 +129,7 @@ async def _test(adapter_name: str, config: dict[str, Any], message: str, replay=
     try:
         adapter = build_adapter(adapter_name, config, replay)
     except Exception as exc:
-        return {"ok": False, "error": f"Invalid configuration: {exc}",
+        return {"ok": False, "error": settings_error(exc, "The connection settings are not valid."),
                 "hint": "Check the adapter settings (base URL, endpoint, callable)."}
     t0 = time.perf_counter()
     try:
@@ -136,17 +137,17 @@ async def _test(adapter_name: str, config: dict[str, Any], message: str, replay=
                                   AdapterContext(case_id="connection-test"))
     except TransientTargetError as exc:
         return {"ok": False, "error": str(exc),
-                "hint": "The target did not answer (timeout, connection refused or a 5xx/429). Is it running, "
+                "hint": "The connection did not answer (timed out, refused or a server error). Is it running, "
                         "and is the base URL right?"}
     except Exception as exc:
-        return {"ok": False, "error": f"{type(exc).__name__}: {exc}",
+        return {"ok": False, "error": plain_error(exc),
                 "hint": "The request could not be made. Check secrets (env:NAME must be set on the server)."}
     finally:
         await adapter.aclose()
     r = call.result
     hint = None
     if r.error:
-        hint = "The target answered with an error. Check the endpoint, method and request body template."
+        hint = "The connection answered with an error. Check the endpoint, method and request body template."
     elif not r.answer:
         hint = "No answer found. Check the response mapping's 'answer' path against the raw response."
     return {"ok": not r.error and bool(r.answer), "elapsed_ms": round((time.perf_counter() - t0) * 1000, 1),
@@ -157,7 +158,7 @@ async def _test(adapter_name: str, config: dict[str, Any], message: str, replay=
 @router.post("/targets/test")
 async def test_unsaved(body: ConnectionTest) -> dict[str, Any]:
     if not body.adapter or body.config is None:
-        raise HTTPException(422, "adapter and config are required")
+        raise HTTPException(422, "Say how the connection is reached and give its settings.")
     return await _test(body.adapter, body.config, body.message)
 
 
@@ -205,7 +206,7 @@ def delete_provider(provider_id: int, s: Session = Depends(get_session)) -> dict
     pc = svc.get(s, m.ProviderConfig, provider_id)
     used = s.scalar(select(m.Experiment.id).where(m.Experiment.judge_config_id == pc.id))
     if used:
-        raise HTTPException(409, "This provider is used by an experiment; it stays for reproducibility.")
+        raise HTTPException(409, "This grading model was used by a run setup; it stays so those runs can be reproduced.")
     s.delete(pc)
     return {"deleted": provider_id}
 
@@ -221,8 +222,8 @@ async def test_provider(provider_id: int, s: Session = Depends(get_session)) -> 
         resp = await provider.complete([ChatMessage("user", 'Reply with the JSON object {"ok": true}.')])
     except ProviderError as exc:
         return {"ok": False, "error": str(exc)}
-    except Exception as exc:
-        return {"ok": False, "error": f"{type(exc).__name__}: could not reach {pc.provider}"}
+    except Exception:
+        return {"ok": False, "error": f"Could not reach {pc.provider}."}
     return {"ok": True, "elapsed_ms": round((time.perf_counter() - t0) * 1000), "reply": resp.text[:200],
             "usage": resp.usage.model_dump() if resp.usage else None}
 

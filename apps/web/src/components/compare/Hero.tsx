@@ -3,6 +3,7 @@
 import clsx from 'clsx'
 import type { ReactNode } from 'react'
 import { chancePhrase, reading } from '../../lib/compare'
+import { plural } from '../../lib/format'
 import type { Comparison, ComparisonRow } from '../../lib/types'
 import { Delta, Needle, SampleSize } from '../instrument'
 import { READING_W } from '../home/shared'
@@ -18,7 +19,7 @@ export function headline(overall: ComparisonRow | null): { word: string; tone: '
   if (read === 'likely worse') return { word: 'Worse.', tone: 'bad', rest: <> Pass rate {dir} {pts}, beyond noise.</> }
   if (overall.delta === 0) return { word: 'No change.', tone: 'neutral', rest: ' Pass rate exactly the same.' }
   if (read === 'within noise') return { word: 'No clear change.', tone: 'neutral', rest: <> Pass rate {dir} {pts}, within noise.</> }
-  return { word: overall.delta > 0 ? 'Up.' : 'Down.', tone: 'neutral', rest: <> Pass rate {dir} {pts}; no interval to judge it by.</> }
+  return { word: overall.delta > 0 ? 'Up.' : 'Down.', tone: 'neutral', rest: <> Pass rate {dir} {pts}; no interval to say how sure it is.</> }
 }
 
 export function Hero({ c, actions }: { c: Comparison; actions?: ReactNode }) {
@@ -47,12 +48,12 @@ export function Hero({ c, actions }: { c: Comparison; actions?: ReactNode }) {
             <Help title="How to read this" wide>
               <p>The needle is the change in pass rate from #{c.baseline_run.id} to #{c.candidate_run.id}; the teal arc behind it is its 95% interval, from resampling questions. An interval clear of zero means a real change, not luck. If the arc covers the middle, the two versions may really be equally good.</p>
               <p>Every question is paired: the same question in both runs, so a hard question counts against both.</p>
-              <p>"Show me why", further down, rebuilds that interval in front of you.</p>
+              <p>“Why this result?”, further down, rebuilds that interval in front of you.</p>
             </Help>
           </span>
         </h1>
         <p className={clsx('mt-3 text-lead text-ink-2', READING_W)}>
-          <b className="font-semibold text-good-ink">{c.improvements.length} question{c.improvements.length === 1 ? '' : 's'} improved</b>,{' '}
+          <b className="font-semibold text-good-ink">{plural(c.improvements.length, 'question')} improved</b>,{' '}
           <b className="font-semibold text-bad-ink">{c.regressions.length} regressed</b>, <span className="font-mono">{mc.both_fail}</span> fail in both.
           {mc.p_value !== null && (
             <> {mc.p_value < 0.05 ? 'A split this lopsided' : 'A split like this'} turns up by chance {chancePhrase(mc.p_value)}{mc.p_value >= 0.05 ? ', so it may be luck' : ''}{' '}

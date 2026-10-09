@@ -34,12 +34,12 @@ def is_trusted(module_name: str) -> bool:
 def load_callable(ref: str) -> Callable[..., Any]:
     module_name, _, attr = ref.partition(":")
     if not attr:
-        raise ValueError(f"Python target must be 'module:function', got {ref!r}")
+        raise ValueError(f"A Python function connection must be written 'module:function', not {ref!r}.")
     if not is_trusted(module_name):
-        raise ValueError(f"{module_name!r} is not a trusted Python target. Add it to ASSAY_PYTHON_TARGETS "
-                         "on the machine running Assay to allow it.")
+        raise ValueError(f"{module_name!r} is not a trusted Python module. Add it to ASSAY_PYTHON_TARGETS "
+                         "on the computer running Assay to allow it.")
     if attr.startswith("_"):
-        raise ValueError(f"{ref!r}: private names cannot be called")
+        raise ValueError(f"{ref!r}: private names cannot be called.")
     module = importlib.import_module(module_name)
     fn = getattr(module, attr, None)
     if not callable(fn):

@@ -65,8 +65,8 @@ export function RunsPage() {
       </div>
       {runs.isLoading ? <Loading /> : runs.isError ? <ErrorState error={runs.error} /> : rows.length === 0 ? (
         (runs.data ?? []).length === 0
-          ? <Empty title="No runs yet. The needle is resting on zero." action={<Link to="/runs/new" className={linkButton('primary')}>Start a run</Link>}>Run a chatbot version on a dataset, or load the Acme demo with <Code>assay seed --run</Code>.</Empty>
-          : <Empty title="Nothing matches that search.">Clear the search or pick all chatbots.</Empty>
+          ? <Empty title="No runs yet" action={<Link to="/runs/new" className={linkButton('primary')}>New run</Link>}>The needle is resting on zero: run a chatbot version on a dataset, or load the Acme demo with <Code>assay seed --run</Code>.</Empty>
+          : <Empty title="No runs match" action={<Button onClick={() => { setSearch(''); setProject('') }}>Clear filters</Button>}>Clear the search or pick all chatbots.</Empty>
       ) : group === 'flat' ? (
         <Card title="All runs" meta={plural(rows.length, 'run')} padded={false}><RunsTable runs={rows} selectable selected={selected} onToggle={toggle} keyboard /></Card>
       ) : (
@@ -81,12 +81,12 @@ export function RunsPage() {
                 title={r0.dataset}
                 meta={<>v{r0.dataset_version} · {plural(g.length, 'run')} · {nq != null ? plural(nq, 'question') : 'questions'}{r0.case_filter ? ' (reduced)' : ''} · setup {r0.comparability_key?.slice(0, 6)}</>}
                 help={<>
-                  <p>These runs asked the same {nq ?? ''} questions{r0.case_filter ? ' (a reduced suite)' : ''} with the same checks and grading model, so their pass rates can be read side by side.</p>
-                  <p>Judge: {r0.judge ? (heur ? 'heuristic word overlap (a rough guide, hatched wherever it appears)' : `${r0.judge.provider}/${r0.judge.model}`) : 'none'}. Setup {r0.comparability_key}: runs with different checks count different things in their pass rate.</p>
-                  <p>The line is each run's pass rate, oldest to newest; runs that asked another chatbot's questions are left out of it.</p>
+                  <p>These runs asked the same {nq ?? ''} questions{r0.case_filter ? ' (reduced)' : ''} with the same checks and grading model, so their pass rates can be read side by side.</p>
+                  <p>Grading model: {r0.judge ? (heur ? 'heuristic word overlap (a rough guide, hatched wherever it appears)' : `${r0.judge.provider}/${r0.judge.model}`) : 'none'}. Setup {r0.comparability_key}: runs with different checks count different things in their pass rate.</p>
+                  <p>The line is each run’s pass rate, oldest to newest; runs that asked another chatbot’s questions are left out of it.</p>
                 </>}
                 actions={<span className="flex items-center gap-3">
-                  <Badge tone={heur ? 'heuristic' : r0.judge ? 'neutral' : 'unmeasured'}>{r0.judge ? (heur ? 'heuristic judge' : r0.judge.model) : 'no judge'}</Badge>
+                  <Badge tone={heur ? 'heuristic' : r0.judge ? 'neutral' : 'unmeasured'}>{r0.judge ? (heur ? 'Heuristic grading' : r0.judge.model) : 'No grading model'}</Badge>
                   {trend.length > 1 && <Sparkline values={trend} width={120} height={26} label="pass rate across these runs" />}
                 </span>}>
                 <RunsTable runs={g} selectable selected={selected} onToggle={toggle} keyboard={i === 0} />
@@ -104,7 +104,7 @@ export function RunsPage() {
             <span className="text-sm">
               {pair.length === 1 ? <>Run <span className="font-mono font-semibold">#{pair[0].id}</span> picked · tick one more</> : <>Compare <span className="font-mono font-semibold text-series-1">#{a.id}</span> (baseline) with <span className="font-mono font-semibold text-series-2">#{b.id}</span></>}
             </span>
-            {pair.length === 2 && !comparable && <span className="flex items-center gap-1 text-xs text-warn-ink"><AlertTriangle className="size-3.5" />different setups</span>}
+            {pair.length === 2 && !comparable && <span className="flex items-center gap-1 text-xs text-warn-ink"><AlertTriangle className="size-3.5" />Different setups</span>}
             <Button variant="primary" size="sm" disabled={pair.length < 2} onClick={() => nav(`/compare?baseline=${a.id}&candidate=${b.id}`, { viewTransition: true })}><GitCompareArrows className="size-3.5" />Compare</Button>
             <Button variant="ghost" size="sm" onClick={() => setSelected([])} aria-label="Clear selection"><X className="size-3.5" /></Button>
           </motion.div>

@@ -11,6 +11,7 @@ from typing import Any
 from assay.evaluators.base import Evaluator, register
 from assay.schemas import EvalStatus, NormalizedTargetResult, ToolCall
 from assay.text import contains_phrase, normalize
+from assay.textutil import plural
 
 # --------------------------------------------------------------------------------------
 # Pure helpers
@@ -122,7 +123,7 @@ class ForbiddenTools(_AgentEvaluator):
     id = "forbidden_tools"
     name = "Forbidden tools"
     failure_type = "incorrect_tool"
-    description = "No tool on the case's forbidden list was called."
+    description = "No tool on the question's forbidden list was called."
 
     async def evaluate(self, case, result, trace, ctx):
         if not case.expected.forbidden_tools:
@@ -189,7 +190,7 @@ class UnnecessaryTools(_AgentEvaluator):
             else:
                 extra.append(c.name)
         return self.passed(len(extra) <= limit, score=len(extra), threshold=limit,
-                           explanation=f"{len(extra)} extra call(s), limit {limit}.", evidence=extra)
+                           explanation=f"{plural(len(extra), 'extra call')}, limit {limit}.", evidence=extra)
 
 
 @register
@@ -207,13 +208,13 @@ class StepCount(_AgentEvaluator):
         tools = len(result.tool_calls or [])
         steps = result.steps or []
         models = sum(1 for s in steps if s.type == "model_call")
-        # A target that reports its tool calls as steps too must not have them counted twice.
+        # A bot that reports its tool calls as steps too must not have them counted twice.
         total = len(steps) + max(0, tools - sum(1 for s in steps if s.type == "tool_call"))
         meta = {"tool_calls": tools, "model_calls": models, "steps": total}
         limit = case.expected.max_steps
         if limit is None:
             return self.result(EvalStatus.NOT_APPLICABLE, score=total, metadata=meta,
-                               explanation=f"{tools} tool call(s), {models} model call(s); no limit set.")
+                               explanation=f"{plural(tools, 'tool call')}, {plural(models, 'model call')}; no limit set.")
         return self.passed(total <= limit, score=total, threshold=limit, metadata=meta,
                            explanation=f"{total} steps vs limit {limit}.")
 
@@ -224,7 +225,7 @@ class TaskSuccess(_AgentEvaluator):
     name = "Task success"
     failure_type = "wrong_answer"
     description = ("The expected outcome fields are found in the structured output or in a successful tool "
-                   "result - decided by code, no judge.")
+                   "result. Decided by code, with no grading model.")
 
     async def evaluate(self, case, result, trace, ctx):
         expected = case.expected.expected_outcome
@@ -257,7 +258,7 @@ class ToolResultConsistency(_AgentEvaluator):
     id = "tool_result_consistency"
     name = "Tool-result consistency"
     failure_type = "tool_result_misused"
-    description = ("The answer states what the tool returned. Configured per case: a result field and the phrases "
+    description = ("The answer states what the tool returned. Configured per question: a result field and the phrases "
                    "that express each value; the answer must use the phrase for the actual value and none for the others.")
 
     async def evaluate(self, case, result, trace, ctx):
@@ -302,7 +303,7 @@ class ErrorRecovery(_AgentEvaluator):
 
     async def evaluate(self, case, result, trace, ctx):
         if result.tool_calls is None:
-            return self.na("Target does not report tool calls.")
+            return self.na("The bot does not report tool calls.")
         failed = [c for c in result.tool_calls if c.status != "success"]
         if not failed:
             return self.na("No tool call failed.")
@@ -311,7 +312,7 @@ class ErrorRecovery(_AgentEvaluator):
         admits = any(contains_phrase(result.answer, p) for p in cfg.get("admit_phrases", self.DEFAULT_ADMIT))
         fabricated = [p for p in cfg.get("success_claims", []) if contains_phrase(result.answer, p)]
         ok = (recovered or admits) and not (fabricated and not recovered)
-        expl = (f"{len(failed)} failed call(s); " + ("retried successfully; " if recovered else "") +
+        expl = (f"{plural(len(failed), 'failed call')}; " + ("retried successfully; " if recovered else "") +
                 ("answer acknowledges the failure; " if admits else "answer does not acknowledge it; ") +
                 (f"claims: {', '.join(fabricated)}" if fabricated else "no fabricated result"))
         return self.passed(ok, score=1.0 if ok else 0.0, explanation=expl.strip("; "))

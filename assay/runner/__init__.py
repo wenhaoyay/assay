@@ -159,7 +159,7 @@ async def evaluate_trial(case: TestCase, result: NormalizedTargetResult, trace: 
             ev = get_evaluator(eid)
         except KeyError:
             scores.append(EvaluationResult(evaluator_id=eid, evaluator_version="?", kind="unknown",
-                                           status=EvalStatus.ERROR, explanation=f"Unknown evaluator {eid!r}"))
+                                           status=EvalStatus.ERROR, explanation=f"Unknown check {eid!r}."))
             continue
         sc = await ev.run(case, result, trace, ctx)
         if eid in ctx.not_measured and sc.status == EvalStatus.NOT_EVALUATED:

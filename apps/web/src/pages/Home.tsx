@@ -66,7 +66,7 @@ export function HomePage() {
         key: 'flaky', dot: 'bg-flaky', to: `/p/${pair.id}`,
         title: <><span className="font-mono">{flaky.length}</span> question{flaky.length === 1 ? ' is' : 's are'} flaky</>,
         body: <>they pass some tries and fail others in run <span className="font-mono">#{pair.latest_run_id}</span>: the answer depends on luck</>,
-        chip: <Badge tone="flaky">flaky</Badge>,
+        chip: <Badge tone="flaky">Flaky</Badge>,
       })
     }
   }
@@ -75,8 +75,8 @@ export function HomePage() {
     look.push({
       key: 'calib', dot: 'bg-series-1', to: '/calibration',
       title: 'The grading model is unchecked',
-      body: <>label <span className="font-mono">20</span> answers to see how often the judge agrees with you</>,
-      chip: <Badge tone="neutral">calibrate</Badge>,
+      body: <>label <span className="font-mono">20</span> answers to see how often the grading model agrees with you</>,
+      chip: <Badge tone="neutral">Calibrate</Badge>,
     })
   }
   for (const r of runs.filter((x) => x.off_topic).slice(0, 2)) {
@@ -84,7 +84,7 @@ export function HomePage() {
       key: `off-${r.id}`, dot: 'bg-warn', to: `/runs/${r.id}`,
       title: <>Run <span className="font-mono">#{r.id}</span> asked another chatbot’s questions</>,
       body: <>they were written for {r.off_topic}, so the run is left out of {projectName(r.project_id) || 'its chatbot'}’s trend</>,
-      chip: <Badge tone="unmeasured">left out</Badge>,
+      chip: <Badge tone="unmeasured">Left out</Badge>,
     })
   }
 
@@ -94,7 +94,7 @@ export function HomePage() {
         eyebrow={today}
         title={<>Your chatbots, <em>today’s reading.</em></>}
         help={<>
-          <p>Each chatbot’s latest run against its last comparable one: the same questions, checks and judge.</p>
+          <p>Each chatbot’s latest run against its last comparable one: the same questions, checks and grading model.</p>
           <p>The needle is the pass rate; the black tick on the arc is the release gate. The dots are the run’s fingerprint, one per question: green passed every try, amber flaky, red failed every try.</p>
           <p>Open a chatbot for its history.</p>
         </>}
@@ -122,7 +122,7 @@ export function HomePage() {
             </div>
 
             <div className="grid gap-x-10 gap-y-12 lg:grid-cols-[7fr_5fr]">
-              <Card title="Recent activity" help={<p>Runs, release-gate checks and anything left out of trends, newest first. Click a line to open that run.</p>}>
+              <Card title="Recent activity" help={<p>Runs, release gate results and anything left out of trends, newest first. Click a line to open that run.</p>}>
                 <ActivityStream runs={runs} projectName={projectName} gates={gates} multi={h.projects.length > 1} />
               </Card>
               <Card title="Worth a look" help={<>
@@ -159,7 +159,7 @@ function FirstSteps() {
   const motionOn = useMotionOn()
   const steps = [
     { n: 1, title: 'Connect a chatbot', body: 'Paste a curl command or pick a template. Bots that reply in the Assay shape need no mapping.', to: '/targets/new', cta: 'Connect' },
-    { n: 2, title: 'Add golden questions', body: 'Import a YAML/CSV dataset, or draft cases from your documents and approve them.', to: '/datasets', cta: 'Datasets' },
+    { n: 2, title: 'Add a dataset', body: 'Import a YAML or CSV file, or draft questions from your documents and approve them.', to: '/datasets', cta: 'Datasets' },
     { n: 3, title: 'Run and compare', body: 'Run two versions on the same questions and see what changed, with the uncertainty stated.', to: '/runs/new', cta: 'New run' },
   ]
   return (
@@ -176,7 +176,7 @@ function FirstSteps() {
           </motion.div>
         ))}
       </div>
-      <Notice title="Want to see it working first?">Load the fictional Acme demo (a support agent in two variants, 58 golden cases, a release gate): run <Code>assay seed --run</Code>, then reload.</Notice>
+      <Notice title="Want to see it working first?">Load the fictional Acme demo (a support chatbot in two versions, 58 questions, a release gate): run <Code>assay seed --run</Code>, then reload.</Notice>
     </div>
   )
 }

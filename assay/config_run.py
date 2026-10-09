@@ -74,16 +74,16 @@ def resolve_dataset(s: Session, project_id: int, spec: dict[str, Any], base: str
 
 
 def resolve_target(s: Session, project_id: int, spec: dict[str, Any]) -> m.TargetVersion:
-    name = spec.get("name") or f"{spec.get('adapter', 'http')} target"
+    name = spec.get("name") or f"{spec.get('adapter', 'http')} connection"
     t = s.scalar(select(m.Target).where(m.Target.project_id == project_id, m.Target.name == name))
     if "config" not in spec and "endpoint" not in spec:
         if t is None:
-            raise svc.NotFound(f"Target {name!r} not found")
+            raise svc.NotFound(f"No connection named {name!r}.")
         if "version" in spec:
             tv = s.scalar(select(m.TargetVersion).where(m.TargetVersion.target_id == t.id,
                                                         m.TargetVersion.version == int(spec["version"])))
             if tv is None:
-                raise svc.NotFound(f"Target {name!r} has no version {spec['version']}")
+                raise svc.NotFound(f"The connection {name!r} has no version {spec['version']}.")
             return tv
         return svc.latest_target_version(s, t.id)
     adapter = spec.get("adapter", "http")

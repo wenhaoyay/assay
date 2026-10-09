@@ -239,7 +239,7 @@ export function Delta({ value, format, higherIsBetter = true, noise = 0.005, suf
   suffix?: ReactNode
   className?: string
 }) {
-  if (value === null || value === undefined || Number.isNaN(value)) return <span className={clsx('text-ink-3', className)}>no baseline</span>
+  if (value === null || value === undefined || Number.isNaN(value)) return <span className={clsx('text-ink-3', className)}>No baseline</span>
   const flat = Math.abs(value) < noise
   const good = flat ? null : (value > 0) === higherIsBetter
   const arrow = flat ? '→' : value > 0 ? '↑' : '↓'

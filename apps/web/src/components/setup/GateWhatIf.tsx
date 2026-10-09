@@ -90,7 +90,7 @@ export function GateWhatIf({ runs, passMin, p95Max }: { runs: WhatIfRun[]; passM
                     initial={motionOn ? { y: y(0), height: 0 } : false} animate={{ y: y(r.pass_rate), height: y(0) - y(r.pass_rate) }}
                     transition={motionOn ? { delay: i * 0.04, duration: DUR.slow, ease: [0.16, 1, 0.3, 1] } : { duration: 0 }}
                     fill={good ? 'var(--good)' : 'var(--bad)'} data-run={r.run_id}>
-                    <title>{`Run #${r.run_id}${r.variant ? ` (${r.variant})` : ''}: pass rate ${(r.pass_rate * 100).toFixed(1)}%, p95 ${ms(r.p95_latency_ms)}`}</title>
+                    <title>{`Run #${r.run_id}${r.variant ? ` (${r.variant})` : ''}: pass rate ${(r.pass_rate * 100).toFixed(1)}%, speed (p95) ${ms(r.p95_latency_ms)}`}</title>
                   </motion.rect>
                   <Link to={`/runs/${r.run_id}`}>
                     <text x={cx} y={H - m.b + 16} textAnchor="middle" className="c-num">#{r.run_id}</text>
@@ -121,9 +121,9 @@ export function GateWhatIf({ runs, passMin, p95Max }: { runs: WhatIfRun[]; passM
       </div>
       {p95 !== null && p95s.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-4">
-          <span className="t-label">p95 limit</span>
+          <span className="t-label">Speed (p95) limit</span>
           <input type="range" min={sMin} max={sMax} step={50} value={p95} onChange={(e) => setP95(Number(e.target.value))}
-            className="w-64 accent-[var(--accent)]" aria-label="p95 limit" data-testid="whatif-p95" />
+            className="w-64 accent-[var(--accent)]" aria-label="Speed (p95) limit" data-testid="whatif-p95" />
           <span className="num font-mono text-sm text-ink">{ms(p95)}</span>
         </div>
       )}

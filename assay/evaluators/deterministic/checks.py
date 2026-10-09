@@ -9,6 +9,7 @@ import jsonschema
 from assay.evaluators.base import EvalContext, Evaluator, register
 from assay.schemas import EvalStatus, EvaluationResult, NormalizedTargetResult, TestCase, Trace
 from assay.text import contains_phrase, looks_like_refusal, normalize
+from assay.textutil import plural
 
 _ANCHORED = re.compile(r"^(?:\(\?[a-z]+\))?\^|(?<!\\)\$$")  # ^ at the start or $ at the end: a pattern about form
 
@@ -125,7 +126,7 @@ class JsonSchemaCheck(Evaluator):
         errors = sorted(jsonschema.Draft202012Validator(schema).iter_errors(payload), key=lambda e: list(e.path))
         msgs = [f"{'/'.join(map(str, e.path)) or '(root)'}: {e.message}" for e in errors[:5]]
         return self.passed(not errors, score=0.0 if errors else 1.0,
-                           explanation="Valid." if not errors else f"{len(errors)} schema error(s).", evidence=msgs)
+                           explanation="Valid." if not errors else f"{plural(len(errors), 'schema error')}.", evidence=msgs)
 
 
 @register
@@ -135,7 +136,7 @@ class CitationValidity(Evaluator):
     kind = "deterministic"
     failure_type = "citation_error"
     description = ("Every cited id refers to a retrieved/available document, and required citations are present. "
-                   "Whether a citation SUPPORTS the claim is a judge question (groundedness), not this check.")
+                   "Whether a citation supports the claim is a question for a grading model (groundedness), not this check.")
 
     async def evaluate(self, case, result, trace, ctx):
         required = case.expected.required_citations
@@ -143,12 +144,12 @@ class CitationValidity(Evaluator):
         if result.citations is None:
             if required or minimum is not None:
                 return self.missing("citations")
-            return self.na("Target does not report citations.")
+            return self.na("The bot does not report citations.")
         if minimum is not None:
             n = len(result.citations)
             if (minimum == 0 and n > 0) or n < minimum:
                 return self.passed(False, score=0.0, evidence=[c.id for c in result.citations],
-                                   explanation=f"{n} citation(s); expected " + ("none." if minimum == 0 else f"at least {minimum}."))
+                                   explanation=f"{plural(n, 'citation')}; expected " + ("none." if minimum == 0 else f"at least {minimum}."))
         if not result.citations and not required:
             if minimum is not None:
                 return self.passed(True, score=1.0, explanation="No citations, as expected.")
@@ -172,7 +173,7 @@ class RefusalCheck(Evaluator):
     kind = "deterministic"
     failure_type = "should_have_refused"
     description = ("Heuristic: does the answer decline when a refusal is expected, and not decline when an answer "
-                   "is expected? Phrase-based; use the appropriate_refusal judge for semantic cases.")
+                   "is expected? Phrase-based; use the appropriate refusal check, which needs a grading model, for meaning.")
 
     async def evaluate(self, case, result, trace, ctx):
         exp = case.expected.refusal_expected
@@ -195,7 +196,7 @@ class LatencyThreshold(Evaluator):
     name = "Latency"
     kind = "performance"
     failure_type = "latency_regression"
-    description = "Trial latency is within the case's (or experiment's) maximum."
+    description = "The answer's speed is within the question's (or run's) limit."
 
     async def evaluate(self, case, result, trace, ctx):
         limit = case.expected.max_latency_ms or ctx.options.get("max_latency_ms")
@@ -231,7 +232,7 @@ class CostBudget(Evaluator):
     name = "Cost budget"
     kind = "performance"
     failure_type = "cost_regression"
-    description = "Estimated target cost within the configured maximum (unknown pricing -> not evaluated)."
+    description = "Estimated cost per answer is within the configured limit (unknown pricing means not evaluated)."
 
     async def evaluate(self, case, result, trace, ctx):
         limit = case.expected.max_cost_usd or ctx.options.get("max_cost_usd")
@@ -258,7 +259,7 @@ class NumbersGrounded(Evaluator):
     kind = "deterministic"
     failure_type = "unsupported_claim"
     description = ("Every number in the answer also appears in the retrieved text or tool results (a cheap, objective "
-                   "hallucination check for specs, prices, dates). The case may allow a few with max_ungrounded_numbers.")
+                   "hallucination check for specs, prices, dates). The question may allow a few with max_ungrounded_numbers.")
 
     async def evaluate(self, case, result, trace, ctx):
         from assay.evaluators.llm_judge.judge import context_text
@@ -276,5 +277,5 @@ class NumbersGrounded(Evaluator):
         loose = sorted(numbers_in(_CITATION.sub(" ", result.answer or "")) - known, key=lambda x: (len(x), x))
         return self.passed(len(loose) <= allowed, score=float(len(loose)), threshold=allowed,
                            explanation=("All numbers appear in the evidence." if not loose else
-                                        f"{len(loose)} number(s) not in the evidence: {', '.join(loose[:8])}"
+                                        f"{plural(len(loose), 'number')} not in the evidence: {', '.join(loose[:8])}"
                                         + f" (allowed {allowed})."), evidence=loose[:20])

@@ -38,15 +38,15 @@ describe('dataset version badge', () => {
   })
 })
 
-describe('experiment setup validation', () => {
+describe('run setup validation', () => {
   const judges = ['correctness', 'groundedness']
-  it('requires a target, a dataset version and evaluators', () => {
+  it('requires a connection, a dataset and at least one check', () => {
     const errs = validateSetup({ targetVersionId: '', datasetVersionId: '', evaluators: [], judge: '' }, judges)
     expect(errs).toHaveLength(3)
   })
-  it('requires a judge when judge evaluators are selected', () => {
+  it('requires a grading model when checks that need one are selected', () => {
     const errs = validateSetup({ targetVersionId: 1, datasetVersionId: 2, evaluators: ['must_mention', 'correctness'], judge: '' }, judges)
-    expect(errs).toEqual(['Judge evaluators selected (correctness) but no judge chosen.'])
+    expect(errs).toEqual(['These checks need a grading model: correctness. Choose one in section 3, or untick them.'])
     expect(validateSetup({ targetVersionId: 1, datasetVersionId: 2, evaluators: ['correctness'], judge: 'heuristic' }, judges)).toEqual([])
   })
 })
@@ -91,7 +91,7 @@ describe('calibration metrics', () => {
   it('shows sample size, accuracy, kappa and the confusion matrix', () => {
     wrap(<AgreementPanel s={stats} />)
     expect(screen.getByText('Calibrated on 20 samples')).toBeInTheDocument()
-    expect(screen.getByText(/small sample/)).toBeInTheDocument()
+    expect(screen.getByText(/Small sample/)).toBeInTheDocument()
     expect(screen.getByText('75.0%')).toBeInTheDocument()
     expect(screen.getByText('0.50')).toBeInTheDocument()
     expect(screen.getByTestId('cell-FAIL-FAIL')).toHaveTextContent('7')
@@ -130,7 +130,7 @@ describe('failure filtering', () => {
     wrap(<Routes><Route path="/runs/:id" element={<RunPage />} /></Routes>, '/runs/7?tab=failures')
     expect(await screen.findByText('case_retrieval_miss')).toBeInTheDocument()
     expect(screen.getByText('case_wrong_answer')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: /Retrieval miss/ }))
+    await userEvent.click(screen.getByRole('button', { name: /Search miss/ }))
     expect(await screen.findByText('Clear filter')).toBeInTheDocument()
     await vi.waitFor(() => expect(screen.queryByText('case_wrong_answer')).not.toBeInTheDocument())
     expect(screen.getByText('case_retrieval_miss')).toBeInTheDocument()
@@ -141,7 +141,7 @@ describe('verdict sentence', () => {
   it('says better only when the interval excludes zero, and names big cost moves', () => {
     const s = verdictSentence({ overall: rate({}), regressions: 2, improvements: 9, rows: [rate({ metric: 'average_cost_usd', label: 'Est. cost / query', unit: 'cost', delta: 0.001, relative: 0.9, ci: null })] })
     expect(s.tone).toBe('good')
-    expect(s.text).toMatch(/^Better: pass rate up \+20.0 pp, beyond noise\. 2 cases regressed, 9 improved\. Also: cost up 90%\.$/)
+    expect(s.text).toMatch(/^Better: pass rate up \+20.0 pp, beyond noise\. 2 questions regressed, 9 improved\. Also: cost up 90%\.$/)
     const noise = verdictSentence({ overall: rate({ delta: 0.02, ci: { delta: 0.02, ci_low: -0.05, ci_high: 0.09, n: 58, excludes_zero: false } }), regressions: 1, improvements: 1 })
     expect(noise.text).toMatch(/^No reliable difference/)
     expect(noise.tone).toBe('neutral')
@@ -162,7 +162,7 @@ describe('cases grouped from trials', () => {
   it('shows tries as dots and a plain label', () => {
     wrap(<><DotStrip statuses={['passed', 'passed', 'failed']} /><Consistency statuses={['passed', 'passed', 'failed']} /></>)
     expect(screen.getByLabelText('2 of 3 passed')).toBeInTheDocument()
-    expect(screen.getByText(/2\/3 passed - flaky/)).toBeInTheDocument()
+    expect(screen.getByText(/2\/3 passed \(flaky\)/)).toBeInTheDocument()
   })
 })
 

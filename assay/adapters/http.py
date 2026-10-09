@@ -3,7 +3,7 @@
 Everything target-specific lives in config, never in code. A target is described by
 ``HttpTargetConfig``: where to send the request, how to fill it from the test input,
 how to read a streamed reply (SSE or NDJSON) if it streams, how to map the reply into
-Assay's normalized result, and an optional clean-up request (for targets that save a
+Assay's normalized result, and an optional clean-up request (for connections that save a
 conversation per question and offer a way to delete it).
 
 Templates: a string value ``"{{input.message}}"`` is replaced by that value (type kept
@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from assay.adapters.base import AdapterContext, TargetAdapter, TargetCall, TransientTargetError, now
 from assay.adapters.mapping import citations_from_markers, get_path, map_field, set_path
+from assay.errors import reach_error
 from assay.schemas import (
     Citation,
     NormalizedTargetResult,
@@ -316,7 +317,7 @@ class HttpTargetAdapter(TargetAdapter):
             else:
                 resp = await client.post(url, params=params, json=render(cfg.body, scope), headers=self._headers())
         except (httpx.TimeoutException, httpx.TransportError) as exc:
-            raise TransientTargetError(f"{type(exc).__name__} calling {url}") from exc
+            raise TransientTargetError(reach_error(exc, url)) from exc
         ended = now()
         if resp.status_code == 429 or resp.status_code >= 500:
             raise TransientTargetError(f"HTTP {resp.status_code} from {url}")

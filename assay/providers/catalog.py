@@ -16,11 +16,11 @@ from assay.secrets import resolve
 CATALOG: list[dict[str, Any]] = [
     {"id": "openai", "label": "OpenAI", "kind": "openai", "base_url": "https://api.openai.com/v1", "local": False,
      "key_name": "OPENAI_API_KEY", "needs_key": True,
-     "blurb": "GPT models through the OpenAI API. Strong, fast judges; you pay per call.",
+     "blurb": "GPT models through the OpenAI API. Strong, fast grading models; you pay per call.",
      "key_url": "https://platform.openai.com/api-keys"},
     {"id": "ollama", "label": "Ollama", "kind": "ollama", "base_url": "http://localhost:11434", "local": True,
      "key_name": None, "needs_key": False,
-     "blurb": "Open models running on this machine. Free and private; slow without a GPU."},
+     "blurb": "Open models running on this computer. Free and private; slow without a graphics card."},
     {"id": "lmstudio", "label": "LM Studio", "kind": "openai", "base_url": "http://localhost:1234/v1", "local": True,
      "key_name": None, "needs_key": False,
      "blurb": "Local models served by LM Studio's OpenAI-compatible server."},
@@ -77,8 +77,8 @@ async def list_models(kind: str, base_url: str | None, api_key_ref: str | None) 
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.get(url, headers=headers)
-    except (httpx.TimeoutException, httpx.TransportError) as exc:
-        raise ValueError(f"Could not reach {url.split('?')[0]} ({type(exc).__name__}). Is it running / is the URL right?") from None
+    except (httpx.TimeoutException, httpx.TransportError):
+        raise ValueError(f"Could not reach {url.split('?')[0]}. Is it running, and is the address right?") from None
     if resp.status_code in (401, 403):
         raise ValueError("The key was refused.")
     if resp.status_code >= 400:

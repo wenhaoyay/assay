@@ -69,9 +69,9 @@ def test_local_judges_only_cannot_be_bypassed(client):  # noqa: F811
                                                  "label": "PASS", "annotator": "me"})
     c.patch(f"/api/targets/{tid}/flags", json={"local_judges_only": True})
     r = c.post(f"/api/experiments/{e['id']}/run")
-    assert r.status_code == 422 and "local judges only" in r.json()["detail"]
+    assert r.status_code == 422 and "local grading models only" in r.json()["detail"]
     # Re-grading with a cloud judge, and a bake-off over its labelled answers, are refused too.
     assert c.post(f"/api/runs/{run['id']}/reevaluate",
                   json={"evaluators": ["correctness"], "judge": {"provider_config_id": cloud["id"]}}).status_code == 422
     r = c.post("/api/bakeoffs", json={"dimension": "correctness", "judges": [{"provider_config_id": cloud["id"]}]})
-    assert r.status_code == 422 and "local judges only" in r.json()["detail"]
+    assert r.status_code == 422 and "local grading models only" in r.json()["detail"]

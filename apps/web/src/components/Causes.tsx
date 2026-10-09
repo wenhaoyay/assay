@@ -9,7 +9,7 @@ import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useSettings } from '../lib/projects'
-import { pct, when } from '../lib/format'
+import { pct, plural, when } from '../lib/format'
 import type { CauseCount, ProviderConfig, RunCauses, TrialDetail, Verdict } from '../lib/types'
 import { causeColor, SampleSize } from './instrument'
 import { LabelHelp } from './LabelHelp'
@@ -33,14 +33,14 @@ export const CAUSE_LABELS: Record<string, string> = {
   too_slow: 'Too slow or too costly',
   bot_error: 'The bot returned an error',
   too_busy: 'Bot too busy (rate limit or time-out)',
-  suspect_test: 'Suspect test',
+  suspect_test: 'Suspect question',
   off_topic: 'Written for another chatbot',
-  cant_tell: "Can't tell yet",
+  cant_tell: "Can’t tell yet",
 }
 
 const KIND_TONE: Record<Verdict['kind'], 'bad' | 'warn' | 'info' | 'neutral'> = { bot: 'bad', content: 'warn', test: 'info', run: 'info', unknown: 'neutral' }
 const KIND_HEAD: Record<Verdict['kind'], string> = {
-  bot: 'In the bot', content: 'In the documents', unknown: 'Not placed yet', test: 'Not the bot: the test itself', run: 'Not the bot: how the run was set up',
+  bot: 'In the bot', content: 'In the documents', unknown: 'Not placed yet', test: 'Not the bot: the question itself', run: 'Not the bot: how the run was set up',
 }
 
 export function useRunCauses(runId: number | undefined, enabled = true) {
@@ -49,7 +49,7 @@ export function useRunCauses(runId: number | undefined, enabled = true) {
 
 export function CauseBadge({ v, className }: { v: Pick<Verdict, 'label' | 'kind' | 'source'>; className?: string }) {
   return (
-    <Badge tone={KIND_TONE[v.kind]} className={className} title={v.source === 'you' ? 'Set by you' : v.source === 'ai' ? 'Explained by a grading model' : 'Found by Assay\'s rules'}>
+    <Badge tone={KIND_TONE[v.kind]} className={className} title={v.source === 'you' ? 'Set by you' : v.source === 'ai' ? 'Explained by a grading model' : 'Found by Assay’s rules'}>
       {v.source === 'ai' && <Sparkles className="size-3" />}{v.source === 'you' && <Pencil className="size-3" />}{v.label}
     </Badge>
   )
@@ -58,14 +58,14 @@ export function CauseBadge({ v, className }: { v: Pick<Verdict, 'label' | 'kind'
 function CauseHelpBody() {
   return (
     <>
-      <p>For each failed answer, Assay looks for what a correct answer needed (the must-mention phrases, the patterns, the reference answer's codes and numbers) in three places:</p>
+      <p>For each failed answer, Assay looks for what a correct answer needed (the must-mention phrases, the patterns, the reference answer’s codes and numbers) in three places:</p>
       <ol className="mt-1.5 list-decimal space-y-1 pl-4">
         <li><b>In the answer</b>: missing, so the answer failed.</li>
         <li><b>In the passages the bot read</b>: there, so search worked and the model left it out: <i>Found but not used</i>.</li>
         <li><b>In the documents you uploaded</b>: there but not read: <i>Search missed it</i>. Nowhere: <i>Not in the documents</i>.</li>
       </ol>
-      <p className="mt-1.5">It also flags answers that say what no passage says, citations that point at a passage without the fact, and questions that fail in every run (often the test, not the bot). Plain text matching, no model, so it costs nothing and shows its evidence. When the evidence does not decide it, it says <i>Can't tell yet</i>: you can ask a grading model, or set the cause yourself.</p>
-      <p className="mt-1.5 text-ink-3">After Barnett et al., "Seven failure points when engineering a retrieval-augmented generation system" (2024).</p>
+      <p className="mt-1.5">It also flags answers that say what no passage says, citations that point at a passage without the fact, and questions that fail in every run (often the test, not the bot). Plain text matching, no model, so it costs nothing and shows its evidence. When the evidence does not decide it, it says <i>Can’t tell yet</i>: you can ask a grading model, or set the cause yourself.</p>
+      <p className="mt-1.5 text-ink-3">After Barnett et al., “Seven failure points when engineering a retrieval-augmented generation system” (2024).</p>
     </>
   )
 }
@@ -86,13 +86,13 @@ export function FixFirst({ runId, targetId, selected, onPick, compact = false }:
   return (
     <Card title="What to fix first" meta={<SampleSize n={total} min={0} unit={total === 1 ? 'question' : 'questions'} />}
       help={<>
-        <p>Failing questions grouped by their likely cause, largest group first, with the change most likely to fix them. Each chip opens one example.{onPick ? ' Show lists only that cause\'s questions.' : ''}</p>
+        <p>Failing questions grouped by their likely cause, largest group first, with the change most likely to fix them. Each chip opens one example.{onPick ? ' Show lists only that cause’s questions.' : ''}</p>
         <CauseHelpBody />
       </>}>
       <div data-testid="fix-first">
       {d.off_topic && (
         <div className="mb-3"><Notice tone="warn" title={`These questions were written for ${d.off_topic}`}>
-          Their failures say nothing about this bot. Run this chatbot's own question set; New run now offers it first.
+          Their failures say nothing about this bot. Run this chatbot’s own dataset; New run now offers it first.
         </Notice></div>
       )}
       {!d.sources_reported && !d.off_topic && <SourcesNotice targetId={targetId} />}
@@ -146,8 +146,8 @@ function SourcesNotice({ targetId }: { targetId?: number | null }) {
   return (
     <div className="mb-3">
       <Notice tone="info" title="Assay cannot see what the bot read"
-        action={targetId ? <Link className={linkButton('secondary', 'sm')} to={`/targets/${targetId}#reading`}>Check the connection<ArrowRight className="size-3" /></Link> : undefined}>
-        This connection reads only the answer, so "search missed it" and "found but not used" cannot be told apart. If the bot sends its sources, let the connection read them, then re-read this run's replies (free: no questions are asked again).
+        action={targetId ? <Link className={linkButton('secondary', 'sm')} to={`/targets/${targetId}#reading`}>Open the connection<ArrowRight className="size-3" /></Link> : undefined}>
+        This connection reads only the answer, so “search missed it” and “found but not used” cannot be told apart. If the bot sends its sources, let the connection read them, then re-read this run’s replies (free: no questions are asked again).
       </Notice>
     </div>
   )
@@ -174,9 +174,9 @@ function ExplainAll({ runId, ids }: { runId: number; ids: number[] }) {
     <div className="mt-4 rounded-lg bg-surface-2/60 p-3">
       <div className="flex flex-wrap items-center gap-2">
         <Wand2 className="size-4 text-accent-ink" />
-        <span className="text-sm">{ids.length} failure{ids.length === 1 ? '' : 's'} not placed by the rules.</span>
-        <Help title="Ask the grading model">{hasJudge ? 'One short call per failure to your default grading model. It picks a cause and says why in a sentence; you can change it on the answer\'s page.' : 'Set a default grading model in Settings > Models & keys first.'}</Help>
-        <Button size="sm" className="ml-auto" disabled={!hasJudge} loading={running} onClick={go}>Ask the grading model ({ids.length} call{ids.length === 1 ? '' : 's'})</Button>
+        <span className="text-sm">{plural(ids.length, 'failure')} not placed by the rules.</span>
+        <Help title="Ask the grading model">{hasJudge ? 'One short call per failure to your default grading model. It picks a cause and says why in a sentence; you can change it on the answer’s page.' : 'Set a default grading model in Settings > Models & keys first.'}</Help>
+        <Button size="sm" className="ml-auto" disabled={!hasJudge} loading={running} onClick={go}>Ask the grading model ({plural(ids.length, 'call')})</Button>
       </div>
       {running && <ProgressBar value={done / ids.length} className="mt-2" />}
       {error != null && <div className="mt-2"><ErrorState error={error} /></div>}
@@ -272,11 +272,11 @@ export function NotesCard({ projectId }: { projectId: number }) {
   const n = notes.data?.length ?? 0
   return (
     <Card title="Your notes on failures"
-      help={<><p>Reading failures and writing one line on each ("ignores the plant", "too formal") finds problems no check was written for. Grouping the notes and counting them shows which problem is biggest: the practice evaluation teams call error analysis.</p>{n ? <p>{n} note{n === 1 ? '' : 's'} across this chatbot's runs.</p> : null}</>}
-      meta={n ? `${n} note${n === 1 ? '' : 's'}` : undefined}>
+      help={<><p>Reading failures and writing one line on each (“ignores the plant”, “too formal”) finds problems no check was written for. Grouping the notes and counting them shows which problem is biggest: the practice evaluation teams call error analysis.</p>{n ? <p>{plural(n, 'note')} across this chatbot’s runs.</p> : null}</>}
+      meta={n ? plural(n, 'note') : undefined}>
       <div data-testid="notes-card">
       {notes.isLoading ? <Skeleton size="figure" /> : n === 0 ? (
-        <Empty title="No notes yet">On a failed answer's page, use <b>Kind of failure &gt; Change &gt; Why</b> to write one line about what went wrong. Twenty or thirty notes are enough to group.</Empty>
+        <Empty title="No notes yet">On a failed answer’s page, use <b>Kind of failure &gt; Change &gt; Why</b> to write one line about what went wrong. Twenty or thirty notes are enough to group.</Empty>
       ) : (
         <>
           <div className="flex flex-wrap items-end gap-2">
@@ -286,7 +286,7 @@ export function NotesCard({ projectId }: { projectId: number }) {
                 {(providers.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.name} ({p.model})</option>)}
               </Select>
             </Field>
-            <Button loading={group.isPending} onClick={() => group.mutate()}><BookOpenCheck className="size-3.5" />Group my notes</Button>
+            <Button loading={group.isPending} onClick={() => group.mutate()}><BookOpenCheck className="size-3.5" />Group your notes</Button>
           </div>
           {group.isError && <div className="mt-2"><ErrorState error={group.error} /></div>}
           {group.data && (

@@ -40,7 +40,7 @@ export function Changed({ cases, c, baseTrials, candTrials }: { cases: PairedCas
     <Card title="What changed"
       help={<>
         <p>Questions whose result changed between the two runs, worst first. The blue dot is #{c.baseline_run.id}'s pass rate on that question, the orange dot #{c.candidate_run.id}'s; the line is green when it rose and red when it fell. The figure is how many of the tries moved.</p>
-        <p>Click a row to open #{c.candidate_run.id}'s answer; the arrow on the right shows both answers side by side. "All" lists every shared question.</p>
+        <p>Click a row to open #{c.candidate_run.id}'s answer; the arrow on the right shows both answers side by side. “All” lists every shared question.</p>
       </>}
       actions={<Segmented size="sm" value={filter} onChange={setFilter} label="Which questions"
         options={[{ id: 'changed', label: <>Changed only · <span className="font-mono">{changed.length}</span></> }, { id: 'all', label: <>All <span className="font-mono">{shared.length}</span></> }]} />}>
@@ -52,7 +52,7 @@ export function Changed({ cases, c, baseTrials, candTrials }: { cases: PairedCas
           return (
             <li key={r.id} data-case={r.id}>
               <div className="flex items-center gap-3 py-2 pl-1">
-                <button type="button" className="min-w-0 flex-1 text-left" onClick={() => r.bTrial && nav(`/trials/${r.bTrial}`)} title="Open the candidate's answer">
+                <button type="button" className="min-w-0 flex-1 text-left" onClick={() => r.bTrial && nav(`/trials/${r.bTrial}`)} title="Open the candidate’s answer">
                   <span className="block truncate text-sm font-medium text-ink hover:text-accent-ink">{r.title}</span>
                   <span className="block truncate text-xs text-ink-3"><span className="font-mono">{r.id}</span>{why && why.length > 0 && <> · {r.d < 0 ? 'now' : 'was'}: {why.map((f) => FAILURE_LABELS[f] ?? f).join(', ').toLowerCase()}</>}</span>
                 </button>
@@ -93,7 +93,7 @@ function SideBySide({ caseId, c, sides }: { caseId: string; c: Comparison; sides
             <span className={clsx('size-2 rounded-full', i === 0 ? 'bg-series-1' : 'bg-series-2')} />
             <span className="font-medium">{i === 0 ? 'Baseline' : 'Candidate'} #{runs[i].id}</span>
             <DotStrip statuses={ts.map((t) => t.status)} />
-            {ts[0] && <Link to={`/trials/${ts[0].id}`} className="ml-auto text-accent-ink hover:underline">open try</Link>}
+            {ts[0] && <Link to={`/trials/${ts[0].id}`} className="ml-auto text-accent-ink hover:underline">Open try</Link>}
           </div>
           {ts[0] ? (
             <>

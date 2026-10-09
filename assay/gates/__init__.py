@@ -29,7 +29,7 @@ def _check(name: str, metric: str, value: float | None, rule: str, limit: float,
                            "kind": kind, "baseline": baseline}
     if value is None:
         out["status"] = "NOT_EVALUATED"
-        out["reason"] = "metric not available for this run"
+        out["reason"] = "This metric is not available for this run."
         return out
     ok = value >= limit if rule == "min" else value <= limit
     out["status"] = "PASS" if ok else "FAIL"
@@ -56,7 +56,7 @@ def evaluate_gates(config: dict[str, Any], metrics: dict[str, Any],
                 if base is None or cur is None:
                     res = _check(f"{name}:{metric}", metric, None, "max", drop, "relative", base)
                     if baseline_metrics is None:
-                        res["reason"] = "no baseline run to compare against"
+                        res["reason"] = "There is no baseline run to compare against."
                 else:
                     # "Drop" = getting worse: a fall for rates, a rise for latency, cost and tokens.
                     worse = (cur - base) if lower_is_better(metric) else (base - cur)
@@ -67,7 +67,7 @@ def evaluate_gates(config: dict[str, Any], metrics: dict[str, Any],
                 results.append(res)
             continue
         if not isinstance(rule, dict):
-            raise ValueError(f"Gate {name!r}: expected {{min: x}} or {{max: x}}")
+            raise ValueError(f"The gate rule {name!r} needs a minimum or a maximum, such as {{min: 0.8}}.")
         for op in ("min", "max"):
             if op in rule:
                 results.append(_check(name, name, metrics.get(name), op, float(rule[op])))

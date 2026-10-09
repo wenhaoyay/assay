@@ -105,13 +105,13 @@ def missing_inputs(rubric: Rubric, case: TestCase, result: NormalizedTargetResul
     """(status, why) when the rubric cannot be applied to this case."""
     for need in rubric.needs:
         if need == "reference" and not case.expected.answer.reference:
-            return "not_applicable", "No reference answer for this case."
+            return "not_applicable", "No reference answer for this question."
         if need == "context" and not context_text(result):
             if case.expected.refusal_expected:  # declining without looking anything up makes no claim to ground
                 return "not_applicable", "The bot is expected to decline here, so there is nothing to ground."
-            return "not_evaluated", "The target reported no retrieved text or tool results to check against."
+            return "not_evaluated", "The bot reported no retrieved text or tool results to check against."
         if need == "instructions" and not instructions_for(case):
-            return "not_applicable", "No instructions configured for this case."
+            return "not_applicable", "No instructions configured for this question."
         if need == "refusal_expected" and case.expected.refusal_expected is None:
             return "not_applicable", "Refusal behaviour not specified."
     return None
@@ -171,7 +171,7 @@ def parse_judge_output(text: str) -> JudgeOutput:
     try:
         return JudgeOutput.model_validate(json_from_text(text))
     except (ValidationError, json.JSONDecodeError) as exc:
-        raise ValueError(f"judge output failed validation: {exc}") from exc
+        raise ValueError("The grading model's reply was not in the required format.") from exc
 
 
 @dataclass
@@ -243,7 +243,8 @@ class Judge:
             return Verdict(out.label, out.confidence, out.reason, out.evidence, total, cost,
                            {**meta, "attempts": attempt + 1})
         cost = self.pricing.cost(self.provider.provider, self.provider.model, total) if self.pricing else None
-        return Verdict("ERROR", None, f"Judge output invalid after retry: {last_error}", [], total, cost, meta)
+        return Verdict("ERROR", None, "The grading model's reply was still not in the required format after a retry.", [], total, cost,
+                       {**meta, "last_error": str(last_error)[:300]})
 
 
 # --------------------------------------------------------------------------------------
@@ -308,5 +309,5 @@ class HeuristicJudge(Judge):
             score = 1.0 if label == "PASS" else 0.0
             reason = "The answer " + ("declines." if refused else "attempts an answer.")
         else:
-            return Verdict("UNKNOWN", None, "The heuristic judge has no rule for this rubric.", [], None, None, meta)
+            return Verdict("UNKNOWN", None, "Heuristic grading has no rule for this check.", [], None, None, meta)
         return Verdict(label, round(min(1.0, max(0.0, score)), 3), f"[heuristic] {reason}", [], None, 0.0, meta)

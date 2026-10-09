@@ -37,7 +37,7 @@ const NUM: { k: NumKey; label: string; fmt: (v: number) => string }[] = [
   { k: 'top', label: 'Best document score', fmt: (v) => v.toFixed(1) },
 ]
 const EXTRA: { k: NumKey; label: string; fmt: (v: number) => string }[] = [
-  { k: 'corr', label: 'Judge correctness', fmt: (v) => v.toFixed(2) },
+  { k: 'corr', label: 'Correctness (grading model)', fmt: (v) => v.toFixed(2) },
   { k: 'mm', label: 'Must-mention score', fmt: (v) => v.toFixed(2) },
 ]
 const AXES = [...NUM, ...EXTRA]
@@ -239,7 +239,7 @@ export function AnyAgainstAny({ rows, filter, setFilter, resetKey }: { rows: XRo
   return (
     <Card title="Any against any" id="scatter" meta={<SampleSize n={rows.length} unit="tries" />}
       help={<>
-        <p>One dot per try: green passed, red failed. Pick the two measures with the menus; judge scores from the heuristic judge are word overlap, not meaning.</p>
+        <p>One dot per try: green passed, red failed. Pick the two measures with the menus; grading-model scores from heuristic grading are word overlap, not meaning.</p>
         <p>Drag a box to filter; the linked charts above and the list on the right follow. Click a dot to open that answer.</p>
       </>}
       actions={<>

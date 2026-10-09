@@ -1,6 +1,6 @@
 // How a comparison row is formatted and read. Kept separate from the page so it can be tested
 // and so the reading rules live in one place.
-import { ms, num, pct, pp, relative, score, usd } from './format'
+import { ms, num, pct, plural, pp, relative, score, usd } from './format'
 import type { ComparisonRow } from './types'
 
 const LOWER_BETTER = new Set(['latency', 'cost', 'count'])
@@ -46,18 +46,18 @@ export interface SetupState {
 /** Client-side checks mirror the server's, so problems show before anything is created. */
 export function validateSetup(s: SetupState, judgeIds: string[]): string[] {
   const errors: string[] = []
-  if (!s.targetVersionId) errors.push('Choose a target.')
-  if (!s.datasetVersionId) errors.push('Choose a dataset version.')
-  if (s.evaluators.length === 0) errors.push('Select at least one evaluator.')
+  if (!s.targetVersionId) errors.push('Choose a connection.')
+  if (!s.datasetVersionId) errors.push('Choose a dataset.')
+  if (s.evaluators.length === 0) errors.push('Pick at least one check.')
   const judges = s.evaluators.filter((e) => judgeIds.includes(e))
-  if (judges.length && !s.judge) errors.push(`Judge evaluators selected (${judges.join(', ')}) but no judge chosen.`)
+  if (judges.length && !s.judge) errors.push(`These checks need a grading model: ${judges.join(', ')}. Choose one in section 3, or untick them.`)
   return errors
 }
 
 /** One plain sentence for a comparison: the overall change, how sure, and what moved. */
 export function verdictSentence(o: { overall: ComparisonRow | null; regressions: number; improvements: number; rows?: ComparisonRow[] }): { text: string; tone: 'good' | 'bad' | 'neutral' } {
   const r = o.overall
-  if (!r || r.delta === null) return { text: 'Not enough shared cases to compare.', tone: 'neutral' }
+  if (!r || r.delta === null) return { text: 'Not enough shared questions to compare.', tone: 'neutral' }
   const read = reading(r)
   const change = pp(r.delta)
   const head =
@@ -65,7 +65,7 @@ export function verdictSentence(o: { overall: ComparisonRow | null; regressions:
     : read.text === 'likely worse' ? `Worse: pass rate down ${change.replace(/^[-−]/, '')}, beyond noise.`
     : r.delta === 0 ? 'No change in pass rate.'
     : `No reliable difference: pass rate ${change}, within noise.`
-  const moved = `${o.regressions} case${o.regressions === 1 ? '' : 's'} regressed, ${o.improvements} improved.`
+  const moved = `${plural(o.regressions, 'question')} regressed, ${o.improvements} improved.`
   const extras: string[] = []
   for (const row of o.rows ?? []) {
     // Rates are already in the sentence as percentage points; mention big moves in latency, tokens, cost.
@@ -91,7 +91,7 @@ export interface PairedCase {
   b: { passed: number; total: number } | null
   /** Candidate rate minus baseline rate (0 when either side is missing). */
   d: number
-  /** The trial to open for this question in each run (the first failing try, else the first try). */
+  /** The try to open for this question in each run (the first failing try, else the first try). */
   aTrial: number | null
   bTrial: number | null
 }

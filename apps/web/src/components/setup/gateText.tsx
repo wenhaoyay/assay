@@ -1,5 +1,5 @@
 // A gate's rules said as one sentence: "Passes when the pass rate is at least 70%, tool accuracy
-// 90%, p95 speed at most 3.0 s, and nothing drops more than 3pp from the baseline."
+// 90%, speed (p95) at most 3.0 s, and nothing drops more than 3pp from the baseline."
 import type { ReactNode } from 'react'
 import { label as metricLabel } from '../../lib/format'
 
@@ -10,10 +10,10 @@ const NAMES: Record<string, string> = {
   tool_accuracy: 'tool accuracy',
   must_mention: 'must-mention',
   'recall_at_k.mean': 'search recall',
-  p95_latency_ms: 'p95 speed',
-  p50_latency_ms: 'p50 speed',
-  average_cost_usd: 'cost per question',
-  average_total_tokens: 'tokens per question',
+  p95_latency_ms: 'speed (p95)',
+  p50_latency_ms: 'median speed',
+  average_cost_usd: 'cost per answer',
+  average_total_tokens: 'tokens per answer',
 }
 
 export const ruleName = (metric: string) => NAMES[metric] ?? metricLabel(metric)

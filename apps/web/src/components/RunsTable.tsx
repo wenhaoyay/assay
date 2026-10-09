@@ -58,10 +58,10 @@ export function RunsTable({ runs, compact = false, selectable = false, selected 
           <th className="t-label">Run</th>
           <th className="t-label">What ran</th>
           {!compact && <th className="t-label">Connection</th>}
-          {!compact && <th className="t-label">Questions · judge</th>}
+          {!compact && <th className="t-label">Questions · grading model</th>}
           <th className="t-label text-right">Pass rate</th>
-          {!compact && <th className="t-label text-right">Tool acc.</th>}
-          <th className="t-label text-right">p95</th>
+          {!compact && <th className="t-label text-right">Tool accuracy</th>}
+          <th className="t-label text-right">Speed (p95)</th>
           <th className="t-label">Gate</th>
           {!compact && <th className="t-label whitespace-nowrap">Started</th>}
         </tr>
@@ -84,8 +84,8 @@ export function RunsTable({ runs, compact = false, selectable = false, selected 
               <td>
                 <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
                   <Link to={`/runs/${r.id}`} viewTransition className="text-ink hover:underline">{name}</Link>
-                  {r.off_topic && <Badge tone="warn" title={`Asked ${r.off_topic}'s questions, so it is left out of trends`}>another chatbot's questions</Badge>}
-                  {r.source !== 'live' && <Badge>{r.source === 'reevaluated' ? `re-graded #${r.parent_run_id}` : r.source}</Badge>}
+                  {r.off_topic && <Badge tone="warn" title={`Asked ${r.off_topic}’s questions, so it is left out of trends`}>Another chatbot’s questions</Badge>}
+                  {r.source !== 'live' && <Badge>{r.source === 'reevaluated' ? `Re-graded #${r.parent_run_id}` : 'Imported'}</Badge>}
                   <RunStatus status={r.status} done={r.progress_done} total={r.progress_total} />
                 </div>
                 {name !== r.experiment && <div className="truncate font-mono text-label text-ink-3" title={r.experiment}>{r.experiment}</div>}
@@ -94,7 +94,7 @@ export function RunsTable({ runs, compact = false, selectable = false, selected 
               {!compact && (
                 <td className="text-xs text-ink-2">
                   <span className="num font-mono whitespace-nowrap">{questionsOf(r) ?? 'n/a'}</span> × <span className="num font-mono">{r.trials_per_case}</span>
-                  {' '}<span className="text-ink-3">{heur ? 'heuristic' : r.judge ? r.judge.model : 'no judge'}</span>
+                  {' '}<span className="text-ink-3">{heur ? 'heuristic' : r.judge ? r.judge.model : 'no grading model'}</span>
                 </td>
               )}
               <td className="whitespace-nowrap text-right">

@@ -1,4 +1,4 @@
-// D1 Show me why: the paired bootstrap, made visible. Each re-draw of the questions drops a dot
+// D1 Why this result?: the paired bootstrap, made visible. Each re-draw of the questions drops a dot
 // into a stacked histogram; the 95% band forms as they land.
 import * as d3 from 'd3'
 import { Play, RotateCcw } from 'lucide-react'
@@ -96,10 +96,10 @@ export function Bootstrap({ diffs, nQuestions }: { diffs: number[]; nQuestions: 
 
   const beyond = !!say && (say.lo > 0 || say.hi < 0)
   return (
-    <Card title="Show me why"
+    <Card title="Why this result?"
       help={<>
         <p>Draws {nQuestions} questions at random, with repeats, and measures the change in pass rate again, {N} times; each dot is one re-draw (the paired bootstrap).</p>
-        <p>If the change were luck, many re-draws would land on zero or beyond it. The grey band is where 95% of them land: the same interval as the needle's.</p>
+        <p>If the change were luck, many re-draws would land on zero or beyond it. The grey band is where 95% of them land: the same interval as the needle’s.</p>
         <p>The draws are seeded, so the same two runs always re-draw the same way.</p>
       </>}
       actions={<Button size="sm" variant="primary" onClick={() => { setSay(null); setRun((v) => v + 1) }} data-testid="bootstrap-go">
@@ -113,8 +113,8 @@ export function Bootstrap({ diffs, nQuestions }: { diffs: number[]; nQuestions: 
               <span className="font-mono">{say.n}</span> re-draws. 95% land between <b className="font-mono font-medium">{ppf(say.lo)}</b> and <b className="font-mono font-medium">{ppf(say.hi)}</b>;{' '}
               <b className={say.zero ? 'font-mono font-medium text-bad-ink' : 'font-mono font-medium text-good-ink'}>{say.zero}</b> reach zero.
               {say.done && (beyond
-                ? <span className="text-accent-ink"> That is "beyond noise".</span>
-                : <span className="text-ink-2"> Zero is inside the band: that is "within noise".</span>)}
+                ? <span className="text-accent-ink"> That is “beyond noise”.</span>
+                : <span className="text-ink-2"> Zero is inside the band: that is “within noise”.</span>)}
             </>
           )}
         </p>

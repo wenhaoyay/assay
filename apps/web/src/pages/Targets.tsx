@@ -14,9 +14,12 @@ import { ms, pct, usd, when } from '../lib/format'
 import type { Capability, Project, Target, TargetCheck, TargetResult } from '../lib/types'
 import { Capabilities, isStandardShape } from './Connect'
 
+/** What kind of connection it is, in words. */
+const kindLabel = (adapter: string) => ({ http: 'HTTP', python: 'Python function', replay: 'Imported' } as Record<string, string>)[adapter] ?? adapter
+
 export function HealthDot({ check, size = 10 }: { check: TargetCheck | null | undefined; size?: number }) {
   const tone = !check ? 'bg-untested' : check.ok ? 'bg-good' : 'bg-bad'
-  const title = !check ? 'Not checked yet' : check.ok ? `Answered${check.elapsed_ms ? ` in ${ms(check.elapsed_ms)}` : ''} - ${when(check.at)}` : `${check.explanation ?? check.error ?? 'Failed'} - ${when(check.at)}`
+  const title = !check ? 'Not tested yet' : check.ok ? `Answered${check.elapsed_ms ? ` in ${ms(check.elapsed_ms)}` : ''} · ${when(check.at)}` : `${check.explanation ?? check.error ?? 'Failed'} · ${when(check.at)}`
   return (
     <span className="relative inline-flex shrink-0" title={title} aria-label={title} style={{ width: size, height: size }}>
       {check?.ok && <span className="absolute inline-flex size-full animate-ping rounded-full bg-good opacity-30 [animation-iteration-count:2]" />}
@@ -41,37 +44,37 @@ export function TargetsPage() {
         title="Connections"
         help={<>
           <p>Where your chatbots run: anything reachable over HTTP, a Python function, or answers imported from logs.</p>
-          <p>Changing a connection's model or prompt makes a new version; runs keep the version they used.</p>
-          <p>The dot is the last health check: green answered, red failed, grey never checked. Check asks one question now.</p>
+          <p>Changing a connection’s model or prompt makes a new version; runs keep the version they used.</p>
+          <p>The dot is the last connection test: green answered, red failed, grey never tested. Test connection asks one question now.</p>
         </>}
         actions={<Link to="/targets/new" viewTransition className={linkButton('primary')}><Plug className="size-3.5" /> Connect a chatbot</Link>}
       />
       {targets.isLoading ? <Loading /> : targets.isError ? <ErrorState error={targets.error} /> : targets.data!.length === 0 ? (
-        <Empty title="Nothing connected. A gauge needs something to point at." action={<Link to="/targets/new" className={linkButton('primary')}>Connect a chatbot</Link>}>
-          Paste a curl command, send a test question, click the reply to say where the answer is. Or run <Code>assay seed</Code> for the Acme demo.
+        <Empty title="No connections yet" action={<Link to="/targets/new" className={linkButton('primary')}>Connect a chatbot</Link>}>
+          A gauge needs something to point at: paste a curl command, send a test question and click the reply to say where the answer is, or run <Code>assay seed</Code> for the Acme demo.
         </Empty>
       ) : (
         <div className="space-y-12">
           {groups.map(({ p, ts }) => (
             <Card key={p.id} padded={false} meta={`${ts.length} ${ts.length === 1 ? 'connection' : 'connections'}`} title={<Link to={`/p/${p.id}`} className="flex items-center gap-2 hover:underline"><ProjectMark name={p.name} color={p.color} size={20} />{p.name}</Link>}>
               <ScrollTable className="[&_table]:min-w-[820px]">
-                <thead><tr className="whitespace-nowrap"><th className="w-6"></th><th className="t-label">Name</th><th className="t-label">Kind</th><th className="t-label">Version</th><th className="t-label">What distinguishes it</th><th className="t-label">Last check</th><th></th></tr></thead>
+                <thead><tr className="whitespace-nowrap"><th className="w-6"></th><th className="t-label">Name</th><th className="t-label">Kind</th><th className="t-label">Version</th><th className="t-label">What distinguishes it</th><th className="t-label">Last test</th><th></th></tr></thead>
                 <tbody>
                   {ts.map((t) => (
                     <tr key={t.id} className="hover:bg-surface-2/60">
                       <td><HealthDot check={t.last_check} /></td>
                       <td>
                         <Link className="font-medium hover:underline" to={`/targets/${t.id}`} viewTransition>{t.name}</Link>
-                        {t.local_judges_only && <Badge tone="accent" className="ml-1.5">local judges only</Badge>}
-                        {t.shared && <Badge className="ml-1.5">shared</Badge>}
-                        {isStandardShape((t.latest_version.config as { reply_shape?: string }).reply_shape) && <Badge tone="accent" className="ml-1.5">standard shape</Badge>}
+                        {t.local_judges_only && <Badge tone="accent" className="ml-1.5">Local grading models only</Badge>}
+                        {t.shared && <Badge className="ml-1.5">Shared</Badge>}
+                        {isStandardShape((t.latest_version.config as { reply_shape?: string }).reply_shape) && <Badge tone="accent" className="ml-1.5" title="The bot replies in the shape Assay reads directly, so nothing is mapped">Assay shape</Badge>}
                         <div className="line-clamp-1 text-xs text-ink-2">{t.description}</div>
                       </td>
-                      <td className="text-ink-2">{t.adapter === 'replay' ? 'imported' : t.adapter}</td>
+                      <td className="text-ink-2">{kindLabel(t.adapter)}</td>
                       <td className="num font-mono text-xs">v{t.latest_version.version}</td>
                       <td className="text-ink-2">{t.latest_version.variant_label || '-'}</td>
-                      <td className="whitespace-nowrap text-xs text-ink-3">{t.last_check ? (t.last_check.ok ? <>ok, <span className="font-mono">{ms(t.last_check.elapsed_ms)}</span></> : <span className="text-bad-ink">{t.last_check.explanation ?? 'failed'}</span>) : 'never'}</td>
-                      <td className="text-right">{t.adapter !== 'replay' && <Button size="sm" loading={check.isPending && check.variables === t.id} onClick={() => check.mutate(t.id)}><RefreshCw className="size-3.5" />Check</Button>}</td>
+                      <td className="whitespace-nowrap text-xs text-ink-3">{t.last_check ? (t.last_check.ok ? <>OK, <span className="font-mono">{ms(t.last_check.elapsed_ms)}</span></> : <span className="text-bad-ink">{t.last_check.explanation ?? 'Failed'}</span>) : 'Never'}</td>
+                      <td className="text-right">{t.adapter !== 'replay' && <Button size="sm" loading={check.isPending && check.variables === t.id} onClick={() => check.mutate(t.id)}><RefreshCw className="size-3.5" />Test connection</Button>}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -96,7 +99,7 @@ interface TestResponse {
 
 /** The mapping as a readable list: "answer ← reply.text". */
 function MappingSummary({ config }: { config: Record<string, unknown> }) {
-  if (isStandardShape(config.reply_shape)) return <p className="text-sm"><Badge tone="accent">standard shape</Badge> The bot replies with answer, sources, citations, tool calls and usage - nothing mapped.</p>
+  if (isStandardShape(config.reply_shape)) return <p className="text-sm"><Badge tone="accent">Assay shape</Badge> The bot replies with answer, sources, citations, tool calls and usage, so nothing is mapped.</p>
   const resp = (config.response ?? {}) as Record<string, unknown>
   const rows: [string, string][] = []
   for (const [k, v] of Object.entries(resp)) {
@@ -118,7 +121,7 @@ export function TargetPage() {
   const projects = useQuery({ queryKey: ['projects'], queryFn: () => api.get<Project[]>('/api/projects') })
   const health = useQuery({ queryKey: ['target-health', id], queryFn: () => api.get<{ runs: { id: number; pass_rate: number | null }[]; typical_latency_ms: number | null; telemetry: Record<string, number> }>(`/api/targets/${id}/health`) })
   const project = projects.data?.find((p) => p.id === t.data?.project_id)
-  useCrumbs([...(project ? [{ label: project.name, to: `/p/${project.id}` }] : [{ label: 'Connections', to: '/targets' }]), { label: t.data?.name ?? '...' }], `target-${id}-${t.data?.name}-${project?.name}`)
+  useCrumbs([...(project ? [{ label: project.name, to: `/p/${project.id}` }] : [{ label: 'Connections', to: '/targets' }]), { label: t.data?.name ?? '…' }], `target-${id}-${t.data?.name}-${project?.name}`)
   const [message, setMessage] = useState('What can you help me with?')
   const [view, setView] = useState<'seen' | 'raw'>('seen')
   const [cfgView, setCfgView] = useState<'summary' | 'json'>('summary')
@@ -143,20 +146,20 @@ export function TargetPage() {
         </>}
         actions={
           <>
-            <Badge>{target.adapter === 'replay' ? 'imported' : target.adapter}</Badge>
+            <Badge>{kindLabel(target.adapter)}</Badge>
             <Badge tone="accent"><span className="font-mono">v{v.version}</span></Badge>
-            {target.adapter !== 'replay' && <Button loading={check.isPending} onClick={() => check.mutate()}><Activity className="size-3.5" />Check now</Button>}
+            {target.adapter !== 'replay' && <Button loading={check.isPending} onClick={() => check.mutate()}><Activity className="size-3.5" />Test connection</Button>}
             {target.adapter !== 'replay' && <Link to={`/targets/new?from=${target.id}`} viewTransition className={linkButton()}><Pencil className="size-3.5" />Edit (new version)</Link>}
             {target.adapter !== 'replay' && <Button variant="ghost" loading={template.isPending} onClick={() => template.mutate()} title="Save as a template" aria-label="Save as a template">{template.isSuccess ? <Check className="size-3.5" /> : <BookmarkPlus className="size-3.5" />}</Button>}
           </>
         }
       />
       {check.isError && <div className="mb-4"><ErrorState error={check.error} /></div>}
-      {lc && !lc.ok && <div className="mb-4"><Notice tone="bad" title={lc.explanation ?? 'The last check failed'}><span className="font-mono text-xs">{lc.error}</span> · {when(lc.at)}</Notice></div>}
+      {lc && !lc.ok && <div className="mb-4"><Notice tone="bad" title={lc.explanation ?? 'The last test failed'}><span className="font-mono text-xs">{lc.error}</span> · {when(lc.at)}</Notice></div>}
       <div className="grid gap-12 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
         <div className="space-y-12">
           <Card title="Ask it something"
-            help={<p>Sends one question with this version's configuration and shows the reply the way Assay reads it, and which checks that makes possible.</p>}>
+            help={<p>Sends one question with this version’s configuration and shows the reply the way Assay reads it, and which checks that makes possible.</p>}>
             <div className="flex gap-2">
               <Input value={message} onChange={(e) => setMessage(e.target.value)} aria-label="Test message" />
               <Button variant="primary" loading={test.isPending} onClick={() => test.mutate()}>Send</Button>
@@ -183,11 +186,11 @@ export function TargetPage() {
               </div>
             )}
           </Card>
-          <Card title="Health" help={<p>The last health check, and figures from the latest runs of this connection.</p>}>
+          <Card title="Health" help={<p>The last connection test, and figures from the latest runs of this connection.</p>}>
             <Figs>
-              <Stat label="Last check" value={<span className={clsx('font-sans text-base', lc ? 'font-medium' : 'font-normal text-ink-3', lc && !lc.ok && 'text-bad-ink')}>{lc ? (lc.ok ? `ok · ${when(lc.at)}` : 'failed') : 'never'}</span>} />
-              <Stat label="Typical answer" value={health.data?.typical_latency_ms != null ? ms(health.data.typical_latency_ms) : <span className="font-sans text-base font-normal text-ink-3">no runs yet</span>} />
-              <Stat label="Recent pass rate" value={health.data?.runs.length ? <Sparkline values={[...health.data.runs].reverse().map((r) => r.pass_rate)} width={120} height={28} label="pass rate of recent runs" /> : <span className="font-sans text-base font-normal text-ink-3">no runs yet</span>} />
+              <Stat label="Last test" value={<span className={clsx('font-sans text-base', lc ? 'font-medium' : 'font-normal text-ink-3', lc && !lc.ok && 'text-bad-ink')}>{lc ? (lc.ok ? `OK · ${when(lc.at)}` : 'Failed') : 'Never'}</span>} />
+              <Stat label="Typical answer" value={health.data?.typical_latency_ms != null ? ms(health.data.typical_latency_ms) : <span className="font-sans text-base font-normal text-ink-3">No runs yet</span>} />
+              <Stat label="Recent pass rate" value={health.data?.runs.length ? <Sparkline values={[...health.data.runs].reverse().map((r) => r.pass_rate)} width={120} height={28} label="pass rate of recent runs" /> : <span className="font-sans text-base font-normal text-ink-3">No runs yet</span>} />
             </Figs>
             {lc?.coverage && <p className="mt-3 text-xs text-ink-2">Reports: {lc.coverage.join(', ') || 'answer only'}.</p>}
             {health.data?.runs[0] && <p className="mt-1 text-xs text-ink-2">Latest run <Link className="font-mono text-accent-ink underline" to={`/runs/${health.data.runs[0].id}`}>#{health.data.runs[0].id}</Link>: <span className="font-mono">{pct(health.data.runs[0].pass_rate)}</span>.</p>}
@@ -220,15 +223,15 @@ export function TargetPage() {
               </tbody>
             </ScrollTable>
           </Card>
-          <Card title="Grading privacy" help={<p>Keeps this bot's answers on this computer when they are graded. Runs that pick a cloud grading model for this bot are refused.</p>}>
+          <Card title="Grading privacy" help={<p>Keeps this bot’s answers on this computer when they are graded. Runs that pick a cloud grading model for this bot are refused.</p>}>
             <Toggle disabled={flags.isPending} checked={!!target.local_judges_only} onChange={(val) => flags.mutate({ local_judges_only: val })}
-              label={<LabelHelp label="Local grading models only"><p>This bot's answers may only be graded by a model running on this machine (Ollama, LM Studio). Runs that pick a cloud model are refused.</p></LabelHelp>} />
+              label={<LabelHelp label="Local grading models only"><p>This bot’s answers may only be graded by a model running on this computer (Ollama, LM Studio). Runs that pick a cloud model are refused.</p></LabelHelp>} />
           </Card>
           <Card title="Load and cost" help={<p>How hard test runs may press on this bot, and what one answer costs when the bot reports no token counts.</p>}>
             <Toggle disabled={flags.isPending} checked={!!target.shared} onChange={(val) => flags.mutate({ shared: val })}
-              label={<LabelHelp label="Other people use this bot" title="A shared bot"><p>New runs then ask 2 questions at a time by default, and warn above that: test questions all at once would slow down real users' answers.</p></LabelHelp>} />
+              label={<LabelHelp label="Other people use this bot" title="A shared bot"><p>New runs then ask 2 questions at a time by default, and warn above that: test questions all at once would slow down real users’ answers.</p></LabelHelp>} />
             <div className="mt-4">
-              <Field label={<LabelHelp label="Cost per answer (USD, your estimate)" title="Cost per answer"><p>For bots that report no token counts (Assay cannot price them). With it, the spend cap and estimates can count this bot's answers.</p></LabelHelp>}
+              <Field label={<LabelHelp label="Cost per answer (USD, your estimate)" title="Cost per answer"><p>For bots that report no token counts (Assay cannot price them). With it, the spend cap and estimates can count this bot’s answers.</p></LabelHelp>}
                 hint={target.cost_per_answer_usd != null ? <>Now <span className="font-mono">{usd(target.cost_per_answer_usd)}</span> per answer.</> : 'Not set: the spend cap cannot limit this bot.'}>
                 <div className="flex gap-2">
                   <Input className="w-32" type="number" min={0} step="0.001" aria-label="Cost per answer" placeholder="e.g. 0.04"

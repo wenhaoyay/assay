@@ -57,7 +57,7 @@ export function LiveFigures({ r, rows, now }: { r: RunHeader; rows: TrialRow[]; 
         <div className="t-label">Pass rate so far</div>
         <div className="t-fig mt-1">{n ? <><Odometer text={pct(pass / n)} /><span className="ml-1.5 font-mono text-xs text-ink-3">± {Math.round(((hi - lo) / 2) * 100)} pp</span></> : '–'}</div>
       </div>
-      <div><div className="t-label">{active ? 'Time left' : 'Took'}</div><div className="t-fig mt-1 num">{active ? (r.status === 'queued' && eta == null ? 'queued' : r.status === 'cancelling' ? 'stopping' : clock(left)) : clock(elapsed)}</div>
+      <div><div className="t-label">{active ? 'Time left' : 'Took'}</div><div className="t-fig mt-1 num">{active ? (r.status === 'queued' && eta == null ? 'Queued' : r.status === 'cancelling' ? 'Stopping' : clock(left)) : clock(elapsed)}</div>
         {active && waiting && r.status !== 'cancelling' && <div className="mt-0.5 max-w-xs text-xs text-ink-3" data-testid="live-waiting">{waiting}</div>}</div>
       <div><div className="t-label">Spent</div><div className="t-fig mt-1 text-ink-2"><Odometer text={usd(spend)} /></div></div>
     </div>
@@ -175,12 +175,12 @@ export function LiveRun({ r, rows, gate }: { r: RunHeader; rows: TrialRow[]; gat
         </div>
         <div className="min-w-0">
           <div className="t-label mb-1 flex items-center gap-2">Pass rate so far <SampleSize n={fin.length} unit="tries" />
-            <Help title="Pass rate so far"><p>The line is the pass rate of the tries finished so far; the band is its 95% interval (Wilson). It narrows as answers arrive: early figures swing, late ones settle.</p><p>Counted per try here; the final figure averages per question first, so it can differ a little.</p>{gate !== null && <p>The dashed line is the release gate's floor.</p>}</Help></div>
+            <Help title="Pass rate so far"><p>The line is the pass rate of the tries finished so far; the band is its 95% interval (Wilson). It narrows as answers arrive: early figures swing, late ones settle.</p><p>Counted per try here; the final figure averages per question first, so it can differ a little.</p>{gate !== null && <p>The dashed line is the release gate’s floor.</p>}</Help></div>
           <Funnel fin={fin} total={r.progress_total} gate={gate} />
         </div>
       </div>
       <Card title="Speed of each answer" meta={<SampleSize n={fin.length} unit="answers" />}
-        help={<p>Each answer drops in as it finishes, placed by how long it took. Tall stacks are the common speeds; the dots far right are the slow tail that sets p95.</p>}
+        help={<p>Each answer drops in as it finishes, placed by how long it took. Tall stacks are the common speeds; the dots far right are the slow tail that sets the speed (p95).</p>}
         actions={<span className="flex gap-3"><LegendItem className="bg-good">passed</LegendItem><LegendItem className="bg-bad">failed</LegendItem></span>}>
         <Swarm fin={fin} />
       </Card>

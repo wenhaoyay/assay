@@ -254,8 +254,8 @@ const STATUS: Record<string, { tone: Tone; text: string; icon?: Icon }> = {
   failed: { tone: 'fail', text: 'Failed', icon: 'x' },
   FAIL: { tone: 'fail', text: 'Fail', icon: 'x' },
   error: { tone: 'error', text: 'Error', icon: 'warn' },
-  unknown: { tone: 'flaky', text: 'Unknown' },
-  UNKNOWN: { tone: 'flaky', text: 'Unknown' },
+  unknown: { tone: 'flaky', text: 'Not sure' },
+  UNKNOWN: { tone: 'flaky', text: 'Not sure' },
   not_applicable: { tone: 'unmeasured', text: 'N/A', icon: 'slash' },
   not_evaluated: { tone: 'unmeasured', text: 'Not evaluated', icon: 'slash' },
   NOT_EVALUATED: { tone: 'unmeasured', text: 'Not evaluated', icon: 'slash' },
@@ -648,15 +648,15 @@ export function DotStrip({ statuses, size = 8, title }: { statuses: string[]; si
   )
 }
 
-/** Consistent / flaky / failing label for a case's trials. */
+/** Consistent / flaky / failing label for a question's tries. */
 export function Consistency({ statuses }: { statuses: string[] }) {
   const decided = statuses.filter((s) => s === 'passed' || s === 'failed' || s === 'error')
   const passed = decided.filter((s) => s === 'passed').length
-  if (!decided.length) return <Badge>not run</Badge>
+  if (!decided.length) return <Badge>Not run</Badge>
   if (decided.length === 1) return <StatusBadge status={decided[0]} />
   if (passed === decided.length) return <Badge tone="good"><Check className="size-3" />{passed}/{decided.length} passed</Badge>
-  if (passed === 0) return <Badge tone="bad"><X className="size-3" />{decided.length}/{decided.length} failed - consistent</Badge>
-  return <Badge tone="warn"><AlertTriangle className="size-3" />{passed}/{decided.length} passed - flaky</Badge>
+  if (passed === 0) return <Badge tone="bad"><X className="size-3" />{decided.length}/{decided.length} failed every try</Badge>
+  return <Badge tone="warn"><AlertTriangle className="size-3" />{passed}/{decided.length} passed (flaky)</Badge>
 }
 
 /** Thin animated progress bar. */

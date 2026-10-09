@@ -4,6 +4,7 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'motion/react'
 import { useState } from 'react'
+import { plural } from '../../lib/format'
 import type { TrialDetail } from '../../lib/types'
 import { Badge, Empty, SectionHead } from '../ui'
 
@@ -43,7 +44,7 @@ export function Sources({ docs, relevant, cited, lit, onLight, shown = 1 }: {
   const fmtScore = (v: number) => (Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2))
   return (
     <section data-testid="sources">
-      <SectionHead title="What the bot read" rule meta={docs ? `${docs.length} passage${docs.length === 1 ? '' : 's'}` : undefined}
+      <SectionHead title="What the bot read" rule meta={docs ? plural(docs.length, 'passage') : undefined}
         help={<>
           <p>The passages search returned, best score first, with the score as a bar. Expected = a document the question needs; cited = the answer refers to it.</p>
           <p>A dashed red row is a needed document search never found. Hover a row to read its passage (click to keep it open); hover a citation in the answer to light the passage it came from.</p>

@@ -87,7 +87,7 @@ export function label(id: string): string {
 }
 
 export const FAILURE_LABELS: Record<string, string> = {
-  retrieval_miss: 'Retrieval miss',
+  retrieval_miss: 'Search miss',
   wrong_answer: 'Wrong answer',
   unsupported_claim: 'Unsupported claim',
   should_have_refused: 'Should have refused',
@@ -100,7 +100,7 @@ export const FAILURE_LABELS: Record<string, string> = {
   incomplete_response: 'Incomplete response',
   latency_regression: 'Latency regression',
   cost_regression: 'Cost regression',
-  judge_disagreement: 'Judge disagreement',
+  judge_disagreement: 'Grading model disagreement',
   execution_error: 'Execution error',
   unknown: 'Unknown',
 }

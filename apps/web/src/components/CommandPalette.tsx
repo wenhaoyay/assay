@@ -1,4 +1,4 @@
-// Ctrl+K: jump to any chatbot, run, target, dataset or test case, or run an action.
+// Ctrl+K: jump to any chatbot, run, connection, dataset or question, or run an action.
 // "compare 5 6" opens that comparison; "#12" opens run 12.
 import { useQuery } from '@tanstack/react-query'
 import clsx from 'clsx'
@@ -82,12 +82,12 @@ export function CommandPalette({ open, onClose, onShortcuts, onTour }: { open: b
     const runId = ql.match(/^#?(\d+)$/)
     if (runId) out.push({ id: 'run', group: 'Jump', label: <>Open run <span className="font-mono font-semibold">#{runId[1]}</span></>, icon: Rows3, run: go(`/runs/${runId[1]}`) })
     const actions: Item[] = [
-      { id: 'a-run', group: 'Actions', label: 'New run', hint: 'Start a run on a chatbot version', icon: Play, run: go('/runs/new'), keywords: 'experiment start evaluate' },
-      { id: 'a-connect', group: 'Actions', label: 'Connect a chatbot', hint: 'Paste a curl command, map the reply', icon: Plug, run: go('/targets/new'), keywords: 'target connection add wizard new' },
+      { id: 'a-run', group: 'Actions', label: 'New run', hint: 'Start a run on a chatbot version', icon: Play, run: go('/runs/new'), keywords: 'start evaluate test' },
+      { id: 'a-connect', group: 'Actions', label: 'Connect a chatbot', hint: 'Paste a curl command, map the reply', icon: Plug, run: go('/targets/new'), keywords: 'connection add wizard new' },
       { id: 'a-compare', group: 'Actions', label: 'Compare two runs', icon: GitCompareArrows, run: go('/compare'), keywords: 'diff baseline candidate' },
-      { id: 'a-models', group: 'Actions', label: 'Models & keys', hint: 'Grading models, API keys', icon: Sparkles, run: go('/settings?tab=models'), keywords: 'judge openai api key provider settings' },
-      { id: 'a-calibrate', group: 'Actions', label: 'Label answers (calibration)', icon: Scale, run: go('/calibration'), keywords: 'judge trust human label' },
-      { id: 'a-bakeoff', group: 'Actions', label: 'Judge bake-off', hint: 'Which grading model agrees with you most?', icon: Zap, run: go('/calibration?tab=bakeoff'), keywords: 'judge compare models' },
+      { id: 'a-models', group: 'Actions', label: 'Models & keys', hint: 'Grading models, API keys', icon: Sparkles, run: go('/settings?tab=models'), keywords: 'grading model openai api key provider settings' },
+      { id: 'a-calibrate', group: 'Actions', label: 'Label answers (calibration)', icon: Scale, run: go('/calibration'), keywords: 'grading model trust human label' },
+      { id: 'a-bakeoff', group: 'Actions', label: 'Bake-off', hint: 'Which grading model agrees with you most?', icon: Zap, run: go('/calibration?tab=bakeoff'), keywords: 'grading model compare models' },
       { id: 'a-theme', group: 'Preferences', label: prefs.theme === 'dark' ? 'Light mode' : 'Dark mode', icon: Moon, run: () => { prefs.toggle('theme'); onClose() }, keywords: 'theme dark light' },
       { id: 'a-density', group: 'Preferences', label: prefs.density === 'compact' ? 'Comfortable density' : 'Compact density', icon: Rows3, run: () => { prefs.toggle('density'); onClose() }, keywords: 'density compact rows' },
       { id: 'a-motion', group: 'Preferences', label: prefs.motion === 'reduced' ? 'Turn animations on' : 'Reduce motion', icon: Sparkles, run: () => { prefs.toggle('motion'); onClose() }, keywords: 'animation motion' },
@@ -98,7 +98,7 @@ export function CommandPalette({ open, onClose, onShortcuts, onTour }: { open: b
       { id: 'p-targets', group: 'Go to', label: 'Connections', icon: Target, run: go('/targets') },
       { id: 'p-datasets', group: 'Go to', label: 'Datasets', icon: Database, run: go('/datasets') },
       { id: 'p-gates', group: 'Go to', label: 'Gates', icon: ShieldCheck, run: go('/gates') },
-      { id: 'p-evaluators', group: 'Go to', label: 'Evaluators', icon: FileText, run: go('/evaluators') },
+      { id: 'p-evaluators', group: 'Go to', label: 'Checks', icon: FileText, run: go('/evaluators') },
       { id: 'p-settings', group: 'Go to', label: 'Settings', icon: Settings, run: go('/settings') },
     ]
     out.push(...actions.filter((a) => !ql || `${typeof a.label === 'string' ? a.label : ''} ${a.hint ?? ''} ${a.keywords ?? ''} ${a.group}`.toLowerCase().includes(ql)))
@@ -106,7 +106,7 @@ export function CommandPalette({ open, onClose, onShortcuts, onTour }: { open: b
     if (r && ql) {
       r.projects.forEach((p) => out.push({ id: `pr${p.id}`, group: 'Chatbots', label: p.name, icon: Bot, run: go(`/p/${p.id}`) }))
       r.runs.forEach((x) => out.push({ id: `r${x.id}`, group: 'Runs', label: <><span className="font-mono text-ink-3">#{x.id}</span> {x.name}</>, icon: Rows3, run: go(`/runs/${x.id}`) }))
-      r.cases.forEach((c) => out.push({ id: `c${c.dataset_id}${c.id}`, group: 'Test cases', label: <><span className="font-mono text-ink-3">{c.id}</span> {c.title}</>, hint: c.dataset, icon: FileText, run: go(`/datasets/${c.dataset_id}?case=${encodeURIComponent(c.id)}`) }))
+      r.cases.forEach((c) => out.push({ id: `c${c.dataset_id}${c.id}`, group: 'Questions', label: <><span className="font-mono text-ink-3">{c.id}</span> {c.title}</>, hint: c.dataset, icon: FileText, run: go(`/datasets/${c.dataset_id}?case=${encodeURIComponent(c.id)}`) }))
       r.targets.forEach((t) => out.push({ id: `t${t.id}`, group: 'Connections', label: t.name, icon: Target, run: go(`/targets/${t.id}`) }))
       r.datasets.forEach((d) => out.push({ id: `d${d.id}`, group: 'Datasets', label: d.name, icon: Database, run: go(`/datasets/${d.id}`) }))
     }
@@ -139,12 +139,12 @@ export function CommandPalette({ open, onClose, onShortcuts, onTour }: { open: b
             <div className="flex items-center gap-2 border-b border-line px-4">
               <Search className="size-4 text-ink-3" aria-hidden />
               <input ref={input} value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKey}
-                placeholder="Search runs, cases, chatbots... or type a command (compare 5 6)"
+                placeholder="Search runs, questions, chatbots… or type a command (compare 5 6)"
                 className="h-12 flex-1 bg-transparent text-lead text-ink outline-none placeholder:text-ink-3" style={{ outline: 'none' }} aria-label="Search" />
               <Kbd>Esc</Kbd>
             </div>
             <ul className="scroll-thin max-h-[52vh] overflow-y-auto p-2" role="listbox">
-              {items.length === 0 && <li className="px-3 py-6 text-center text-sm text-ink-3">{results.isFetching ? 'Searching...' : 'Nothing matches.'}</li>}
+              {items.length === 0 && <li className="px-3 py-6 text-center text-sm text-ink-3">{results.isFetching ? 'Searching…' : 'Nothing matches'}</li>}
               {items.map((it, i) => {
                 const header = it.group !== lastGroup ? it.group : null
                 lastGroup = it.group
@@ -188,14 +188,14 @@ export const SHORTCUTS: { group: string; keys: string[]; label: string }[] = [
   { group: 'Lists', keys: ['J'], label: 'Next row' },
   { group: 'Lists', keys: ['K'], label: 'Previous row' },
   { group: 'Lists', keys: ['Enter'], label: 'Open the picked row' },
-  { group: 'Run page', keys: ['1'], label: 'Summary ... 7 Config (tabs by number)' },
+  { group: 'Run page', keys: ['1'], label: 'Tabs by number: 1 is Summary, 7 is Config' },
   { group: 'Run page', keys: ['C'], label: 'Compare with the previous comparable run' },
-  { group: 'Trial page', keys: ['['], label: 'Previous trial of this case' },
-  { group: 'Trial page', keys: [']'], label: 'Next trial of this case' },
-  { group: 'Trial page', keys: ['Shift', 'J'], label: 'Next failing case of this run' },
-  { group: 'Calibration', keys: ['P'], label: 'Label PASS' },
-  { group: 'Calibration', keys: ['F'], label: 'Label FAIL' },
-  { group: 'Calibration', keys: ['U'], label: 'Label UNKNOWN' },
+  { group: 'Try page', keys: ['['], label: 'Previous try of this question' },
+  { group: 'Try page', keys: [']'], label: 'Next try of this question' },
+  { group: 'Try page', keys: ['Shift', 'J'], label: 'Next failing question of this run' },
+  { group: 'Calibration', keys: ['P'], label: 'Label pass' },
+  { group: 'Calibration', keys: ['F'], label: 'Label fail' },
+  { group: 'Calibration', keys: ['U'], label: 'Label not sure' },
 ]
 
 export function ShortcutSheet({ open, onClose }: { open: boolean; onClose: () => void }) {

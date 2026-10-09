@@ -148,7 +148,7 @@ class ReplayTargetAdapter(TargetAdapter):
         t = now()
         stored = self.results.get(ctx.case_id)
         if stored is None:
-            result = NormalizedTargetResult(error=f"No imported result for case {ctx.case_id}")
+            result = NormalizedTargetResult(error=f"No imported result for question {ctx.case_id}")
         else:
             result = stored.model_copy(deep=True)
             result.metadata = {**result.metadata, "replayed": True}

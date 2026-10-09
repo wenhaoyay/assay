@@ -33,6 +33,7 @@ import yaml
 from pydantic import ValidationError
 
 from assay.schemas import CaseInput, TestCase
+from assay.textutil import plural
 
 
 class DatasetError(ValueError):
@@ -84,7 +85,7 @@ def validate_cases(raw_cases: list[Any], where: str = "cases") -> list[TestCase]
     for i, raw in enumerate(raw_cases):
         label = f"{where}[{i}]"
         if not isinstance(raw, dict):
-            errors.append(f"{label}: expected a mapping, got {type(raw).__name__}")
+            errors.append(f"{label}: expected a set of named fields (a mapping), not a single value.")
             continue
         if raw.get("id"):
             label += f" (id {raw['id']})"
@@ -159,7 +160,7 @@ def cases_from_csv(text: str) -> list[TestCase]:
         raise DatasetError(["CSV header: needs a 'question' (or 'message') column"])
     unknown = cols - CSV_COLUMNS
     if unknown:
-        raise DatasetError([f"CSV header: unknown column(s) {', '.join(sorted(unknown))}; "
+        raise DatasetError([f"CSV header: unknown {plural(len(unknown), 'column')} {', '.join(sorted(unknown))}; "
                             f"allowed: {', '.join(sorted(CSV_COLUMNS))}"])
     raw_cases, errors = [], []
     for row_no, row in enumerate(reader, start=2):  # row 1 is the header

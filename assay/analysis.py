@@ -216,8 +216,8 @@ def aggregate(trials: list[TrialView], cases: dict[str, CaseInfo] | None = None)
 
 HEADLINE = [
     ("overall_pass_rate", "Overall pass rate", "rate"),
-    ("correctness", "Answer correctness (judge)", "rate"),
-    ("groundedness", "Groundedness (judge)", "rate"),
+    ("correctness", "Answer correctness (grading model)", "rate"),
+    ("groundedness", "Groundedness (grading model)", "rate"),
     ("must_mention", "Must-mention check", "rate"),
     ("refusal_check", "Refusal behaviour", "rate"),
     ("recall_at_k.mean", "Recall@k (mean)", "score"),
@@ -328,7 +328,7 @@ def describe_delta(row: dict[str, Any]) -> str:
     if row.get("delta") is None:
         return "not available"
     if not ci or ci.get("ci_low") is None:
-        return "no interval (too few paired cases)"
+        return "no interval (too few paired questions)"
     if ci["excludes_zero"]:
         return "interval excludes zero"
     return "within noise (interval includes zero)"

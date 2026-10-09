@@ -64,7 +64,7 @@ describe('formatting', () => {
 describe('states', () => {
   it('writes statuses in sentence case', () => {
     render(<><StatusBadge status="PASS" /><StatusBadge status="INCOMPLETE" /><StatusBadge status="UNKNOWN" /></>)
-    for (const t of ['Pass', 'Incomplete', 'Unknown']) expect(screen.getByText(t)).toBeInTheDocument()
+    for (const t of ['Pass', 'Incomplete', 'Not sure']) expect(screen.getByText(t)).toBeInTheDocument()
   })
   it('maps status words to one of the states', () => {
     expect(stateOf('passed')).toBe('pass')

@@ -50,7 +50,7 @@ class OpenAICompatibleProvider(LLMProvider):
 
 
 class OllamaProvider(LLMProvider):
-    """Local models through Ollama's /api/chat. Nothing leaves the machine."""
+    """Local models through Ollama's /api/chat. Nothing leaves the computer."""
 
     provider = "ollama"
 
@@ -151,5 +151,5 @@ def json_from_text(text: str) -> dict:
         t = t[4:] if t.lower().startswith("json") else t
     start, end = t.find("{"), t.rfind("}")
     if start < 0 or end < start:
-        raise ValueError("no JSON object in judge output")
+        raise ValueError("The grading model's reply had no JSON object.")
     return json.loads(t[start : end + 1])

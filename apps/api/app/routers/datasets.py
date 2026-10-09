@@ -19,6 +19,7 @@ from assay.schemas import TestCase
 from assay.store import models as m
 from assay.store import service as svc
 from assay.store import workspace
+from assay.textutil import plural
 
 from .. import serializers as ser
 from ..deps import get_session
@@ -88,7 +89,7 @@ def delete_dataset(dataset_id: int, s: Session = Depends(get_session)) -> dict[s
     ds = svc.get(s, m.Dataset, dataset_id)
     runs = _dataset_runs(s, dataset_id)
     if runs:
-        raise HTTPException(409, {"message": f"{len(runs)} run(s) used this dataset, so it cannot be deleted. "
+        raise HTTPException(409, {"message": f"{plural(len(runs), 'run')} used this dataset, so it cannot be deleted. "
                                              "Archive it instead: it is hidden but those runs keep their questions.",
                                   "run_ids": runs[:50]})
     version_ids = [v.id for v in ds.versions]
@@ -213,14 +214,14 @@ def _edit_result(s: Session, original_id: int, v: m.DatasetVersion) -> dict[str,
 def add_case(version_id: int, body: dict[str, Any], s: Session = Depends(get_session)) -> dict[str, Any]:
     case = _case(body)
     if any(c.id == case.id for _, c in svc.version_cases(s, version_id)):
-        raise HTTPException(409, f"A case with id {case.id!r} already exists in this version")
+        raise HTTPException(409, f"A question with id {case.id!r} already exists in this version.")
     return _edit_result(s, version_id, svc.upsert_case(s, version_id, case))
 
 
 @router.put("/dataset-versions/{version_id}/cases/{case_key}")
 def update_case(version_id: int, case_key: str, body: dict[str, Any], s: Session = Depends(get_session)) -> dict[str, Any]:
     if not any(c.id == case_key for _, c in svc.version_cases(s, version_id)):
-        raise HTTPException(404, f"No case {case_key!r} in this version")
+        raise HTTPException(404, f"No question {case_key!r} in this version.")
     return _edit_result(s, version_id, svc.upsert_case(s, version_id, _case(body), replace_key=case_key))
 
 
@@ -334,7 +335,7 @@ class CandidateEdit(BaseModel):
 def edit_candidate(candidate_id: int, body: CandidateEdit, s: Session = Depends(get_session)) -> dict[str, Any]:
     c = svc.get(s, m.GeneratedTestCandidate, candidate_id)
     if c.status == "approved" and c.approved_in_version_id:
-        raise HTTPException(409, "Already added to a dataset version; edit the case there instead.")
+        raise HTTPException(409, "Already added to a dataset version; edit the question there instead.")
     c.case = _case(body.case).model_dump(mode="json")
     c.edited = True
     return _candidate(c, None)
@@ -371,8 +372,8 @@ def promote(version_id: int, body: PromoteIn, s: Session = Depends(get_session))
         q = q.where(m.GeneratedTestCandidate.id.in_(body.candidate_ids))
     cands = s.scalars(q).all()
     if not cands:
-        raise HTTPException(409, "No approved candidates waiting. Only APPROVED candidates can enter a dataset.")
-    target = svc.editable_version(s, v.id, f"added {len(cands)} reviewed generated case(s)")
+        raise HTTPException(409, "No approved candidates waiting. Only approved candidates can enter a dataset.")
+    target = svc.editable_version(s, v.id, f"added {plural(len(cands), 'reviewed drafted question')}")
     existing = {c.id for _, c in svc.version_cases(s, target.id)}
     for c in cands:
         case = _case(c.case)
@@ -437,7 +438,7 @@ async def group_real_questions(file: UploadFile = File(...)) -> dict[str, Any]:
     try:
         qs = read_questions(file.filename or "history.txt", text)
     except (json.JSONDecodeError, ValueError) as exc:
-        raise HTTPException(422, f"Could not read questions from {file.filename}: {exc}") from exc
+        raise HTTPException(422, f"Could not read questions from {file.filename}. Check that it is a text, JSON or CSV file.") from exc
     if not qs:
         raise HTTPException(422, "No questions found. Use JSONL/JSON with a question field, a CSV with a "
                                  "'question' column, or one question per line.")
@@ -499,7 +500,7 @@ async def variations(version_id: int, case_key: str, body: VariationsIn, s: Sess
     v = svc.get(s, m.DatasetVersion, version_id)
     case = next((c for _, c in svc.version_cases(s, v.id) if c.id == case_key), None)
     if case is None:
-        raise HTTPException(404, f"No case {case_key!r} in this version")
+        raise HTTPException(404, f"No question {case_key!r} in this version.")
     texts: list[tuple[str, str]] = []
     if "typo" in body.kinds:
         texts.append(("typo", typo_variant(case.input.message)))
@@ -556,7 +557,7 @@ async def import_results(project_id: int = Form(...), name: str = Form(...), con
     try:
         cfg = ImportConfig.model_validate(json.loads(config or "{}"))
     except (ValidationError, json.JSONDecodeError) as exc:
-        raise HTTPException(422, f"Invalid import config: {exc}") from exc
+        raise HTTPException(422, "The import settings are not valid. Say which column holds the question and the answer.") from exc
     text = (await _read(file)).decode("utf-8", errors="replace")
     try:
         return create_import(s, project_id, name, file.filename or "results.jsonl", text, cfg)

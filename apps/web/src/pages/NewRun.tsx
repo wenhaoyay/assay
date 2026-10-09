@@ -16,13 +16,13 @@ import { whereLabel } from '../lib/models'
 import { validateSetup } from '../lib/compare'
 import { projectOption, useProjects } from '../lib/projects'
 import { useCrumbs } from '../lib/crumbs'
-import { usd } from '../lib/format'
+import { plural, usd } from '../lib/format'
 import type { Dataset, EvaluatorInfo, Gate, ProviderConfig, RunHeader, Settings, Target } from '../lib/types'
 
 const KIND_ORDER: EvaluatorInfo['kind'][] = ['deterministic', 'retrieval', 'agent', 'performance', 'llm_judge']
 const KIND_LABEL: Record<string, string> = {
-  deterministic: 'Objective checks', retrieval: 'Retrieval (needs labelled documents)', agent: 'Agent / tool use',
-  performance: 'Latency and cost', llm_judge: 'Meaning (needs a grading model)',
+  deterministic: 'Objective checks', retrieval: 'Search (needs labelled documents)', agent: 'Tools and agents',
+  performance: 'Speed and cost', llm_judge: 'Meaning (needs a grading model)',
 }
 
 // Used in default run names (month-day); fixed at load so a render never reads the clock.
@@ -31,9 +31,9 @@ const TODAY = new Date().toISOString().slice(5, 10)
 type Preset = 'quick' | 'smoke' | 'release' | 'full' | 'search' | 'custom'
 const PRESETS: { id: Preset; title: string; body: string; icon: typeof Zap }[] = [
   { id: 'quick', title: 'Quick check', body: '30 questions across the categories, the same 30 each time, 1 try. Objective checks plus correctness.', icon: Zap },
-  { id: 'smoke', title: 'Quick smoke', body: 'Objective checks only, 1 try per question. Free and fast.', icon: Zap },
+  { id: 'smoke', title: 'Fast and free', body: 'Objective checks only, 1 try per question. No grading model needed.', icon: Zap },
   { id: 'release', title: 'Release gate', body: 'Default checks, 3 tries (shows flakiness), the release gate.', icon: ShieldCheck },
-  { id: 'full', title: 'Full + grading model', body: 'Everything, including meaning checks by the default judge.', icon: Sparkles },
+  { id: 'full', title: 'Full + grading model', body: 'Everything, including meaning checks by the default grading model.', icon: Sparkles },
   { id: 'search', title: 'Search only', body: 'Did search find what a correct answer needs? With a search-only connection, no answer is paid for.', icon: ScanSearch },
   { id: 'custom', title: 'Custom', body: 'Pick each check yourself.', icon: Gauge },
 ]
@@ -42,10 +42,10 @@ type Purpose = 'correctness' | 'speed' | 'large'
 const PURPOSES: { id: Purpose; label: string; atOnce: number }[] = [
   { id: 'correctness', label: 'Right or wrong only', atOnce: 4 },
   { id: 'speed', label: 'Speed matters too', atOnce: 1 },
-  { id: 'large', label: 'Large set, sturdy bot', atOnce: 8 },
+  { id: 'large', label: 'Large dataset, sturdy bot', atOnce: 8 },
 ]
 
-/** Does a gate judge speed? (a latency rule, absolute or against a baseline) */
+/** Does a gate judge speed? (a speed rule, absolute or against a baseline) */
 const gateJudgesSpeed = (g?: Gate) => !!g && /latency/.test(JSON.stringify(g.config))
 
 function speedReliability(c: number): { text: string; tone: 'good' | 'warn' | 'bad' } {
@@ -170,8 +170,8 @@ export function NewRunPage() {
   const reliability = speedReliability(concurrency)
   const warnings: { title: string; body: string }[] = []
   if (concurrency >= 8 && (gateJudgesSpeed(gate) || maxLatency)) {
-    warnings.push({ title: `${gate && gateJudgesSpeed(gate) ? `"${gate.name}" judges speed` : 'This run has a latency limit'}, but ${concurrency} at a time inflates speed`,
-      body: 'Answers wait for each other, so a latency FAIL here may not be the bot\'s fault. Use 1-2 at a time for a run that judges speed.' })
+    warnings.push({ title: `${gate && gateJudgesSpeed(gate) ? `“${gate.name}” checks speed` : 'This run has a speed limit'}, but ${concurrency} at a time inflates speed`,
+      body: 'Answers wait for each other, so a failed speed check here may not be the bot’s fault. Use 1 or 2 at a time for a run that measures speed.' })
   }
   if (tv?.shared && concurrency > 2) {
     warnings.push({ title: `Other people use this bot: ${concurrency} test questions at once slow their answers`, body: 'The connection is marked as shared. 2 at a time keeps the load gentle; 1 when speed matters.' })
@@ -179,10 +179,10 @@ export function NewRunPage() {
 
   if (targets.isLoading || datasets.isLoading || evs.isLoading) return <PageSkeleton />
   const toggle = (id: string) => { setPreset('custom'); setCustom(checks.includes(id) ? checks.filter((x) => x !== id) : [...checks, id]) }
-  const datasetOption = (d: Dataset, v: Dataset['versions'][number]) => <option key={v.id} value={v.id}>{d.name} v{v.version} ({v.case_count} cases{v.status === 'draft' ? ', draft' : ''})</option>
+  const datasetOption = (d: Dataset, v: Dataset['versions'][number]) => <option key={v.id} value={v.id}>{d.name} v{v.version} ({plural(v.case_count, 'question')}{v.status === 'draft' ? ', draft' : ''})</option>
   const judgeReadout = e && e.judge_calls > 0 && e.judge_ms_per_call ? (
     e.judge_local
-      ? <><b className="num font-mono font-medium">{e.judge_calls}</b> grading calls on this PC: about {duration(Math.round((e.judge_calls * e.judge_ms_per_call) / 1000))}, free.</>
+      ? <><b className="num font-mono font-medium">{e.judge_calls}</b> grading calls on this computer: about {duration(Math.round((e.judge_calls * e.judge_ms_per_call) / 1000))}, free.</>
       : <><b className="num font-mono font-medium">{e.judge_calls}</b> grading calls: about {duration(Math.round((e.judge_calls * e.judge_ms_per_call) / 1000 / concurrency))}, {e.judge_cost_usd !== null ? usd(e.judge_cost_usd) : 'price unknown'}.</>
   ) : judge === null && defaultJudge ? 'Your default (Settings).' : undefined
 
@@ -207,34 +207,34 @@ export function NewRunPage() {
               </SetupField>
               <SetupField label="Connection · version" readout={tv && (
                 <span className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                  <Badge>{tv.adapter}</Badge>
+                  <Badge>{({ http: 'HTTP', python: 'Python function', replay: 'Imported' } as Record<string, string>)[tv.adapter] ?? tv.adapter}</Badge>
                   {tv.latest_version.variant_label && <Badge>{tv.latest_version.variant_label}</Badge>}
-                  {tv.shared && <Badge tone="warn">shared with other people</Badge>}
-                  {tv.local_judges_only && <Badge tone="accent">local grading models only</Badge>}
+                  {tv.shared && <Badge tone="warn">Shared with other people</Badge>}
+                  {tv.local_judges_only && <Badge tone="accent">Local grading models only</Badge>}
                 </span>
               )}>
                 <Select value={targetVersionId} onChange={(ev) => setTargetVersionId(ev.target.value ? Number(ev.target.value) : '')} aria-label="Connection">
-                  <option value="">Choose...</option>
-                  {projectTargets.map((t) => <option key={t.id} value={t.latest_version.id}>{t.name} - v{t.latest_version.version}{t.latest_version.variant_label ? ` (${t.latest_version.variant_label})` : ''}</option>)}
+                  <option value="">Choose…</option>
+                  {projectTargets.map((t) => <option key={t.id} value={t.latest_version.id}>{t.name} · v{t.latest_version.version}{t.latest_version.variant_label ? ` (${t.latest_version.variant_label})` : ''}</option>)}
                 </Select>
               </SetupField>
               <SetupField label="Questions" helpTitle="Questions (dataset version)" help={<>
                 <p>The dataset version this run asks. Running freezes this version; later edits create a new one.</p>
-                <p>Another chatbot's questions are listed separately: they are off-topic for this one. The last entry imports a file or lets you type questions without leaving this page.</p>
+                <p>Another chatbot’s questions are listed separately: they are off-topic for this one. The last entry imports a file or lets you type questions without leaving this page.</p>
               </>}>
                 <Select value={datasetVersionId} onChange={(ev) => { if (ev.target.value === '__add') { setAdding(true); return } setDatasetVersionId(ev.target.value ? Number(ev.target.value) : '') }} aria-label="Dataset version">
-                  <option value="">{projectDatasets.length ? 'Choose...' : effectiveProject ? 'No questions for this chatbot yet' : 'Choose...'}</option>
+                  <option value="">{projectDatasets.length ? 'Choose…' : effectiveProject ? 'No questions for this chatbot yet' : 'Choose…'}</option>
                   {otherDatasets.length > 0 ? (
-                    <optgroup label="This chatbot's questions">
+                    <optgroup label="This chatbot’s questions">
                       {projectDatasets.flatMap((d) => d.versions.map((v) => datasetOption(d, v)))}
                     </optgroup>
                   ) : projectDatasets.flatMap((d) => d.versions.map((v) => datasetOption(d, v)))}
                   {otherDatasets.length > 0 && (
-                    <optgroup label="Other chatbots' questions (off-topic for this one)">
-                      {otherDatasets.flatMap((d) => d.versions.map((v) => <option key={v.id} value={v.id}>{d.name} v{v.version} - {ownerName(d.project_id)}</option>))}
+                    <optgroup label="Other chatbots’ questions (off-topic for this one)">
+                      {otherDatasets.flatMap((d) => d.versions.map((v) => <option key={v.id} value={v.id}>{d.name} v{v.version} · {ownerName(d.project_id)}</option>))}
                     </optgroup>
                   )}
-                  {effectiveProject && <option value="__add">+ Import or type questions...</option>}
+                  {effectiveProject && <option value="__add">+ Import or type questions…</option>}
                 </Select>
               </SetupField>
               <SetupField label="Run name"><Input value={name} onChange={(ev) => setName(ev.target.value)} aria-label="Run name" /></SetupField>
@@ -244,7 +244,7 @@ export function NewRunPage() {
                 <Notice tone="warn" title={`These questions were written for ${ownerName(otherPicked.project_id)}`}>
                   {tv?.name ?? 'This connection'} belongs to {ownerName(Number(effectiveProject))}: it will answer them off-topic, and each answer may be billed. Their failures say nothing about this bot.
                   <Checkbox className="mt-2 font-medium text-ink" checked={allowOther} onChange={setAllowOther}
-                    label="I mean to use them (say, a successor bot or a shared safety set)" />
+                    label="Use them anyway (say, a successor bot or a shared safety set)" />
                 </Notice>
               </div>
             )}
@@ -290,7 +290,7 @@ export function NewRunPage() {
                               label={<>
                                 {ev.name}
                                 {!ev.gating && <span className="ml-1 text-xs text-ink-3">(diagnostic)</span>}
-                                {ev.calibration && <span className="ml-1 text-xs text-ink-3">- {ev.calibration.status}</span>}
+                                {ev.calibration && <span className="ml-1 text-xs text-ink-3">· {ev.calibration.status}</span>}
                               </>} />
                           ))}
                         </div>
@@ -304,23 +304,23 @@ export function NewRunPage() {
 
           <Card title="3 · Grading and load">
             <div className="grid gap-x-4 gap-y-5 md:grid-cols-2 xl:grid-cols-4">
-              <SetupField className="flex min-w-0 flex-col gap-1 xl:col-span-2" label="Grading model" helpTitle="Grading model (judge)" readout={judgeReadout} help={<>
-                <p>Only for meaning checks: a model that reads each answer and judges whether it means the right thing. Objective checks need none.</p>
-                <p>The heuristic compares words with the reference: free, fast, not an LLM. A local model runs on this PC (free, slow on a CPU); a cloud model is fast and paid.</p>
+              <SetupField className="flex min-w-0 flex-col gap-1 xl:col-span-2" label="Grading model" helpTitle="Grading model" readout={judgeReadout} help={<>
+                <p>Only for meaning checks: a model that reads each answer and decides whether it means the right thing. Objective checks need none.</p>
+                <p>The heuristic compares words with the reference: free, fast, and no model involved. A local model runs on this computer (free, slow on a CPU); a cloud model is fast and paid.</p>
               </>}>
-                <Select value={judgeValue} onChange={(ev) => setJudge(ev.target.value)} aria-label="Judge">
+                <Select value={judgeValue} onChange={(ev) => setJudge(ev.target.value)} aria-label="Grading model">
                   <option value="">None</option>
-                  <option value="heuristic">Heuristic (word overlap, free, not an LLM)</option>
-                  {(models.data ?? []).map((m) => <option key={m.id} value={m.id}>{m.name} ({whereLabel(m)}){m.key_status === 'missing' ? ' - key missing' : ''}</option>)}
+                  <option value="heuristic">Heuristic (word overlap, free, no model)</option>
+                  {(models.data ?? []).map((m) => <option key={m.id} value={m.id}>{m.name} ({whereLabel(m)}){m.key_status === 'missing' ? ' · key missing' : ''}</option>)}
                 </Select>
-                {!(models.data ?? []).length && <span className="text-xs text-ink-2">No grading model yet: <Link className="text-accent-ink underline" to="/settings?tab=models">connect one</Link> for meaning checks.</span>}
+                {!(models.data ?? []).length && <span className="text-xs text-ink-2">No grading model yet: <Link className="text-accent-ink underline" to="/settings?tab=models">add one</Link> for meaning checks.</span>}
               </SetupField>
               <SetupField group label={<>Tries per question <Term k="flaky">(flakiness)</Term></>}>
                 <div><Segmented size="md" value={String(trials)} onChange={(v) => setTrials(Number(v))} label="Tries per question"
                   options={[1, 2, 3, 5, 10].map((n) => ({ id: String(n), label: <span className="num font-mono">{n}</span> }))} /></div>
               </SetupField>
               <SetupField label={<span className="inline-flex items-center gap-1.5">In parallel<ParallelHelp /></span>}
-                readout={pickedConcurrency === null && !purpose && defaultConcurrency === 2 ? (tv?.shared ? 'Default 2: other people use this bot.' : 'Default 2: this run judges speed.') : undefined}>
+                readout={pickedConcurrency === null && !purpose && defaultConcurrency === 2 ? (tv?.shared ? 'Default 2: other people use this bot.' : 'Default 2: this run measures speed.') : undefined}>
                 <Select value={concurrency} onChange={(ev) => { setConcurrency(Number(ev.target.value)); setPurpose(null) }} aria-label="In parallel">{[1, 2, 4, 8, 16].map((n) => <option key={n}>{n}</option>)}</Select>
               </SetupField>
               <SetupField label="Spend cap (USD)" help={<>
@@ -332,11 +332,11 @@ export function NewRunPage() {
               <SetupField label="Max answers" help={<p>Stops after this many questions were sent: works even when the price is unknown.</p>}>
                 <Input type="number" min={1} step={1} value={maxAnswers} onChange={(ev) => setMaxAnswers(ev.target.value)} placeholder={e ? `no limit (${answers} planned)` : 'no limit'} aria-label="Max answers" />
               </SetupField>
-              <SetupField label="Latency limit (ms)" help={<p>Each answer slower than this fails the latency check. A run with a limit defaults to 2 in parallel, because waiting in a queue would count against the bot.</p>}>
-                <Input type="number" min={0} value={maxLatency} onChange={(ev) => setMaxLatency(ev.target.value)} placeholder="no limit" aria-label="Latency limit" />
+              <SetupField label="Speed limit (ms)" help={<p>Each answer slower than this fails the speed check. A run with a limit defaults to 2 in parallel, because waiting in a queue would count against the bot.</p>}>
+                <Input type="number" min={0} value={maxLatency} onChange={(ev) => setMaxLatency(ev.target.value)} placeholder="no limit" aria-label="Speed limit" />
               </SetupField>
               <SetupField label={<Term k="gate">Release gate</Term>}
-                readout={effectiveProject && !projectGates.length ? <>No gate for this chatbot yet (<Link className="text-accent-ink underline" to="/gates">Setup › Gates</Link>).</> : undefined}>
+                readout={effectiveProject && !projectGates.length ? <>No gate for this chatbot yet (<Link className="text-accent-ink underline" to="/gates">Setup &gt; Gates</Link>).</> : undefined}>
                 <Select value={gateValue} onChange={(ev) => setGateId(ev.target.value ? Number(ev.target.value) : '')} aria-label="Release gate">
                   <option value="">None</option>{projectGates.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
                 </Select>
@@ -345,7 +345,7 @@ export function NewRunPage() {
           </Card>
 
           <Card title="4 · What is this run for?"
-            help={<p>Sets how many questions go out at once to suit the run: 1 when speed is judged (nothing waits, so timings are the bot's own), 4 for right-or-wrong runs, 8 for a large set on a bot built for load. Picking a number under In parallel overrides it.</p>}
+            help={<p>Sets how many questions go out at once to suit the run: 1 when speed is judged (nothing waits, so timings are the bot’s own), 4 for right-or-wrong runs, 8 for a large set on a bot built for load. Picking a number under In parallel overrides it.</p>}
             actions={<Segmented value={purpose ?? ('' as Purpose)} onChange={(p) => { setPurpose(p); setConcurrency(null) }} options={PURPOSES.map((p) => ({ id: p.id, label: p.label }))} label="Run purpose" />}>
             <div className="space-y-6">
               <Panel>

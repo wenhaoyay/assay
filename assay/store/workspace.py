@@ -155,8 +155,8 @@ async def check_provider(s: Session, pc: m.ProviderConfig, tries: int = 5) -> di
             if not latencies:
                 break  # the first call failing (key, URL) will fail every time
             continue
-        except Exception as exc:
-            errors.append(f"{type(exc).__name__}: could not reach {pc.provider}")
+        except Exception:
+            errors.append(f"Could not reach {pc.provider}.")
             break
         latencies.append((time.perf_counter() - t0) * 1000)
         if resp.usage:
@@ -186,7 +186,7 @@ async def check_provider(s: Session, pc: m.ProviderConfig, tries: int = 5) -> di
             "explanation": explain_error(errors[0]) if errors and not ok else None,
             "warnings": [] if not latencies or valid == len(latencies) else
             [f"{len(latencies) - valid} of {len(latencies)} replies were not valid JSON verdicts; "
-             "those trials would be marked not evaluated."]}
+             "those answers would be marked not evaluated."]}
 
 
 # --------------------------------------------------------------------------------------
@@ -421,11 +421,11 @@ def judge_allowed(s: Session, target_id: int, judge: dict[str, Any] | None) -> s
         return None
     pc = s.get(m.ProviderConfig, judge.get("provider_config_id"))
     if pc is None:  # fail closed: an unknown judge is not known to be local
-        return f"'{t.name}' is set to local judges only, and this judge's settings could not be found."
+        return f"'{t.name}' is set to local grading models only, and this grading model's settings could not be found."
     if not is_local_provider(pc):
         where = "Ollama's servers (a cloud model, though reached through the local Ollama)"             if is_cloud_model_name(pc.model) else (pc.base_url or pc.provider)
-        return (f"'{t.name}' is set to local judges only, and {pc.name} sends answers to "
-                f"{where}. Pick a judge that runs on this machine.")
+        return (f"'{t.name}' is set to local grading models only, and {pc.name} sends answers to "
+                f"{where}. Pick a grading model that runs on this computer.")
     return None
 
 

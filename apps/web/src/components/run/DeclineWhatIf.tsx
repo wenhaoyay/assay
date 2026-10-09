@@ -87,7 +87,7 @@ export function DeclineWhatIf({ rows }: { rows: XRow[] }) {
   return (
     <Card title="What if the bot declined below a score?" id="decline" meta={<SampleSize n={pts.length} unit="tries" />}
       help={<>
-        <p>If the bot said "I don't know" whenever its best document scored below the line, which tries would change?</p>
+        <p>If the bot said “I don’t know” whenever its best document scored below the line, which tries would change?</p>
         <p>Top row: questions it should decline (green = now declined). Bottom row: questions it should answer (amber = good answers it would lose).</p>
         <p>Drag the line, or click anywhere on the chart. The best line is the one with the most tries fixed minus good answers lost, for this set of questions only.</p>
       </>}>

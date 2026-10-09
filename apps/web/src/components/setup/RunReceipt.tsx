@@ -66,16 +66,16 @@ export function RunReceipt({ e, trials, concurrency, gateName, judgeLabel, targe
     )
   }
   const hidden = e.target_cost_visible === false
-  const botCost = hidden ? 'unknown — the cap cannot limit it' : usd(e.target_cost_usd ?? 0)
-  const gradingCost = !e.judge_calls ? '$0' : e.judge_local ? '$0 (this PC)' : judgeLabel === 'heuristic' ? '$0 (heuristic)' : e.judge_cost_usd === null ? 'price unknown' : usd(e.judge_cost_usd)
+  const botCost = hidden ? 'unknown: the cap cannot limit it' : usd(e.target_cost_usd ?? 0)
+  const gradingCost = !e.judge_calls ? '$0' : e.judge_local ? '$0 (this computer)' : judgeLabel === 'heuristic' ? '$0 (heuristic)' : e.judge_cost_usd === null ? 'price unknown' : usd(e.judge_cost_usd)
   const time = duration(e.estimated_seconds)
   const total = hidden
     ? `${time} · ${e.judge_cost_usd ? usd(e.judge_cost_usd) : '$0'} + bot`
     : `${time} · ${usd((e.target_cost_usd ?? 0) + (e.judge_cost_usd ?? 0))}`
   const notes: ReactNode[] = []
-  if (e.judge_local && e.judge_calls > 0) notes.push('Local grading runs on this PC, one call at a time: the judge is the slow part.')
+  if (e.judge_local && e.judge_calls > 0) notes.push('Local grading runs on this computer, one call at a time: the grading model is the slow part.')
   if (hidden) {
-    notes.push(<>The spend cap cannot see this bot's cost (it reports no token counts, so its answers count as $0). Set Max answers, or {targetId ? <Link className="text-accent-ink underline" to={`/targets/${targetId}`}>enter a cost per answer on the connection</Link> : 'enter a cost per answer on the connection'}.</>)
+    notes.push(<>The spend cap cannot see this bot’s cost (it reports no token counts, so its answers count as $0). Set Max answers, or {targetId ? <Link className="text-accent-ink underline" to={`/targets/${targetId}`}>enter a cost per answer on the connection</Link> : 'enter a cost per answer on the connection'}.</>)
   }
   return (
     <Receipt title={title} sub={PRINTED}>

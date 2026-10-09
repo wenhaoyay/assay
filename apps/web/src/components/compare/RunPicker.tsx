@@ -7,7 +7,7 @@ import type { RunHeader } from '../../lib/types'
 import { Menu } from '../form'
 import { Input, StatusBadge } from '../ui'
 
-const judgeName = (r: RunHeader) => (r.judge ? (r.judge.provider === 'heuristic' ? 'heuristic judge' : r.judge.model) : 'no judge')
+const judgeName = (r: RunHeader) => (r.judge ? (r.judge.provider === 'heuristic' ? 'heuristic grading' : r.judge.model) : 'no grading model')
 
 export function RunPicker({ runs, value, onChange, side }: { runs: RunHeader[]; value: number | null; onChange: (id: number) => void; side: 'baseline' | 'candidate' }) {
   const [q, setQ] = useState('')
@@ -51,7 +51,7 @@ export function RunPicker({ runs, value, onChange, side }: { runs: RunHeader[]; 
                   </button>
                 </li>
               ))}
-              {!list.length && <li className="px-2.5 py-2 text-sm text-ink-3">No run matches.</li>}
+              {!list.length && <li className="px-2.5 py-2 text-sm text-ink-3">No runs match</li>}
             </ul>
           </>
         )}

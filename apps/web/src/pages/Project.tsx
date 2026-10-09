@@ -17,7 +17,7 @@ import { Badge, Card, Empty, ErrorState, PageHeader, PageSkeleton, PROJECT_COLOR
 import { api } from '../lib/api'
 import { verdictSentence } from '../lib/compare'
 import { useCrumbs } from '../lib/crumbs'
-import { FAILURE_LABELS, ms, pct, when } from '../lib/format'
+import { FAILURE_LABELS, ms, pct, plural, when } from '../lib/format'
 import { useMotionOn } from '../lib/prefs'
 import type { CaseMatrix, Lineage, ProjectHome, TrialRow } from '../lib/types'
 
@@ -28,7 +28,7 @@ export function ProjectPage() {
   const q = useQuery({ queryKey: ['project-home', id], queryFn: () => api.get<ProjectHome>(`/api/projects/${id}/home`) })
   const nav = useNavigate()
   const gates = useGateThresholds()
-  const name = q.data?.project.name ?? '...'
+  const name = q.data?.project.name ?? '…'
   useCrumbs([{ label: 'Home', to: '/' }, { label: name }], `project-${id}-${name}`)
   const [linKey, setLinKey] = useState<string | null>(null)
   const [metric, setMetric] = useState<Metric>('pass')
@@ -75,7 +75,7 @@ export function ProjectPage() {
         title={<span className="inline-flex items-center gap-3"><ProjectMark name={p.name} color={p.color} size={34} />{p.name}</span>}
         help={<>
           {p.description && <p>{p.description}</p>}
-          <p>Everything below follows this chatbot’s comparable runs: the same questions, checks and judge, so the figures can be set side by side. A run that asked another chatbot’s questions is shown but kept out of the line.</p>
+          <p>Everything below follows this chatbot’s comparable runs: the same questions, checks and grading model, so the figures can be set side by side. A run that asked another chatbot’s questions is shown but kept out of the line.</p>
           <p>The needle is the latest pass rate; the black tick is the release gate.</p>
         </>}
         actions={latest && <div data-tour="verdict"><Needle mode="level" value={lastPt?.pass_rate ?? latest.metrics.overall_pass_rate} gate={gate} size={200} label={`latest pass rate ${pct(lastPt?.pass_rate ?? latest.metrics.overall_pass_rate)}`} /></div>}
@@ -90,7 +90,7 @@ export function ProjectPage() {
 
       {!latest ? (
         <Empty title="No completed run yet" action={<Link to={`/runs/new?project=${p.id}`} viewTransition className={linkButton('primary')}>Start the first run</Link>}>
-          Run a target of this chatbot on a dataset. Once two comparable runs exist, this page says whether it got better.
+          Run a connection of this chatbot on a dataset. Once two comparable runs exist, this page says whether it got better.
         </Empty>
       ) : (
         <div className="space-y-12">
@@ -99,12 +99,12 @@ export function ProjectPage() {
               help={<>
                 <p>Pass rate of each comparable run, by date; the shaded band is its 95% interval. Notes above the line mark what changed in the variant (red where the pass rate fell). A hollow ring is a run left out of the line because it asked another chatbot’s questions.</p>
                 <p>Click a run to see it on the right; <b>[</b> and <b>]</b> step through runs. Drag across the strip under the chart to read a range of runs.</p>
-                <p>Comparable here: {lineage.comparability.dataset} v{lineage.comparability.dataset_version}, {lineage.comparability.n_cases} questions{lineage.comparability.case_filter ? ' (reduced suite)' : ''}, judge {lineage.comparability.judge ?? 'none'}, {lineage.comparability.evaluators.length} checks.</p>
+                <p>Comparable here: {lineage.comparability.dataset} v{lineage.comparability.dataset_version}, {lineage.comparability.n_cases} questions{lineage.comparability.case_filter ? ' (reduced)' : ''}, grading model {lineage.comparability.judge ?? 'none'}, {lineage.comparability.evaluators.length} checks.</p>
               </>}
               actions={<>
                 {lineages.length > 1 && (
                   <Select aria-label="Which comparable runs" value={lineage.key} onChange={(e) => setLinKey(e.target.value)}>
-                    {lineages.map((l) => <option key={l.key} value={l.key}>runs #{Math.min(...l.run_ids)}–#{Math.max(...l.run_ids)} · {l.comparability.n_cases} questions · {l.comparability.judge ?? 'no judge'}</option>)}
+                    {lineages.map((l) => <option key={l.key} value={l.key}>runs #{Math.min(...l.run_ids)}–#{Math.max(...l.run_ids)} · {l.comparability.n_cases} questions · {l.comparability.judge ?? 'no grading model'}</option>)}
                   </Select>
                 )}
                 <MetricSwitch value={metric} onChange={setMetric} />
@@ -114,7 +114,7 @@ export function ProjectPage() {
           )}
 
           {matrix && journeyRuns.length > 0 && counts && (
-            <Card title="Case journey" meta={<SampleSize n={counts.all} unit="questions" />}
+            <Card title="Question journey" meta={<SampleSize n={counts.all} unit="questions" />}
               help={<>
                 <p>Every question across every comparable run, one dot per run: green passed every try, amber flaky, red failed every try. A coloured link means the result changed there: green better, red worse.</p>
                 <p>The filters keep questions that flipped between the first and last run, always fail, or are flaky now. Failing questions come first. Hover a row to light that question everywhere; click it to open its answer in run #{lastRun}.</p>
@@ -139,7 +139,7 @@ export function ProjectPage() {
           <Card title="Where failures start" meta={<Link className="font-mono text-accent-ink hover:underline" to={`/runs/${latest.id}`} viewTransition>run #{latest.id}</Link>}
             help={<>
               <p>The <Term k="stage">pipeline stages</Term> of the latest run, and how many failures start in each.</p>
-              <p>Each failed trial is counted once per kind of failure it shows. The stage is where that kind of failure starts. Click a kind to see those answers.</p>
+              <p>Each failed try is counted once per kind of failure it shows. The stage is where that kind of failure starts. Click a kind to see those answers.</p>
             </>}>
             <StagePipeline stages={h!.stages} onPick={undefined} />
             {h!.top_failures.length > 0 && <TopFailures h={h!} runId={latest.id} />}
@@ -155,7 +155,7 @@ export function ProjectPage() {
               <div className="pt-2"><RunsTable runs={h!.recent_runs.slice(0, 8)} compact /></div>
             </Card>
             <div className="space-y-12">
-              <Card title="Connections" padded={false} help={<p>Where this chatbot runs, and the version of each connection. The dot is the last health check: green answered, red failed, grey not checked yet.</p>}>
+              <Card title="Connections" padded={false} help={<p>Where this chatbot runs, and the version of each connection. The dot is the last connection test: green answered, red failed, grey not tested yet.</p>}>
                 <ul className="divide-y divide-line">
                   {h!.targets.map((t) => (
                     <li key={t.id}>
@@ -165,8 +165,8 @@ export function ProjectPage() {
                           <span className="block truncate text-sm font-medium">{t.name} <span className="font-mono font-normal text-ink-3">v{t.version}</span></span>
                           <span className="block truncate text-xs text-ink-3">{t.variant_label || t.adapter}</span>
                         </span>
-                        {t.local_judges_only && <Badge tone="accent">local judges only</Badge>}
-                        <Badge>{t.adapter}</Badge>
+                        {t.local_judges_only && <Badge tone="accent">Local grading models only</Badge>}
+                        <Badge>{({ http: 'HTTP', python: 'Python function', replay: 'Imported' } as Record<string, string>)[t.adapter] ?? t.adapter}</Badge>
                       </Link>
                     </li>
                   ))}
@@ -175,7 +175,7 @@ export function ProjectPage() {
               <Card title="Datasets" padded={false}>
                 <ul className="divide-y divide-line">
                   {h!.datasets.map((d) => (
-                    <li key={d.id}><Link to={`/datasets/${d.id}`} viewTransition className="flex items-center justify-between py-2.5 text-sm hover:bg-surface-2"><span className="font-medium">{d.name}</span><span className="text-xs text-ink-3"><span className="font-mono">{d.cases}</span> questions · <span className="font-mono">{d.versions}</span> version{d.versions === 1 ? '' : 's'}</span></Link></li>
+                    <li key={d.id}><Link to={`/datasets/${d.id}`} viewTransition className="flex items-center justify-between py-2.5 text-sm hover:bg-surface-2"><span className="font-medium">{d.name}</span><span className="text-xs text-ink-3">{plural(d.cases, 'question')} · {plural(d.versions, 'version')}</span></Link></li>
                   ))}
                 </ul>
               </Card>
@@ -223,7 +223,7 @@ function LatestVsPrevious({ h }: { h: ProjectHome }) {
         <p>The latest run against the previous comparable one, metric by metric, on the questions both asked.</p>
         <p>Each change carries its 95% interval. If the interval covers zero, the difference could be chance.</p>
       </>}
-      actions={<TextLink to={`/compare?baseline=${v.baseline_run_id}&candidate=${v.candidate_run_id}`} viewTransition>Every metric, every case <ArrowRight className="size-3.5" /></TextLink>}>
+      actions={<TextLink to={`/compare?baseline=${v.baseline_run_id}&candidate=${v.candidate_run_id}`} viewTransition>Every metric, every question <ArrowRight className="size-3.5" /></TextLink>}>
       <p className={clsx('t-readout', s.tone === 'good' && 'text-good-ink', s.tone === 'bad' && 'text-bad-ink')}>{s.text}</p>
       <div className="mt-4"><MetricTable rows={v.rows} /></div>
     </Card>
@@ -250,7 +250,7 @@ function TopFailures({ h, runId }: { h: ProjectHome; runId: number }) {
 
 export function HealthDot({ check }: { check: ProjectHome['targets'][number]['last_check'] }) {
   const tone = !check ? 'bg-untested' : check.ok ? 'bg-good' : 'bg-bad'
-  const title = !check ? 'Not checked yet' : check.ok ? `Answered ${check.elapsed_ms ? ms(check.elapsed_ms) : ''} - ${when(check.at)}` : `${check.explanation ?? check.error ?? 'Failed'} - ${when(check.at)}`
+  const title = !check ? 'Not tested yet' : check.ok ? `Answered ${check.elapsed_ms ? ms(check.elapsed_ms) : ''} · ${when(check.at)}` : `${check.explanation ?? check.error ?? 'Failed'} · ${when(check.at)}`
   return <span className={clsx('size-2.5 shrink-0 rounded-full', tone)} title={title} aria-label={title} />
 }
 

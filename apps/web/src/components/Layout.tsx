@@ -47,10 +47,10 @@ const GROUPS = [
     ],
   },
   {
-    label: 'Judge trust',
+    label: 'Grading',
     items: [
       { to: '/calibration', label: 'Calibration', icon: Scale },
-      { to: '/evaluators', label: 'Evaluators', icon: FileText },
+      { to: '/evaluators', label: 'Checks', icon: FileText },
     ],
   },
 ]

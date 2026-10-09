@@ -4,7 +4,7 @@ import { Lightbulb } from 'lucide-react'
 import { motion } from 'motion/react'
 import { Link } from 'react-router-dom'
 import { useMotionOn } from '../../lib/prefs'
-import { ms, pct, usd } from '../../lib/format'
+import { ms, pct, plural, usd } from '../../lib/format'
 import type { ProjectCard, RunHeader } from '../../lib/types'
 import { PpDelta } from '../compare/delta'
 import { Fingerprint, Needle, Odometer } from '../instrument'
@@ -32,15 +32,15 @@ export function ReadingCard({ p, i, gate, runs }: { p: ProjectCard; i: number; g
           <div className="min-w-0 flex-1">
             <h2 className="flex items-center gap-2 text-base font-semibold">
               <span className="min-w-0">{p.name}</span>
-              {p.active_runs > 0 && <Badge tone="info">running</Badge>}
+              {p.active_runs > 0 && <Badge tone="info">Running</Badge>}
             </h2>
             {p.latest_variant && <div className="line-clamp-2 text-sm text-ink-2">{p.latest_variant}</div>}
           </div>
           {p.latest_run_id && (first
-            ? <Badge tone="accent">first reading</Badge>
+            ? <Badge tone="accent">First reading</Badge>
             : p.gate_status
               ? <div className="-mb-2 -ml-6 mt-1 origin-top-right scale-[0.72]"><Stamp status={p.gate_status} runId={p.latest_run_id} /></div>
-              : <Badge>no gate</Badge>)}
+              : <Badge>No gate</Badge>)}
         </div>
 
         {p.latest_run_id ? (
@@ -51,7 +51,7 @@ export function ReadingCard({ p, i, gate, runs }: { p: ProjectCard; i: number; g
                 <span className="t-label">Pass rate · run <span className="font-mono">#{p.latest_run_id}</span></span>
                 <Odometer text={pct(p.latest_pass_rate)} className={clsx('t-fig-xl', good ? 'text-good-ink' : 'text-ink')} />
                 {first
-                  ? <span className="text-sm text-ink-3">nothing to compare with yet</span>
+                  ? <span className="text-sm text-ink-3">Nothing to compare with yet</span>
                   : <span className="text-sm"><PpDelta value={change} /> <span className="text-ink-3">vs <span className="font-mono">#{p.previous_run_id}</span></span></span>}
               </div>
             </div>
@@ -80,10 +80,10 @@ export function ReadingCard({ p, i, gate, runs }: { p: ProjectCard; i: number; g
               </div>
             )}
             {first && missing.length === 0 && latest && (
-              <div className="mt-auto text-sm text-ink-3">p95 <span className="font-mono">{ms(latest.metrics.p95_latency_ms)}</span> · <span className="font-mono">{usd(latest.metrics.average_cost_usd)}</span> an answer</div>
+              <div className="mt-auto text-sm text-ink-3">Speed (p95) <span className="font-mono">{ms(latest.metrics.p95_latency_ms)}</span> · <span className="font-mono">{usd(latest.metrics.average_cost_usd)}</span> per answer</div>
             )}
             {(p.off_topic_runs ?? 0) > 0 && (
-              <div className="text-sm text-ink-3"><span className="mr-1.5 inline-block size-2 rounded-full bg-warn" /><span className="font-mono">{p.off_topic_runs}</span> run{p.off_topic_runs === 1 ? '' : 's'} asked another chatbot’s questions, left out of the trend.</div>
+              <div className="text-sm text-ink-3"><span className="mr-1.5 inline-block size-2 rounded-full bg-warn" />{plural(p.off_topic_runs ?? 0, 'run')} asked another chatbot’s questions, left out of the trend.</div>
             )}
           </>
         ) : (
@@ -101,7 +101,7 @@ export function ConnectCard({ i }: { i: number }) {
     <motion.div initial={motionOn ? { opacity: 0, y: 10 } : false} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * STAGGER, type: 'spring', stiffness: 260, damping: 26 }}
       className="flex min-w-0 flex-col [&>div]:flex-1">
       <Empty title="Connect another chatbot" action={<Link to="/targets/new" viewTransition className={linkButton('secondary', 'sm')}>Paste a curl command</Link>}>
-        Nothing to measure yet. Even a gauge needs something to point at.
+        Even a gauge needs something to point at: connect the next bot here.
       </Empty>
     </motion.div>
   )

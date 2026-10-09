@@ -12,8 +12,8 @@ export function QueueViz({ atOnce }: { atOnce: number }) {
   const waiting = Math.max(0, n - SERVE)
   const W = 320
   const door = 214
-  const caption = n <= 1 ? 'One at a time: nothing waits, so timings show the bot\'s real speed.'
-    : n <= SERVE ? 'Little waiting: timings stay close to the bot\'s real speed.'
+  const caption = n <= 1 ? 'One at a time: nothing waits, so timings show the bot’s real speed.'
+    : n <= SERVE ? 'Little waiting: timings stay close to the bot’s real speed.'
     : n <= 4 ? 'Some questions wait their turn: timings run a little slow.'
     : 'Most questions wait at the door: the timings measure the queue, not the bot.'
   return (

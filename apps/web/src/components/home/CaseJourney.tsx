@@ -45,7 +45,7 @@ export function CaseJourney({ matrix, runIds, filter, trialFor, latestRun }: {
 
   if (!rows.length) {
     return (
-      <Empty title="Nothing here">Either the bot is perfect or the filter is.</Empty>
+      <Empty title="No questions match this filter">Either the bot is perfect or the filter is.</Empty>
     )
   }
   const cw = 34
@@ -59,7 +59,7 @@ export function CaseJourney({ matrix, runIds, filter, trialFor, latestRun }: {
   }
   return (
     <div className="scroll-thin overflow-x-auto" data-testid="case-journey">
-      <svg width={W} height={H} role="img" aria-label="Case journey">
+      <svg width={W} height={H} role="img" aria-label="Question journey">
         {runIds.map((r, j) => <text key={r} x={lw + j * cw + cw / 2} y={14} textAnchor="middle" className="c-num">#{r}</text>)}
         {rows.map((r, i) => {
           const Y = 30 + i * rh + rh / 2

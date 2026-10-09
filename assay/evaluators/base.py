@@ -54,7 +54,7 @@ class Evaluator(ABC):
         return self.result(EvalStatus.NOT_APPLICABLE, explanation=why)
 
     def missing(self, what: str) -> EvaluationResult:
-        return self.result(EvalStatus.NOT_EVALUATED, explanation=f"The target did not report {what}.")
+        return self.result(EvalStatus.NOT_EVALUATED, explanation=f"The bot did not report {what}.")
 
     def passed(self, ok: bool, **kw: Any) -> EvaluationResult:
         return self.result(EvalStatus.PASS if ok else EvalStatus.FAIL, **kw)

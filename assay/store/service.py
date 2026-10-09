@@ -63,10 +63,18 @@ def _hash(obj: Any) -> str:
     return hashlib.sha256(json.dumps(obj, sort_keys=True, default=str).encode()).hexdigest()
 
 
+# What each stored thing is called on screen (never the class name).
+_THING = {"Project": "chatbot", "ProviderConfig": "grading model", "Target": "connection", "TargetVersion": "connection version",
+          "Dataset": "dataset", "DatasetVersion": "dataset version", "Experiment": "run setup", "Run": "run",
+          "Trial": "try", "RegressionGate": "release gate", "GateResult": "gate result", "DocumentSource": "document",
+          "GeneratedTestCandidate": "candidate question", "ImportBatch": "import", "JudgeBakeoff": "bake-off"}
+
+
 def get(s: Session, model: type, ident: Any) -> Any:
     row = s.get(model, ident)
     if row is None:
-        raise NotFound(f"{model.__name__} {ident} not found")
+        thing = _THING.get(model.__name__, "item")
+        raise NotFound(f"No {thing} with id {ident}.")
     return row
 
 
@@ -181,7 +189,7 @@ def upsert_case(s: Session, version_id: int, case: TestCase, replace_key: str | 
     target = editable_version(s, version_id, f"edited {case.id}")
     rows = [r for r, _ in version_cases(s, target.id)]
     if case.id != key and any(r.case_key == case.id for r in rows):
-        raise Conflict(f"A case with id {case.id!r} already exists in this version")
+        raise Conflict(f"A question with id {case.id!r} already exists in this version")
     new_row = _case_row(s, target.dataset_id, case, origin)
     idx = next((i for i, r in enumerate(rows) if r.case_key == key), None)
     if idx is None:
@@ -226,7 +234,7 @@ def latest_target_version(s: Session, target_id: int) -> m.TargetVersion:
     tv = s.scalar(select(m.TargetVersion).where(m.TargetVersion.target_id == target_id)
                   .order_by(m.TargetVersion.version.desc()))
     if tv is None:
-        raise NotFound(f"Target {target_id} has no versions")
+        raise NotFound(f"Connection {target_id} has no versions.")
     return tv
 
 
@@ -418,7 +426,7 @@ def estimate_judge_cost(s: Session, experiment: m.Experiment) -> dict[str, Any]:
     judge_ids = sorted(e for e in listed if get_evaluator(e).kind == "llm_judge")
     if not judge_ids or judge is None:
         return {"judge_calls": 0, "estimated_cost_usd": 0.0 if judge_ids == [] else None,
-                "note": "No judge evaluators selected." if not judge_ids else "No judge configured."}
+                "note": "No checks that need a grading model are selected." if not judge_ids else "No grading model chosen."}
     calls, tin, tout = 0, 0, 0
     placeholder = NormalizedTargetResult(answer="x" * 600)
     from assay.evaluators.llm_judge.judge import missing_inputs
@@ -445,7 +453,7 @@ def estimate_judge_cost(s: Session, experiment: m.Experiment) -> dict[str, Any]:
 
         cost = pricing(s).cost(desc["provider"], desc["model"], Usage(input_tokens=tin, output_tokens=tout))
     return {"judge_calls": calls, "input_tokens": tin, "output_tokens": tout, "estimated_cost_usd": cost,
-            "judge": desc, "note": "Rough estimate: prompt size from case text, answers assumed ~600 chars."
+            "judge": desc, "note": "Rough estimate: prompt size from the question text, answers assumed ~600 chars."
             + ("" if cost is not None else " Price unknown for this model - add it to the price table.")}
 
 

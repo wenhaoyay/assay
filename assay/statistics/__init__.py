@@ -133,7 +133,7 @@ def mcnemar_exact(pairs: Sequence[tuple[bool, bool]]) -> McNemar:
 def pass_at_k(n: int, c: int, k: int) -> float:
     """P(at least one of k trials passes), estimated from c passes in n trials (Chen et al. 2021)."""
     if k > n:
-        raise ValueError("k cannot exceed the number of trials")
+        raise ValueError("k cannot be more than the number of tries.")
     if n - c < k:
         return 1.0
     return 1.0 - math.comb(n - c, k) / math.comb(n, k)
@@ -142,7 +142,7 @@ def pass_at_k(n: int, c: int, k: int) -> float:
 def pass_hat_k(n: int, c: int, k: int) -> float:
     """P(all k trials pass) - the 'pass^k' consistency metric - estimated from c of n."""
     if k > n:
-        raise ValueError("k cannot exceed the number of trials")
+        raise ValueError("k cannot be more than the number of tries.")
     return math.comb(c, k) / math.comb(n, k)
 
 

@@ -24,12 +24,12 @@ type Route = 'curl' | 'http' | 'stream' | 'openai' | 'python' | 'logs' | 'templa
 type Cfg = Record<string, unknown> & { response?: Record<string, unknown> }
 
 const ROUTES: { id: Route; title: string; body: string; icon: typeof Terminal; badge?: string }[] = [
-  { id: 'curl', title: 'Paste a curl command', body: 'From browser DevTools ("Copy as cURL") or Postman. Everything fills itself in.', icon: Terminal, badge: 'Recommended' },
+  { id: 'curl', title: 'Paste a curl command', body: 'From browser DevTools (“Copy as cURL”) or Postman. Everything fills itself in.', icon: Terminal, badge: 'Recommended' },
   { id: 'http', title: 'HTTP API (JSON reply)', body: 'Type the URL and request body yourself.', icon: Plug },
-  { id: 'stream', title: 'Streaming chat (SSE)', body: 'The reply arrives as server-sent events.', icon: Radio },
+  { id: 'stream', title: 'Streaming chat', body: 'The reply arrives piece by piece, as server-sent events.', icon: Radio },
   { id: 'openai', title: 'OpenAI-compatible endpoint', body: 'Any /chat/completions API. No mapping needed.', icon: Sparkles },
-  { id: 'python', title: 'Python function', body: 'module:function(test_input, options, ctx) in this process.', icon: Code2 },
-  { id: 'logs', title: 'I only have logs', body: 'Upload a JSONL or CSV of past answers and grade those.', icon: FileUp },
+  { id: 'python', title: 'Python function', body: 'Call a function in your own code; no web server needed.', icon: Code2 },
+  { id: 'logs', title: 'Start from logs', body: 'Upload a JSONL or CSV file of past answers and grade those.', icon: FileUp },
 ]
 
 const STEPS = ['How to reach it', 'The request', 'Test and map', 'Safety and save']
@@ -233,7 +233,7 @@ function StepRoute({ route, onRoute, templates, onTemplate, standard, setStandar
       {route !== 'logs' && route !== 'python' && (
         <Card>
           <Toggle checked={standard} onChange={setStandard}
-            label={<LabelHelp label="My bot replies in the Assay shape" title="The Assay reply shape">
+            label={<LabelHelp label="Your bot replies in the Assay shape" title="The Assay reply shape">
               <p>The reply is <code>{'{answer, sources, citations, tool_calls, usage}'}</code>: nothing to map.</p>
               <p>Turn it off for bots you did not build: you will map the reply by clicking it. <a className="text-accent-ink underline" href="/settings?tab=shape">How to add the shape to a bot</a></p>
             </LabelHelp>} />
@@ -244,7 +244,7 @@ function StepRoute({ route, onRoute, templates, onTemplate, standard, setStandar
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {templates.map((t) => (
               <PanelButton key={t.id} onClick={() => onTemplate(t)}>
-                <div className="flex items-center gap-2 text-sm font-medium">{t.name}{!t.builtin && <Badge tone="accent">yours</Badge>}</div>
+                <div className="flex items-center gap-2 text-sm font-medium">{t.name}{!t.builtin && <Badge tone="accent">Yours</Badge>}</div>
                 <div className="mt-0.5 line-clamp-2 text-xs text-ink-2">{t.description}</div>
               </PanelButton>
             ))}
@@ -307,7 +307,7 @@ function StepRequest({ route, adapter, cfg, setCfg }: { route: Route; adapter: '
   const set = (k: string, v: unknown) => setCfg((c) => ({ ...c, [k]: v }))
   if (adapter === 'python') {
     return (
-      <Card title="Which function?" help={<p>Return a dict with at least "answer"; add "retrieved_documents", "citations", "tool_calls" and "usage" to unlock more checks.</p>}>
+      <Card title="Which function?" help={<p>Return a dictionary with at least <code>answer</code>; add <code>retrieved_documents</code>, <code>citations</code>, <code>tool_calls</code> and <code>usage</code> to unlock more checks.</p>}>
         <div className="grid gap-3 md:grid-cols-2">
           <Field label={<LabelHelp label="Callable"><p><code>package.module:function</code>, called as <code>function(test_input, options, ctx)</code>.</p></LabelHelp>}><Input value={field('callable')} onChange={(e) => set('callable', e.target.value)} /></Field>
           <Field label="Options (JSON)"><Input value={JSON.stringify(cfg.options ?? {})} onChange={(e) => { try { set('options', JSON.parse(e.target.value)) } catch { /* typing */ } }} /></Field>
@@ -322,7 +322,7 @@ function StepRequest({ route, adapter, cfg, setCfg }: { route: Route; adapter: '
           <p>Copy a real request to your bot as curl and Assay reads the address, headers and body from it, finds where the question goes, and offers to store any key securely.</p>
           <p>Chrome / Edge DevTools → Network → right-click the request → Copy → Copy as cURL (bash).</p>
         </>}>
-          <Textarea mono rows={6} value={curl} onChange={(e) => setCurl(e.target.value)} placeholder={"curl 'https://my-bot.example.com/api/chat' \\\n  -H 'Authorization: Bearer sk-...' \\\n  -H 'Content-Type: application/json' \\\n  --data-raw '{\"question\":\"How do I reset it?\"}'"} aria-label="curl command" />
+          <Textarea mono rows={6} value={curl} onChange={(e) => setCurl(e.target.value)} placeholder={"curl 'https://my-bot.example.com/api/chat' \\\n  -H 'Authorization: Bearer sk-…' \\\n  -H 'Content-Type: application/json' \\\n  --data-raw '{\"question\":\"How do I reset it?\"}'"} aria-label="curl command" />
           <div className="mt-2 flex items-center gap-2">
             <Button loading={parse.isPending} disabled={curl.trim().length < 6} onClick={() => parse.mutate()}><Wand2 className="size-3.5" />Read it</Button>
             <span className="text-xs text-ink-2">DevTools → Network → Copy as cURL (bash)</span>
@@ -331,8 +331,8 @@ function StepRequest({ route, adapter, cfg, setCfg }: { route: Route; adapter: '
           {parsed && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-3 space-y-2">
               <Notice tone="good" title="Request read">
-                {parsed.question_path ? <>The question goes in <code>{parsed.question_path}</code> - replaced by each test question.</> : 'No question field found: put {{input.message}} where the question goes in the body below.'}
-                {parsed.session_fields.length > 0 && <> A fresh <code>{parsed.session_fields.join(', ')}</code> per question keeps cases from sharing chat history.</>}
+                {parsed.question_path ? <>The question goes in <code>{parsed.question_path}</code> , replaced by each test question.</> : 'No question field found: put {{input.message}} where the question goes in the body below.'}
+                {parsed.session_fields.length > 0 && <> A fresh <code>{parsed.session_fields.join(', ')}</code> per question keeps questions from sharing chat history.</>}
                 {parsed.looks_streaming && <> It looks like a streaming endpoint.</>}
               </Notice>
               {parsed.secrets.map((s) => <SecretRow key={s.header} secret={s} onStored={(ref) => setCfg((c) => ({ ...c, auth: { header: s.header, prefix: s.prefix, secret_ref: ref } }))} stored={(cfg.auth as { header?: string } | undefined)?.header === s.header} />)}
@@ -347,7 +347,7 @@ function StepRequest({ route, adapter, cfg, setCfg }: { route: Route; adapter: '
           <Field label={<span className="inline-flex items-center gap-1.5">Method<MethodHelp /></span>}><Select value={field('method') || 'POST'} onChange={(e) => set('method', e.target.value)} aria-label="Method"><option>POST</option><option>GET</option></Select></Field>
         </div>
         <div className="mt-3">
-          <Field label={<LabelHelp label="Body (JSON)" title="Placeholders in the body"><p><code>{'{{input.message}}'}</code> the question, <code>{'{{uuid}}'}</code> a fresh id per call, <code>{'{{input.fields.x}}'}</code> a per-case field.</p></LabelHelp>} error={bodyErr ?? undefined}>
+          <Field label={<LabelHelp label="Body (JSON)" title="Placeholders in the body"><p><code>{'{{input.message}}'}</code> the question, <code>{'{{uuid}}'}</code> a fresh id per call, <code>{'{{input.fields.x}}'}</code> a per-question field.</p></LabelHelp>} error={bodyErr ?? undefined}>
             <Textarea mono rows={7} value={bodyText} spellCheck={false} onChange={(e) => { setBodyText(e.target.value); try { set('body', JSON.parse(e.target.value)); setBodyErr(null) } catch { setBodyErr('Not valid JSON yet') } }} />
           </Field>
         </div>
@@ -356,11 +356,11 @@ function StepRequest({ route, adapter, cfg, setCfg }: { route: Route; adapter: '
         )}
         {quotedLiterals(cfg.body).map((w) => (
           <p key={w.path} className="mt-2 text-xs text-warn-ink">
-            <code>{w.path}</code> is the <i>text</i> "{w.value}" because of its quotes. If you meant the empty value, write <code>{w.value}</code> without quotes (a bot that expects an id refuses the text "null").
+            <code>{w.path}</code> is the <i>text</i> “{w.value}” because of its quotes. If you meant the empty value, write <code>{w.value}</code> without quotes (a bot that expects an id refuses the text “null”).
             <TextLink size="sm" className="ml-1" onClick={() => { const fixed = unquote(cfg.body, w.path); set('body', fixed); setBodyText(JSON.stringify(fixed, null, 2)) }}>Remove the quotes</TextLink>
           </p>
         ))}
-        {!!cfg.auth && <p className="mt-2 flex items-center gap-1.5 text-xs text-good-ink"><Lock className="size-3.5" />Sends {(cfg.auth as { header: string }).header} from {(cfg.auth as { secret_ref: string }).secret_ref} - the key itself is not in this configuration.</p>}
+        {!!cfg.auth && <p className="mt-2 flex items-center gap-1.5 text-xs text-good-ink"><Lock className="size-3.5" />Sends {(cfg.auth as { header: string }).header} from {(cfg.auth as { secret_ref: string }).secret_ref}, and the key itself is not in this configuration.</p>}
       </Card>
     </div>
   )
@@ -392,9 +392,9 @@ function SecretRow({ secret, onStored, stored }: { secret: { header: string; pre
 const ROLES: { id: string; label: string; group: string; list?: string; sub?: string; hint: string }[] = [
   { id: 'answer', label: 'Answer', group: 'Answer', hint: 'The text the user sees' },
   { id: 'sources', label: 'Source list', group: 'Sources', hint: 'The list of retrieved documents' },
-  { id: 'sources.id', label: 'Source id', group: 'Sources', list: 'sources', sub: 'id', hint: 'Names a document (used for recall, citations)' },
+  { id: 'sources.id', label: 'Source id', group: 'Sources', list: 'sources', sub: 'id', hint: 'Names a document (used to check which documents were found, and citations)' },
   { id: 'sources.title', label: 'Source title', group: 'Sources', list: 'sources', sub: 'title', hint: 'Optional' },
-  { id: 'sources.text', label: 'Source text', group: 'Sources', list: 'sources', sub: 'text', hint: 'Needed for groundedness' },
+  { id: 'sources.text', label: 'Source text', group: 'Sources', list: 'sources', sub: 'text', hint: 'Needed to check answers against their sources' },
   { id: 'sources.score', label: 'Source score', group: 'Sources', list: 'sources', sub: 'score', hint: 'Optional' },
   { id: 'citations', label: 'Citations', group: 'Citations', hint: 'Ids of the documents the answer cites' },
   { id: 'tools', label: 'Tool call list', group: 'Tools', hint: 'The list of tool calls' },
@@ -502,15 +502,15 @@ function StepMap(props: {
 
       {probe?.ok && adapter === 'http' && standard && probe.suggestion && (
         probe.suggestion.standard.matches
-          ? <Notice tone="good" title="The reply is in the Assay shape - nothing to map">Found: {probe.suggestion.standard.present.join(', ')}.{probe.suggestion.standard.missing.length > 0 && <> Not in this reply: {probe.suggestion.standard.missing.join(', ')}.</>}</Notice>
+          ? <Notice tone="good" title="The reply is in the Assay shape: nothing to map">Found: {probe.suggestion.standard.present.join(', ')}.{probe.suggestion.standard.missing.length > 0 && <> Not in this reply: {probe.suggestion.standard.missing.join(', ')}.</>}</Notice>
           : <Notice tone="warn" title="This reply is not in the Assay shape" action={<Button size="sm" onClick={() => { setStandard(false); setCfg((c) => ({ ...c, response: probe.suggestion!.mapping })) }}>Map it instead</Button>}>
-              {probe.suggestion.standard.problems.concat(probe.suggestion.standard.missing.includes('answer') ? ['There is no top-level "answer" string.'] : []).join(' ')} Turn the switch off and map the reply by clicking it.
+              {probe.suggestion.standard.problems.concat(probe.suggestion.standard.missing.includes('answer') ? ['There is no top-level “answer” string.'] : []).join(' ')} Turn the switch off and map the reply by clicking it.
             </Notice>
       )}
 
       {probe?.ok && adapter === 'http' && !standard && raw !== undefined && (
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-          <Card title={isStream ? 'The reply, with the stream folded into one' : 'The reply'} help={<p>Pick a role on the right, then click the node in the reply where it is. Nodes already mapped carry their role's label.</p>}>
+          <Card title={isStream ? 'The reply, with the stream folded into one' : 'The reply'} help={<p>Pick a role on the right, then click the node in the reply where it is. Nodes already mapped carry their role’s label.</p>}>
             <AnimatePresence>{picking && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="mb-2 flex items-center gap-2 text-xs text-accent-ink"><MousePointerClick className="size-3.5" />Picking <span className="font-semibold">{ROLES.find((r) => r.id === picking)?.label}</span>: click its node<Button size="sm" variant="ghost" onClick={() => setPicking(null)}>Cancel</Button></motion.div>}</AnimatePresence>
             {pickError && <p className="mb-2 text-xs text-bad-ink">{pickError}</p>}
             <JsonTree data={raw} onPick={onPick} marks={marksFor(mapping)} picking={!!picking} />
@@ -543,7 +543,7 @@ function StepMap(props: {
       {probe?.ok && isStream && (
         <Card title="Streamed reply" help={<>
           <p>Event types seen in the stream and how each is folded into one reply.</p>
-          <p>Text pieces ("deltas") are joined into the answer; other events are kept by name so the mapping can read them. Edit the details in Advanced (JSON).</p>
+          <p>Text pieces (“deltas”) are joined into the answer; other events are kept by name so the mapping can read them. Edit the details in Advanced (JSON).</p>
         </>}>
           <ul className="space-y-1.5">
             {probe.events?.map((e) => {
@@ -561,9 +561,9 @@ function StepMap(props: {
       )}
 
       {probe?.ok && (
-        <Card title="What Assay will see" help={<p>Runs the whole connection (request and mapping) and shows the result as Assay reads it, and which checks that makes possible.</p>} actions={<Button loading={testing} onClick={runTest}><Check className="size-3.5" />Check the mapping</Button>}>
+        <Card title="What Assay will see" help={<p>Runs the whole connection (request and mapping) and shows the result as Assay reads it, and which checks that makes possible.</p>} actions={<Button loading={testing} onClick={runTest}><Check className="size-3.5" />Test the mapping</Button>}>
           {!!testError && <div className="mb-3"><ErrorState error={testError} /></div>}
-          {!test ? <p className="text-sm text-ink-2">Not checked yet: press Check the mapping.</p> : !test.ok ? (
+          {!test ? <p className="text-sm text-ink-2">Not tested yet: press Test the mapping.</p> : !test.ok ? (
             <Notice tone="bad" title={test.explanation ?? test.error ?? 'No answer'}>{test.error}</Notice>
           ) : (
             <div className="grid gap-4 lg:grid-cols-2">
@@ -585,14 +585,14 @@ function StepMap(props: {
 export function Capabilities({ caps }: { caps: Capability[] }) {
   return (
     <div>
-      <div className="t-label mb-1.5">What you'll get</div>
+      <div className="t-label mb-1.5">What you’ll get</div>
       <ul className="space-y-1.5">
         {caps.map((c, i) => (
           <motion.li key={c.field} initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }} className="flex items-start gap-2 text-sm">
             {c.received ? <Check className="mt-0.5 size-4 shrink-0 text-good-ink" /> : c.mapped ? <CircleAlert className="mt-0.5 size-4 shrink-0 text-warn-ink" /> : <X className="mt-0.5 size-4 shrink-0 text-ink-3" />}
             <span>
               <span className={clsx(c.received ? 'font-semibold text-ink' : 'font-medium text-ink-2')}>{c.label}</span>{c.count !== null && c.received ? <span className="font-mono"> ({c.count})</span> : ''}
-              <span className="block text-xs text-ink-2">{c.received ? `→ ${c.unlocks}` : c.mapped ? `Mapped, but empty in this reply - ${c.unlocks} may show "not evaluated"` : `Not mapped: ${c.unlocks} won't run`}</span>
+              <span className="block text-xs text-ink-2">{c.received ? `→ ${c.unlocks}` : c.mapped ? `Mapped, but empty in this reply: ${c.unlocks} may show “not evaluated”` : `Not mapped: ${c.unlocks} won’t run`}</span>
             </span>
           </motion.li>
         ))}
@@ -688,11 +688,11 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved, reply, tes
         t = await api.put<Target>(`/api/targets/${editing.id}`, { config: cfg, variant_label: label, notes })
       } else {
         let pid = projectMode === 'existing' ? projectId : ''
-        if (!pid) pid = (await api.post<Project>('/api/projects', { name: newProject || name || 'My chatbot' })).id
+        if (!pid) pid = (await api.post<Project>('/api/projects', { name: newProject || name || 'New chatbot' })).id
         t = await api.post<Target>('/api/targets', { project_id: pid, name, adapter, config: cfg, variant_label: label })
       }
-      if (asTemplate) await api.post('/api/connector-templates', { name: name || 'My connection', adapter, config: cfg, description: label })
-      try { await api.post(`/api/targets/${t.id}/check`) } catch (e) { toast(`Saved, but the first check failed: ${e instanceof Error ? e.message : 'no answer'}`, 'bad') }
+      if (asTemplate) await api.post('/api/connector-templates', { name: name || 'New connection', adapter, config: cfg, description: label })
+      try { await api.post(`/api/targets/${t.id}/check`) } catch (e) { toast(`Saved, but the first test failed: ${e instanceof Error ? e.message : 'no answer'}`, 'bad') }
       return t
     },
     onSuccess: (t) => onSaved(t.id),
@@ -706,13 +706,13 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved, reply, tes
   return (
     <div className="space-y-12">
       {!editing && (
-        <Card title="Which chatbot is this?" help={<p>Decides which question sets are offered below and where its runs appear.</p>}>
+        <Card title="Which chatbot is this?" help={<p>Decides which datasets are offered below and where its runs appear.</p>}>
           <div className="flex flex-wrap items-center gap-2">
             <Segmented size="sm" value={projectMode} onChange={setProjectMode} options={[{ id: 'existing', label: 'Existing' }, { id: 'new', label: 'New' }]} />
             {projectMode === 'existing'
               ? (
                 <Select className="w-80" value={projectId} onChange={(e) => { setProjectId(Number(e.target.value)); setSource('') }} aria-label="Chatbot">
-                  {!projectId && <option value="">Choose a chatbot...</option>}
+                  {!projectId && <option value="">Choose a chatbot…</option>}
                   {projects.map((p) => <option key={p.id} value={p.id}>{projectOption(p)}</option>)}
                 </Select>
               )
@@ -724,7 +724,7 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved, reply, tes
       {adapter === 'http' && (
         <Card title="Side effects" help={<p>Also check what else a question writes (usage tables, shared logs, budgets) before pointing Assay at a shared instance. When that is not acceptable, use an isolated copy or import logs instead.</p>}>
           <Toggle checked={savesChats} onChange={setCleanup}
-            label={<LabelHelp label="Each question saves a conversation in the bot" title="Clean-up"><p>Then Assay deletes it right after the answer, so test runs do not pile up in the bot's history.</p></LabelHelp>} />
+            label={<LabelHelp label="Each question saves a conversation in the bot" title="Clean-up"><p>Then Assay deletes it right after the answer, so test runs do not pile up in the bot’s history.</p></LabelHelp>} />
           {!savesChats && idPath && (
             <div className="mt-3">
               <Notice tone="info" title={<>The reply carries a chat id (<code>{idPath}</code>)</>} action={<Button size="sm" onClick={() => setCleanup(true)}>Clean up after each question</Button>}>
@@ -748,7 +748,7 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved, reply, tes
           {mismatch && (
             <div className="mt-3">
               <Notice tone="warn" title="The clean-up looks for the chat id in the wrong place" action={<Button size="sm" onClick={() => setCfg((c) => ({ ...c, cleanup: { ...cleanup, endpoint: suggested.endpoint, only_if: idPath ?? undefined } }))}>Use {idPath}</Button>}>
-                It reads <code>{cleanup.only_if}</code>, but this bot's reply has the id at <code>{idPath}</code>: the delete would be skipped silently.
+                It reads <code>{cleanup.only_if}</code>, but this bot’s reply has the id at <code>{idPath}</code>: the delete would be skipped silently.
               </Notice>
             </div>
           )}
@@ -762,26 +762,26 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved, reply, tes
           <Field label="Questions from">
             <Select className="w-80" value={src} onChange={(e) => setSource(e.target.value)} aria-label="Dry-run questions">
               {own.length > 0 && (
-                <optgroup label={`${projectName || 'This chatbot'}'s question sets`}>
+                <optgroup label={`${projectName || 'This chatbot'}’s datasets`}>
                   {own.map((d) => d.latest && <option key={d.latest.id} value={`dsv:${d.latest.id}`}>{d.name} v{d.latest.version} ({d.latest.case_count} questions)</option>)}
                 </optgroup>
               )}
               <optgroup label="Other">
-                <option value="typed">Type my own questions</option>
+                <option value="typed">Type your own questions</option>
                 <option value="generic">Three generic questions</option>
-                {testMs !== null && <option value="test">Use the test answer's timing (no extra cost)</option>}
+                {testMs !== null && <option value="test">Use the test answer’s timing (no extra cost)</option>}
               </optgroup>
               {showOthers && others.length > 0 && (
                 <optgroup label="Written for other chatbots">
-                  {others.map((d) => d.latest && <option key={d.latest.id} value={`dsv:${d.latest.id}`}>{d.name} v{d.latest.version} - {projects.find((p) => p.id === d.project_id)?.name ?? 'another chatbot'}</option>)}
+                  {others.map((d) => d.latest && <option key={d.latest.id} value={`dsv:${d.latest.id}`}>{d.name} v{d.latest.version} · {projects.find((p) => p.id === d.project_id)?.name ?? 'another chatbot'}</option>)}
                 </optgroup>
               )}
             </Select>
           </Field>
-          {canAsk && <Button loading={dry.isPending} onClick={() => dry.mutate()}><Send className="size-3.5" />Ask {asked} question{asked === 1 ? '' : 's'}{loadCheck ? `, then ${asked} at once` : ''}</Button>}
+          {canAsk && <Button loading={dry.isPending} onClick={() => dry.mutate()}><Send className="size-3.5" />Ask {plural(asked, 'question')}{loadCheck ? `, then ${asked} at once` : ''}</Button>}
         </div>
         {others.length > 0 && (
-          <Checkbox className="mt-3" checked={showOthers} onChange={setShowOthers} label={`Also list question sets written for other chatbots (${others.length})`} />
+          <Checkbox className="mt-3" checked={showOthers} onChange={setShowOthers} label={`Also list datasets written for other chatbots (${others.length})`} />
         )}
         {src === 'typed' && (
           <div className="mt-3 grid gap-2 md:grid-cols-3">
@@ -791,12 +791,12 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved, reply, tes
         {foreign && (
           <div className="mt-3">
             <Notice tone="warn" title={`These questions were written for ${foreignOwner}`}>
-              {projectName || 'This chatbot'} will be answering off-topic questions, and each answer may be billed by the bot. Type your own instead, or pick one of its own sets.
+              {projectName || 'This chatbot'} will be answering off-topic questions, and each answer may be billed by the bot. Type your own instead, or pick one of its own datasets.
             </Notice>
           </div>
         )}
         {src !== 'test' && asked > 0 && (
-          <Checkbox className="mt-3" checked={loadCheck} onChange={setLoadCheck} label={`Also check how it copes when busy: ask the same questions again, all at once (${asked} more answer${asked === 1 ? '' : 's'})`} />
+          <Checkbox className="mt-3" checked={loadCheck} onChange={setLoadCheck} label={`Also check how it copes when busy: ask the same questions again, all at once (${plural(asked, 'more answer', 'more answers')})`} />
         )}
         {src === 'test' && <p className="mt-2 text-xs text-ink-2">No new questions: the estimate below uses the <span className="font-mono">{ms(testMs)}</span> the test question took. One answer is a rough guide; three are steadier.</p>}
         {dry.isError && <div className="mt-2"><ErrorState error={dry.error} /></div>}
@@ -806,12 +806,12 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved, reply, tes
               <div key={i} className="flex items-start gap-2 text-sm">
                 {c.ok ? <Check className="mt-0.5 size-4 text-good-ink" /> : <X className="mt-0.5 size-4 text-bad-ink" />}
                 <span className="min-w-0 flex-1"><span className="text-ink-2">{c.question}</span><span className="block truncate text-xs text-ink-3">{c.ok ? c.answer : c.explanation ?? c.error}</span></span>
-                <span className="num font-mono text-xs text-ink-3">{ms(c.elapsed_ms)}{c.cleanup && ` - clean-up ${c.cleanup}`}</span>
+                <span className="num font-mono text-xs text-ink-3">{ms(c.elapsed_ms)}{c.cleanup && ` · clean-up ${c.cleanup}`}</span>
               </div>
             ))}
             {dry.data.load && (
               <Notice tone={dry.data.load.verdict === 'copes' ? 'good' : dry.data.load.verdict === 'unknown' ? 'info' : 'warn'}
-                title={`Alone: ${ms(dry.data.load.alone_ms)} per answer. ${dry.data.load.n} at once: ${ms(dry.data.load.together_ms)}${dry.data.load.ratio ? ` (x${dry.data.load.ratio})` : ''}${dry.data.load.errors ? `, ${plural(dry.data.load.errors, 'error')}` : ''}.`}>
+                title={`Alone: ${ms(dry.data.load.alone_ms)} per answer. ${dry.data.load.n} at once: ${ms(dry.data.load.together_ms)}${dry.data.load.ratio ? ` (×${dry.data.load.ratio})` : ''}${dry.data.load.errors ? `, ${plural(dry.data.load.errors, 'error')}` : ''}.`}>
                 This bot {LOAD_TEXT[dry.data.load.verdict]} Suggested <span className="font-semibold">In parallel: <span className="font-mono">{dry.data.load.suggested_concurrency}</span></span>.
               </Notice>
             )}
@@ -823,7 +823,7 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved, reply, tes
               What a full run would take{perCost === null ? '. The bot reports no token counts, so its price is unknown: count the billed answers.' : ''}
             </div>
             <Table>
-              <thead><tr><th className="t-label">Question set</th><th className="t-label text-right">Answers (1 try)</th><th className="t-label text-right">Time at 1 / 4 in parallel</th><th className="t-label text-right">Bot cost</th></tr></thead>
+              <thead><tr><th className="t-label">Dataset</th><th className="t-label text-right">Answers (1 try)</th><th className="t-label text-right">Time at 1 / 4 in parallel</th><th className="t-label text-right">Bot cost</th></tr></thead>
               <tbody>
                 {[...own.map((d) => ({ key: d.id, label: d.name, n: d.latest?.case_count ?? 0 })), { key: 0, label: 'Per 10 questions', n: 10 }].map((r) => (
                   <tr key={r.key}>
@@ -842,10 +842,10 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved, reply, tes
         <div className="grid gap-3 md:grid-cols-2">
           {!editing && (
             <Field label={<span className="inline-flex items-center gap-1.5">Name this connection<ConnectionHelp /></span>}>
-              <Input aria-label="Connection name" placeholder={`e.g. ${initials} – local dev (:8120)`} value={name} onChange={(e) => setName(e.target.value)} />
+              <Input aria-label="Connection name" placeholder={`e.g. ${initials} - local dev (:8120)`} value={name} onChange={(e) => setName(e.target.value)} />
             </Field>
           )}
-          <Field label={<LabelHelp label="What's inside this version"><p>Model, prompt, retriever. Say what it is ("gpt-6-sol answer, high effort"), not just "v1": in six months it still tells you what changed.</p></LabelHelp>}>
+          <Field label={<LabelHelp label="What’s inside this version"><p>Model, prompt, retriever. Say what it is (“gpt-6-sol answer, high effort”), not just “v1”: in six months it still tells you what changed.</p></LabelHelp>}>
             <Input aria-label="Version description" placeholder="e.g. gpt-x answer / hybrid top-20 / prompt v3" value={label} onChange={(e) => setLabel(e.target.value)} />
           </Field>
           {editing && <Field label="What changed"><Input value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>}
@@ -871,10 +871,10 @@ function AdvancedPanel({ adapter, cfg, setCfg }: { adapter: string; cfg: Cfg; se
     <div className="xl:sticky xl:top-16 xl:self-start">
       <Card title="Configuration" boxed meta={adapter} help={<>
         <p>The record of this connection. Edits here update the steps, and the other way round.</p>
-        <p>Same format as YAML experiment files and <code>local/targets/*.yaml</code>.</p>
+        <p>Same format as the YAML connection and run files.</p>
       </>}>
         <Textarea mono rows={26} value={text} spellCheck={false} onBlur={() => setDraft(null)}
-          onChange={(e) => { setDraft(e.target.value); try { const v = JSON.parse(e.target.value); setCfg(() => v); setErr(null) } catch { setErr('Not valid JSON yet - the steps keep the last valid version.') } }} />
+          onChange={(e) => { setDraft(e.target.value); try { const v = JSON.parse(e.target.value); setCfg(() => v); setErr(null) } catch { setErr('Not valid JSON yet: the steps keep the last valid version.') } }} />
         {err && <p className="mt-1 text-xs text-warn-ink">{err}</p>}
       </Card>
     </div>
@@ -912,11 +912,11 @@ function LogsImport({ projects, onDone }: { projects: Project[]; onDone: (target
     onSuccess: (r) => onDone(r.target_id ?? r.target?.id ?? 0),
   })
   const cols = preview.data?.columns ?? []
-  const ROLE_LIST: [string, string][] = [['case_id', 'Id'], ['message', 'Question'], ['answer', 'Answer'], ['sources', 'Sources (list)'], ['category', 'Category'], ['latency_ms', 'Latency (ms)'], ['latency_s', 'Latency (s)']]
+  const ROLE_LIST: [string, string][] = [['case_id', 'Id'], ['message', 'Question'], ['answer', 'Answer'], ['sources', 'Sources (list)'], ['category', 'Category'], ['latency_ms', 'Reply time (milliseconds)'], ['latency_s', 'Reply time (seconds)']]
   return (
     <Card title="Import past answers" help={<>
       <p>Drop a log of past questions and answers (.jsonl, .json or .csv), then say which column is which.</p>
-      <p>Creates a dataset of the logged questions and a "replay" connection that answers with what was logged: graded without calling the bot.</p>
+      <p>Creates a dataset of the logged questions and an imported connection that answers with what was logged: graded without calling the bot.</p>
     </>}>
       <div className={clsx('flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-8 text-sm transition-colors', file ? 'border-good/50 bg-good-wash/30' : 'border-line-strong')}
         onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) { setFile(f); preview.mutate(f) } }}>

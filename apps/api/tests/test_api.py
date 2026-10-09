@@ -137,7 +137,7 @@ def test_validation_and_connection_tests(client):
     c = client
     r = c.post("/api/experiments", json={"project_id": 1, "name": "x", "target_version_id": 1,
                                          "dataset_version_id": 1, "evaluators": ["correctness"]})
-    assert r.status_code == 422 and "no judge configured" in r.text
+    assert r.status_code == 422 and "need a grading model" in r.text
     r = c.post("/api/experiments", json={"project_id": 1, "name": "x", "target_version_id": 1,
                                          "dataset_version_id": 1, "evaluators": ["made_up"]})
     assert r.status_code == 422

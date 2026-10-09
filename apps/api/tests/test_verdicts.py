@@ -62,9 +62,9 @@ def test_changed_checks_or_rubrics_break_comparability():
 
     assert comparability(_run("aaa"))["key"] == comparability(_run("aaa"))["key"]
     assert comparability(_run("aaa"))["key"] != comparability(_run("bbb"))["key"]
-    assert any("Checks changed" in i for i in comparability_issues(_run("aaa"), _run("bbb")))
+    assert any("These checks changed" in i for i in comparability_issues(_run("aaa"), _run("bbb")))
     assert comparability(_run("aaa"))["key"] != comparability(_run("aaa", "v2"))["key"]
-    assert any("prompt template" in i for i in comparability_issues(_run("aaa"), _run("aaa", "v2")))
+    assert any("different prompt" in i for i in comparability_issues(_run("aaa"), _run("aaa", "v2")))
 
 
 def test_calibration_needs_agreement_on_enough_labels_with_the_current_rubric(client):  # noqa: F811

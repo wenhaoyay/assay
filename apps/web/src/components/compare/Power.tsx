@@ -1,4 +1,4 @@
-// D2 How many questions do I need? The smallest reliable change against the number of questions,
+// D2 How many questions are enough? The smallest reliable change against the number of questions,
 // for this pair's share of questions that flip; a slider moves the marker.
 import * as d3 from 'd3'
 import { useId, useMemo, useState } from 'react'
@@ -23,10 +23,10 @@ export function Power({ flipShare, n0 }: { flipShare: number; n0: number }) {
   const area = d3.area<number>().x((k) => x(k)).y0(H - M.b).y1((k) => y(mde(k)))(pts) ?? ''
   const need5 = questionsFor(flipShare, 0.05)
   return (
-    <Card title="How many questions do I need?"
+    <Card title="How many questions are enough?"
       help={<>
         <p>The smallest change in pass rate a set of this size can detect reliably. Move the slider to see how a bigger set narrows it.</p>
-        <p>A rough guide: 80% power at the 5% level, questions paired between the two runs, using this pair's share of questions that changed result ({Math.round(flipShare * 100)}%). The detectable change is about 2.8 × √(share ÷ questions).</p>
+        <p>A rough guide: 80% power at the 5% level, questions paired between the two runs, using this pair’s share of questions that changed result ({Math.round(flipShare * 100)}%). The detectable change is about 2.8 × √(share ÷ questions).</p>
         <p>Pairs of versions that change fewer questions can see smaller changes with the same set.</p>
       </>}>
       <div className="grid items-center gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">

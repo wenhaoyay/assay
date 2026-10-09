@@ -84,7 +84,7 @@ export function BakeoffScatter({ bakeoff, dimension }: { bakeoff: Bakeoff; dimen
   const splits = pts.filter((p) => p.split).length
   const axisOptions = axes.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)
 
-  if (axes.length < 2) return <p className="text-sm text-ink-2">This bake-off has one grader and no labels to set it against.</p>
+  if (axes.length < 2) return <p className="text-sm text-ink-2">This bake-off has one grading model and no labels to set it against.</p>
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-2 text-sm text-ink-2">
@@ -133,13 +133,13 @@ export function BakeoffScatter({ bakeoff, dimension }: { bakeoff: Bakeoff; dimen
             </svg>
           )}
           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-2">
-            <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-warn" />graders disagree on pass/fail</span>
-            <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-ink-3" />graders agree</span>
+            <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-warn" />grading models disagree on pass or fail</span>
+            <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-ink-3" />grading models agree</span>
           </div>
         </div>
         <aside className="min-w-0" data-testid="bakeoff-side">
           {sel ? <DotDetail key={sel.id} trialId={sel.id} index={sel.i} axes={axes} shown={[ax.id, ay.id]} dimension={dimension} />
-            : <p className="text-sm text-ink-2">The two graders agree on every answer here. Click any dot to read it.</p>}
+            : <p className="text-sm text-ink-2">The two grading models agree on every answer here. Click any dot to read it.</p>}
         </aside>
       </div>
     </div>

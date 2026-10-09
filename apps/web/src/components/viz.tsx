@@ -33,7 +33,7 @@ export function Sparkline({ values, width = 120, height = 32, domain = [0, 1], c
     y: height - 4 - ((v - domain[0]) / (domain[1] - domain[0] || 1)) * (height - 8),
   }))
   const real = pts.filter((p): p is { x: number; y: number } => p !== null)
-  if (!real.length) return <span className="text-xs text-ink-3">no trend yet</span>
+  if (!real.length) return <span className="text-xs text-ink-3">No trend yet</span>
   const d = real.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
   const last = real[real.length - 1]
   const up = real.length > 1 && last.y < real[real.length - 2].y
@@ -80,7 +80,7 @@ export function ForestPlot({ rows, isHeuristic, onPick }: { rows: ComparisonRow[
         <div ref={box} className="relative h-4 max-md:hidden" aria-hidden>
           {ticks.map((t) => <span key={t} className="num absolute -translate-x-1/2 font-mono text-label text-ink-3" style={{ left: x(t) }}>{tickLabel(t)}</span>)}
         </div>
-        <span className="t-label text-right">Change, pp</span>
+        <span className="t-label text-right">Change (pp)</span>
       </div>
       <div className="relative mt-1">
         {ranged.map((r, i) => {
@@ -94,7 +94,7 @@ export function ForestPlot({ rows, isHeuristic, onPick }: { rows: ComparisonRow[
             <button key={r.metric} type="button" onClick={() => onPick?.(r)} title={`${r.label}: ${fmtDelta(r)}, ${read.text}`}
               className={clsx('grid w-full grid-cols-[minmax(0,170px)_minmax(0,1fr)_96px] items-center gap-3 rounded-md text-left hover:bg-surface-2 max-md:grid-cols-[minmax(0,1fr)_96px]')}
               style={{ height: RH }} data-testid={`forest-${r.metric}`}>
-              <span className="flex min-w-0 items-center gap-1.5 pl-1 text-sm text-ink"><span className="truncate">{r.label.replace(/ \(judge\)$/, '')}</span>{heur && <Badge tone="heuristic">heuristic</Badge>}</span>
+              <span className="flex min-w-0 items-center gap-1.5 pl-1 text-sm text-ink"><span className="truncate">{r.label.replace(/ \(grading model\)$/, '')}</span>{heur && <Badge tone="heuristic">Heuristic</Badge>}</span>
               <svg width={W} height={RH} className="max-md:hidden" role="img"
                 aria-label={`${r.label}: ${fmtDelta(r)}${lo !== null ? `, interval ${(lo * 100).toFixed(1)} to ${((hi ?? 0) * 100).toFixed(1)}` : ''}`}>
                 {ticks.map((t) => <line key={t} x1={x(t)} x2={x(t)} y1={0} y2={RH} stroke={t === 0 ? 'var(--ink-3)' : 'var(--line)'} strokeDasharray={t === 0 ? undefined : '2 3'} />)}
@@ -265,7 +265,7 @@ export function StagePipeline({ stages, onPick, selected }: { stages: Stage[]; o
 }
 
 // --------------------------------------------------------------------------------------
-// Case matrix: cases down, runs across. A row red in every run is often a bad golden answer.
+// Question matrix: questions down, runs across. A row red in every run is often a wrong expected answer.
 // --------------------------------------------------------------------------------------
 
 export function CaseMatrixView({ data, filter = 'all', focusCase }: { data: CaseMatrix; filter?: 'all' | 'changed' | 'always_fail' | 'flaky'; focusCase?: string | null }) {
@@ -290,7 +290,7 @@ export function CaseMatrixView({ data, filter = 'all', focusCase }: { data: Case
           <tr>
             <th className="t-label sticky left-0 z-20 min-w-[220px] border-b border-line bg-surface px-3 py-2 text-left">Question</th>
             {data.runs.map((r) => (
-              <th key={r.id} className="border-b border-line px-1 py-2 align-bottom" title={`${r.name}\n${r.target} - ${r.variant}\njudge: ${r.judge ?? 'none'}`}>
+              <th key={r.id} className="border-b border-line px-1 py-2 align-bottom" title={`${r.name}\n${r.target} · ${r.variant}\nGrading model: ${r.judge ?? 'none'}`}>
                 <Link to={`/runs/${r.id}`} className="flex flex-col items-center gap-0.5 font-mono text-label text-accent-ink hover:underline">
                   #{r.id}
                   <span className="num text-label text-ink-3">{pct(r.pass_rate, 0)}</span>
@@ -305,7 +305,7 @@ export function CaseMatrixView({ data, filter = 'all', focusCase }: { data: Case
               <td className="sticky left-0 z-(--z-sticky) max-w-[280px] border-b border-line bg-surface px-3 py-1">
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-xs text-ink">{c.id}</span>
-                  {always.has(c.id) && <Badge tone="fail" title="Failed in every run: check the golden answer">always fails</Badge>}
+                  {always.has(c.id) && <Badge tone="fail" title="Failed in every run: check the expected answer">Always fails</Badge>}
                 </div>
                 <div className="truncate text-xs text-ink-3">{c.title}</div>
               </td>
@@ -328,7 +328,7 @@ export function CaseMatrixView({ data, filter = 'all', focusCase }: { data: Case
           ))}
         </tbody>
       </table>
-      {!rows.length && <p className="p-4 text-sm text-ink-3">No case matches this filter.</p>}
+      {!rows.length && <p className="p-4 text-sm text-ink-3">No questions match this filter.</p>}
     </div>
   )
 }
@@ -337,8 +337,8 @@ export function MatrixLegend() {
   const item = (cls: string, label: string) => <span className="flex items-center gap-1.5"><span className={clsx('size-3 rounded-full', cls)} />{label}</span>
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-3">
-      {item('bg-good', 'passed every trial')}{item('bg-flaky', 'flaky')}{item('bg-bad', 'failed every trial')}{item('bg-error', 'error')}
-      {item('border border-dashed border-untested', 'not in the run')}{item('bg-good hatched-light', 'run graded by the heuristic judge')}
+      {item('bg-good', 'passed every try')}{item('bg-flaky', 'flaky')}{item('bg-bad', 'failed every try')}{item('bg-error', 'error')}
+      {item('border border-dashed border-untested', 'not in the run')}{item('bg-good hatched-light', 'run graded by heuristic grading')}
     </div>
   )
 }
@@ -351,7 +351,7 @@ export function LiveGrid({ total, done, statuses }: { total: number; done: numbe
   const motionOn = useMotionOn()
   const tiles = Array.from({ length: Math.max(total, statuses.length) }, (_, i) => statuses[i] ?? null)
   return (
-    <div className="flex flex-wrap gap-[3px]" aria-label={`${done} of ${total} trials finished`}>
+    <div className="flex flex-wrap gap-[3px]" aria-label={`${done} of ${total} tries finished`}>
       {tiles.map((t, i) => (
         <motion.span key={t?.key ?? `pending-${i}`} title={t ? `${t.caseId}: ${t.status}` : 'waiting'}
           data-case={t?.caseId}

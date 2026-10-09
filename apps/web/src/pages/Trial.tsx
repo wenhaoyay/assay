@@ -14,7 +14,7 @@ import { Checkbox, Chip, TextLink } from '../components/form'
 import { Badge, Button, Card, Empty, ErrorState, Field, Figs, Input, Json, Kbd, PageSkeleton, SectionHead, Segmented, Select, Skeleton, StateDot, stateOf, Stat, StatusBadge, Term } from '../components/ui'
 import { api } from '../lib/api'
 import { useCrumbs } from '../lib/crumbs'
-import { FAILURE_LABELS, ms, num, usd } from '../lib/format'
+import { FAILURE_LABELS, ms, num, plural, usd } from '../lib/format'
 import { useHotkey } from '../lib/hotkeys'
 import { describePattern, groupByCase } from '../lib/trials'
 import type { RunHeader, Score, TrialDetail, TrialRow } from '../lib/types'
@@ -22,7 +22,7 @@ import type { RunHeader, Score, TrialDetail, TrialRow } from '../lib/types'
 const ORDER: Record<string, number> = { fail: 0, error: 1, unknown: 2, pass: 3, not_evaluated: 4, not_applicable: 5 }
 const ANSWER_FAILURES = new Set(['wrong_answer', 'incomplete_response', 'should_have_refused', 'malformed_output', 'unsupported_claim', 'citation_error'])
 const STAGE_OF: Record<string, string> = {
-  retrieval_miss: 'retrieval', incorrect_tool: 'tools', incorrect_tool_arguments: 'tools', unnecessary_tool: 'tools', tool_result_misused: 'tools',
+  retrieval_miss: 'search', incorrect_tool: 'tools', incorrect_tool_arguments: 'tools', unnecessary_tool: 'tools', tool_result_misused: 'tools',
   wrong_answer: 'the answer', incomplete_response: 'the answer', should_have_refused: 'the answer', malformed_output: 'the answer',
   unsupported_claim: 'grounding', citation_error: 'grounding', latency_regression: 'speed', cost_regression: 'cost', execution_error: 'execution',
 }
@@ -43,7 +43,7 @@ export function TrialPage() {
   const project = projects.data?.find((p) => p.id === run.data?.project_id)
   useCrumbs([
     ...(project ? [{ label: project.name, to: `/p/${project.id}` }] : []),
-    ...(t ? [{ label: `Run #${t.run_id}`, to: `/runs/${t.run_id}` }, { label: t.case_id, to: `/runs/${t.run_id}?tab=cases&case=${t.case_id}` }, { label: `try ${t.trial_index + 1}` }] : []),
+    ...(t ? [{ label: `Run #${t.run_id}`, to: `/runs/${t.run_id}` }, { label: t.case_id, to: `/runs/${t.run_id}?tab=cases&case=${t.case_id}` }, { label: `Try ${t.trial_index + 1}` }] : []),
   ], `trial-${id}-${!!t}-${project?.name}`)
 
   const failingCases = useMemo(() => groupByCase(runTrials.data ?? []).filter((g) => g.firstFailing), [runTrials.data])
@@ -105,12 +105,12 @@ function TrialView({ t: tr, heuristic, projectId, failIdx, failN, onNext }: { t:
             <AddFailureToDataset projectId={projectId} question={tr.question} answer={answer} runId={tr.run_id} trialId={tr.id} reference={c?.expected.answer.reference} />
           )}
           {siblings.length > 1 && siblings.map((s) => (
-            <Chip key={s.id} to={`/trials/${s.id}`} selected={s.id === tr.id} title={`try ${s.trial_index + 1}: ${s.status} ([ and ] step between tries)`} aria-current={s.id === tr.id ? 'page' : undefined}
-              icon={<StateDot state={stateOf(s.status)} />}>try {s.trial_index + 1}</Chip>
+            <Chip key={s.id} to={`/trials/${s.id}`} selected={s.id === tr.id} title={`Try ${s.trial_index + 1}: ${s.status} ([ and ] step between tries)`} aria-current={s.id === tr.id ? 'page' : undefined}
+              icon={<StateDot state={stateOf(s.status)} />}>Try {s.trial_index + 1}</Chip>
           ))}
           {failN > 0 && (
             <Button size="sm" onClick={onNext} title="Next failing question (J); previous: K">
-              next failing{failIdx >= 0 && <span className="font-mono text-ink-3">{failIdx + 1}/{failN}</span>}<Kbd>J</Kbd>
+              Next failing{failIdx >= 0 && <span className="font-mono text-ink-3">{failIdx + 1}/{failN}</span>}<Kbd>J</Kbd>
             </Button>
           )}
         </div>
@@ -141,7 +141,7 @@ function TrialView({ t: tr, heuristic, projectId, failIdx, failN, onNext }: { t:
             {tr.cause && <CauseCard t={tr} />}
             <FailureAnnotation t={tr} />
             {tr.annotations.length > 0 && (
-              <Card title="Your labels" meta={tr.annotations.length} help={<p>Labels people gave this answer while checking the grading model (Judge trust). They are the reference the judge is measured against.</p>}>
+              <Card title="Your labels" meta={tr.annotations.length} help={<p>Labels people gave this answer while checking the grading model (Grading). They are the reference the grading model is measured against.</p>}>
                 <ul className="divide-y divide-line">
                   {tr.annotations.map((a, i) => (
                     <li key={i} className="flex flex-wrap items-baseline gap-2 py-2 text-sm">
@@ -175,7 +175,7 @@ function Verdict({ t, failing, diag }: { t: TrialDetail; failing: Score[]; diag:
   const what = t.status === 'error' ? 'the bot did not answer'
     : t.cause ? t.cause.label.toLowerCase()
       : t.failure_types.length ? t.failure_types.map((f) => FAILURE_LABELS[f] ?? f).join(', ').toLowerCase()
-        : `${failing.length} check${failing.length === 1 ? '' : 's'}`
+        : plural(failing.length, 'check')
   const evidence = passed ? null : (t.cause?.evidence[0] ?? failing[0]?.explanation ?? t.result?.error ?? null)
   return (
     <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="mt-6 max-w-[980px]" data-testid="trial-verdict">
@@ -221,9 +221,9 @@ function AnswerBlock({ tr, mustMention, mustNot, missing, answerFailed, resolve,
       <div>
       <SectionHead title="Answer" rule meta={r?.provider?.model}
         help={<>
-          <p>Hover a citation chip to light the passage it came from, in "What the bot read"; hover a passage to light its citations. A dashed chip cites something the bot did not report reading.</p>
+          <p>Hover a citation chip to light the passage it came from, in “What the bot read”; hover a passage to light its citations. A dashed chip cites something the bot did not report reading.</p>
           <p>Phrases the question must mention are underlined green; phrases it must not claim are struck through in red.</p>
-          <p>Diff shows what changed from another run's answer to the same question (the same try where it exists): removed words struck in red, added words in green.</p>
+          <p>Diff shows what changed from another run’s answer to the same question (the same try where it exists): removed words struck in red, added words in green.</p>
         </>}
         actions={otherId && (
           <>
@@ -282,7 +282,7 @@ function Expectations({ c }: { c: NonNullable<TrialDetail['case']> }) {
   if (Object.keys(e.expected_outcome).length) rows.push(['Expected outcome', <span key="eo" className="break-all font-mono text-xs">{JSON.stringify(e.expected_outcome)}</span>])
   if (e.refusal_expected != null) rows.push(['Should decline', e.refusal_expected ? 'yes' : 'no'])
   if (c.description) rows.push(['Note', c.description])
-  if (!rows.length) return <Empty title="No expected outcomes">Only black-box checks apply.</Empty>
+  if (!rows.length) return <Empty title="No expected outcomes">Only checks that need no expected answer apply.</Empty>
   return (
     <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2" data-testid="expected">
       {rows.map(([k, v]) => <div key={k} className={clsx(k === 'Reference answer' && 'sm:row-span-2')}><dt className="t-label">{k}</dt><dd className="mt-1 text-sm text-ink-2">{v}</dd></div>)}
@@ -327,7 +327,7 @@ function Checks({ scores, heuristic }: { scores: Score[]; heuristic: boolean }) 
         {passed.length > 0 && (
           <div className="flex flex-wrap gap-1 pt-1">
             {passed.map((s) => (
-              <Badge key={s.evaluator_id} tone={heur(s) ? 'heuristic' : 'pass'} className="font-mono" title={`${s.explanation}${heur(s) ? ' (heuristic judge)' : ''}`}>
+              <Badge key={s.evaluator_id} tone={heur(s) ? 'heuristic' : 'pass'} className="font-mono" title={`${s.explanation}${heur(s) ? ' (heuristic grading)' : ''}`}>
                 <Check className="size-3" />{s.evaluator_id}
               </Badge>
             ))}
@@ -336,11 +336,11 @@ function Checks({ scores, heuristic }: { scores: Score[]; heuristic: boolean }) 
         <div className="flex flex-wrap items-center gap-4 pt-1 text-xs text-ink-2">
           {passed.length > 0 && (
             <TextLink size="sm" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
-              <ChevronRight className={clsx('size-3.5 transition-transform duration-(--dur-fast)', open && 'rotate-90')} />details of the passed checks
+              <ChevronRight className={clsx('size-3.5 transition-transform duration-(--dur-fast)', open && 'rotate-90')} />Details of the passed checks
             </TextLink>
           )}
           {na.length > 0 && (
-            <Checkbox checked={showNA} onChange={setShowNA} className="text-xs" label={<>show <span className="font-mono">{na.length}</span> not applicable</>} />
+            <Checkbox checked={showNA} onChange={setShowNA} className="text-xs" label={<>Show <span className="font-mono">{na.length}</span> not applicable</>} />
           )}
         </div>
         <AnimatePresence initial={false}>
@@ -368,14 +368,14 @@ function ScoreRow({ s, heuristic }: { s: Score; heuristic: boolean }) {
         {s.score != null && <span className="font-mono text-xs text-ink-3">{s.score.toFixed(2)}{s.threshold != null && ` / needs ${s.threshold}`}</span>}
         {!bad && s.status !== 'pass' && <StatusBadge status={s.status} />}
         {!s.gating && <span className="text-xs text-ink-3"><Term k="gating">diagnostic</Term></span>}
-        {judge && (heuristic ? <Badge tone="heuristic">heuristic judge</Badge> : <span className="text-xs text-ink-3">grading model</span>)}
+        {judge && (heuristic ? <Badge tone="heuristic">Heuristic grading</Badge> : <span className="text-xs text-ink-3">grading model</span>)}
         {s.failure_type && bad && <Badge tone="bad" className="ml-auto">{FAILURE_LABELS[s.failure_type] ?? s.failure_type}</Badge>}
       </div>
       <p className="mt-0.5 text-sm text-ink-2">{s.explanation}</p>
       {s.evidence.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{s.evidence.slice(0, 8).map((e, i) => <code key={i} className="rounded bg-surface px-1 font-mono text-xs">{e}</code>)}</div>}
       {judge && s.metadata?.model != null && (
         <div className="mt-1 font-mono text-xs text-ink-3">
-          {String(s.metadata.provider)}/{String(s.metadata.model)} · rubric v{String(s.metadata.rubric_version)} · prompt {String(s.metadata.prompt_hash)}{s.judge_cost_usd != null && ` · ${usd(s.judge_cost_usd)}`}
+          {String(s.metadata.provider)}/{String(s.metadata.model)} · rubric v{String(s.metadata.rubric_version)} · prompt version {String(s.metadata.prompt_hash)}{s.judge_cost_usd != null && ` · ${usd(s.judge_cost_usd)}`}
         </div>
       )}
     </div>
@@ -387,13 +387,13 @@ function Telemetry({ tr }: { tr: TrialDetail }) {
   return (
     <Card title="Telemetry" help={<p>What this one answer took. Costs are estimates from the token counts and the price list; the grading cost is what the grading model charged to check it.</p>}>
       <Figs>
-        <Stat label="Latency" value={ms(tr.latency_ms)} />
+        <Stat label="Speed" value={ms(tr.latency_ms)} />
         <Stat label="Tokens" value={num(tr.total_tokens)} />
         <Stat label="Attempts" value={tr.attempts} />
       </Figs>
       <Figs className="border-t-0">
-        <Stat label="Bot cost (est.)" value={usd(tr.target_cost_usd)} />
-        <Stat label="Grading cost (est.)" value={graded || tr.judge_cost_usd != null ? usd(tr.judge_cost_usd) : '$0'} title={graded ? undefined : 'No grading model was asked about this answer'} />
+        <Stat label="Bot cost (estimated)" value={usd(tr.target_cost_usd)} />
+        <Stat label="Grading cost (estimated)" value={graded || tr.judge_cost_usd != null ? usd(tr.judge_cost_usd) : '$0'} title={graded ? undefined : 'No grading model was asked about this answer'} />
       </Figs>
     </Card>
   )
@@ -421,7 +421,7 @@ function ToolCalls({ r }: { r: TrialDetail['result'] }) {
 function RawResponse({ tr }: { tr: TrialDetail }) {
   const [rawTab, setRawTab] = useState<'normalized' | 'raw'>('normalized')
   return (
-    <Card title="Response" help={<p>"As Assay read it" is the bot's response after the connector mapped it to answer, citations, passages and tools; "Raw" is exactly what the bot sent.</p>}
+    <Card title="Response" help={<p>“As Assay read it” is the bot’s response after the connection mapped it to answer, citations, passages and tools; “Raw” is exactly what the bot sent.</p>}
       actions={<Segmented size="sm" value={rawTab} onChange={setRawTab} options={[{ id: 'normalized', label: 'As Assay read it' }, { id: 'raw', label: 'Raw' }]} />}>
       <Json value={rawTab === 'raw' ? tr.raw : tr.result} maxHeight={320} />
     </Card>
@@ -429,7 +429,7 @@ function RawResponse({ tr }: { tr: TrialDetail }) {
 }
 
 const GROUPS: { label: string; types: string[] }[] = [
-  { label: 'Retrieval', types: ['retrieval_miss'] },
+  { label: 'Search', types: ['retrieval_miss'] },
   { label: 'Tools', types: ['incorrect_tool', 'incorrect_tool_arguments', 'unnecessary_tool', 'tool_result_misused'] },
   { label: 'Answer', types: ['wrong_answer', 'incomplete_response', 'should_have_refused', 'malformed_output'] },
   { label: 'Grounding', types: ['unsupported_claim', 'citation_error'] },
@@ -448,7 +448,7 @@ function FailureAnnotation({ t }: { t: TrialDetail }) {
   return (
     <Card title="Kind of failure"
       help={<p>Classified automatically from the failing checks. Change it when you know better: run summaries count your classification. Your note is kept with it.</p>}
-      actions={<>{t.failure_override ? <Badge tone="info">set by you</Badge> : <Badge>automatic</Badge>}{!editing && <Button size="sm" variant="ghost" onClick={() => setEditing(true)}><Pencil className="size-3.5" />Change</Button>}</>}>
+      actions={<>{t.failure_override ? <Badge tone="info">Set by you</Badge> : <Badge>Automatic</Badge>}{!editing && <Button size="sm" variant="ghost" onClick={() => setEditing(true)}><Pencil className="size-3.5" />Change</Button>}</>}>
       {!editing ? (
         <div className="space-y-1.5">
           {t.failure_types.length ? <div className="flex flex-wrap gap-1">{t.failure_types.map((f) => <Badge key={f} tone="bad">{FAILURE_LABELS[f] ?? f}</Badge>)}</div> : <Empty title="None" />}

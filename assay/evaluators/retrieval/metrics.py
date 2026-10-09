@@ -11,6 +11,7 @@ import math
 
 from assay.evaluators.base import EvalContext, Evaluator, register
 from assay.schemas import EvaluationResult, NormalizedTargetResult, TestCase, Trace
+from assay.textutil import plural
 
 
 def _dedupe(ids: list[str]) -> list[str]:
@@ -91,7 +92,7 @@ class _RetrievalEvaluator(Evaluator):
                        ctx: EvalContext) -> EvaluationResult:
         relevant = set(case.expected.relevant_documents)
         if not relevant:
-            return self.na("No relevant documents labelled for this case.")
+            return self.na("No relevant documents labelled for this question.")
         if result.retrieved_documents is None:
             return self.missing("retrieved documents")
         k = int(self.config(case).get("k", ctx.k))
@@ -176,6 +177,6 @@ class SearchFoundIt(Evaluator):
         missing = [p for p in phrases if not any(a.strip().lower() in text for a in p.split("|") if a.strip())]
         n = len(result.retrieved_documents)
         return self.passed(not missing, score=1 - len(missing) / len(phrases),
-                           explanation=(f"All {len(phrases)} phrase(s) are in the {n} passages read." if not missing
-                                        else f"Not in the {n} passages read: {', '.join(missing)}."),
+                           explanation=(f"All {plural(len(phrases), 'phrase')} are in the {plural(n, 'passage')} read." if not missing
+                                        else f"Not in the {plural(n, 'passage')} read: {', '.join(missing)}."),
                            evidence=missing)

@@ -17,10 +17,10 @@ import type { EvaluatorInfo, Gate, ProjectHome, RunDetail, RunHeader } from '../
 const BUILTIN = [
   { id: 'overall_pass_rate', label: 'Overall pass rate', unit: 'rate' },
   { id: 'tool_accuracy', label: 'Tool accuracy', unit: 'rate' },
-  { id: 'p95_latency_ms', label: 'p95 latency (ms)', unit: 'ms' },
-  { id: 'p50_latency_ms', label: 'p50 latency (ms)', unit: 'ms' },
-  { id: 'average_cost_usd', label: 'Cost per question (USD)', unit: 'usd' },
-  { id: 'average_total_tokens', label: 'Tokens per question', unit: 'n' },
+  { id: 'p95_latency_ms', label: 'Speed (p95, ms)', unit: 'ms' },
+  { id: 'p50_latency_ms', label: 'Speed (median, ms)', unit: 'ms' },
+  { id: 'average_cost_usd', label: 'Cost per answer (USD)', unit: 'usd' },
+  { id: 'average_total_tokens', label: 'Tokens per answer', unit: 'n' },
 ]
 
 export function gateToRules(config: Record<string, unknown>): Rule[] {
@@ -47,8 +47,8 @@ export function rulesToGate(rules: Rule[]): Record<string, unknown> {
 
 const PAGE_HELP = (
   <>
-    <p>Rules a run must meet before you ship: minimum scores, maximum latency or cost, and how far a metric may drop against a baseline. Each rule is PASS, FAIL or not evaluated - there is no blended score.</p>
-    <p>A gate turns "is it good enough to ship?" into explicit rules. Runs started with a gate show a PASS or FAIL stamp.</p>
+    <p>Rules a run must meet before you ship: minimum scores, a speed limit or cost limit, and how far a metric may drop against a baseline. Each rule passes, fails or is not evaluated: there is no blended score.</p>
+    <p>A gate turns “is it good enough to ship?” into explicit rules. Runs started with a gate show a pass or fail stamp.</p>
   </>
 )
 
@@ -121,9 +121,9 @@ export function GatesPage() {
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
             <Card boxed title={editing === 'new' ? 'New gate' : `Edit ${editing.name}`}
               help={<>
-                <p>Each rule names a metric, how it is judged and a limit. Absolute rules hold for any run; "may drop at most" compares the run with the baseline it is checked against.</p>
-                <p>Rates are fractions: 0.85 means 85%. "May drop at most 0.03" means at most 3 percentage points below the baseline run.</p>
-                <p>JSON shows the same rules as the gate's raw configuration, for copying between gates.</p>
+                <p>Each rule names a metric, how it is judged and a limit. Absolute rules hold for any run; “may drop at most” compares the run with the baseline it is checked against.</p>
+                <p>Rates are fractions: 0.85 means 85%. “May drop at most 0.03” means at most 3 percentage points below the baseline run.</p>
+                <p>JSON shows the same rules as the gate’s raw configuration, for copying between gates.</p>
               </>}
               actions={<Segmented size="sm" value={mode} onChange={(md) => { if (md === 'json') setText(JSON.stringify(rulesToGate(rules), null, 2)); else { try { setRules(gateToRules(JSON.parse(text))) } catch { /* keep */ } } setMode(md) }} options={[{ id: 'form', label: 'Rules' }, { id: 'json', label: 'JSON' }]} />}>
               <div className="grid gap-4 md:grid-cols-2">
@@ -143,7 +143,7 @@ export function GatesPage() {
                         <option value="min">must be at least</option><option value="max">must be at most</option><option value="drop">may drop at most</option>
                       </Select>
                       <Input value={r.value} onChange={(e) => setRule(i, { value: e.target.value })} aria-label="Limit" className="font-mono" />
-                      <Button variant="ghost" size="sm" onClick={() => setRules((rs) => rs.filter((_, k) => k !== i))} aria-label="Remove rule"><Trash2 className="size-3.5" /></Button>
+                      <Button variant="ghost" size="sm" onClick={() => setRules((rs) => rs.filter((_, k) => k !== i))} aria-label="Delete rule"><Trash2 className="size-3.5" /></Button>
                     </motion.div>
                   ))}
                   <div className="pt-1">
@@ -160,7 +160,7 @@ export function GatesPage() {
       </AnimatePresence>
 
       {gates.isLoading ? <Loading /> : gates.isError ? <ErrorState error={gates.error} /> : list.length === 0 ? (
-        <Empty title="No gates yet" icon={<ShieldCheck className="size-6" />} action={<Button variant="primary" onClick={() => start('new')}>Create a gate</Button>}>A gate turns "is it good enough to ship?" into explicit rules. Runs started with a gate show a PASS or FAIL stamp.</Empty>
+        <Empty title="No gates yet" icon={<ShieldCheck className="size-6" />} action={<Button variant="primary" onClick={() => start('new')}>New gate</Button>}>A gate turns “is it good enough to ship?” into explicit rules, and runs started with a gate show a pass or fail stamp.</Empty>
       ) : (
         <>
           {gate && (
@@ -195,7 +195,7 @@ export function GatesPage() {
   )
 }
 
-/** The chosen gate's chatbot: every comparable past run, re-judged against a limit you drag. */
+/** The chosen gate's chatbot: every comparable past run, re-checked against a limit you drag. */
 function WhatIf({ gate }: { gate: Gate }) {
   const home = useQuery({ queryKey: ['project-home', gate.project_id], queryFn: () => api.get<ProjectHome>(`/api/projects/${gate.project_id}/home`) })
   const cfg = gate.config as Record<string, { min?: number; max?: number }>
@@ -210,12 +210,12 @@ function WhatIf({ gate }: { gate: Gate }) {
     .sort((a, b) => a.run_id - b.run_id)
   return (
     <Card title="What if the gate were stricter?" meta={runs.length ? plural(runs.length, 'run') : undefined} help={<>
-      <p>Every comparable past run of this chatbot (same questions, same checks), re-judged against a gate you set. Each bar is a run's pass rate.</p>
-      <p>Drag the dashed line (or focus it and use the arrow keys) to move the pass-rate limit; the slider under the chart sets the p95 limit. The stamps flip as runs cross the line, and the count says how many would have shipped.</p>
-      <p>Only the pass-rate and p95 rules are re-judged here; the gate's other rules are not. Nothing is saved: edit the gate to change it.</p>
+      <p>Every comparable past run of this chatbot (same questions, same checks), re-checked against a gate you set. Each bar is a run’s pass rate.</p>
+      <p>Drag the dashed line (or focus it and use the arrow keys) to move the pass-rate limit; the slider under the chart sets the speed (p95) limit. The stamps flip as runs cross the line, and the count says how many would have shipped.</p>
+      <p>Only the pass-rate and speed (p95) rules are re-checked here; the gate’s other rules are not. Nothing is saved: edit the gate to change it.</p>
     </>}>
       {home.isLoading ? <Loading rows={6} /> : home.isError ? <ErrorState error={home.error} /> : runs.length === 0 ? (
-        <Empty title="No past runs to re-judge">Run this chatbot a few times with the same questions; each run appears here as a bar.</Empty>
+        <Empty title="No past runs to re-check">Run this chatbot a few times with the same questions; each run appears here as a bar.</Empty>
       ) : <GateWhatIf runs={runs} passMin={passMin} p95Max={p95Max} />}
     </Card>
   )
@@ -229,12 +229,12 @@ function LatestReceipt({ gate }: { gate: Gate }) {
   const checked = !!run.data?.gate_results?.some((g) => g.gate_id === gate.id || g.gate_id === null)
   return (
     <Card title="The receipt" help={<>
-      <p>What a gate hands you when it checks a run: the rules, the figures, the run's fingerprint (one dot per question) and the stamp. This is the latest run checked against this gate{latest && checked ? <>, run #{latest.id}</> : null}.</p>
-      <p>Each line is one rule: the run's figure, then ✓ when it met the rule or ✕ when it did not. Lines marked "vs baseline" compare the run with the baseline run named at the top.</p>
+      <p>What a gate hands you when it checks a run: the rules, the figures, the run’s fingerprint (one dot per question) and the stamp. This is the latest run checked against this gate{latest && checked ? <>, run #{latest.id}</> : null}.</p>
+      <p>Each line is one rule: the run’s figure, then ✓ when it met the rule or ✕ when it did not. Lines marked “vs baseline” compare the run with the baseline run named at the top.</p>
       <p>Copy the link or print it for whoever signs off.</p>
     </>}>
       {runs.isLoading || (latest && run.isLoading) ? <Loading rows={6} /> : !latest || !run.data || !checked ? (
-        <Empty title="No run has met this gate yet">Start a run with this gate (New run › Release gate) and its receipt appears here.</Empty>
+        <Empty title="No run has met this gate yet">Start a run with this gate (New run &gt; Release gate) and its receipt appears here.</Empty>
       ) : <ReleaseReceipt run={run.data} className="w-full" />}
     </Card>
   )

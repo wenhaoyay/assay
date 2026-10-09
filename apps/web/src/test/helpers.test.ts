@@ -44,7 +44,7 @@ describe('prompt kit', () => {
     expect(p).toContain('- Blueprint v28.pdf')
     expect(p).toContain('8 x lookup')
     expect(p).toContain('Question,Must mention (comma-separated),Must never say,Should refuse? (yes/no)')
-    expect(p).toMatch(/Use ONLY the attached documents/)
+    expect(p).toMatch(/Use only the attached documents/)
   })
 })
 

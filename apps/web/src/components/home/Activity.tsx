@@ -86,7 +86,7 @@ export function regressionItem(r: CaseChange, baselineId: number, trialFor: (cas
     key: `reg-${r.case_id}`, dot: 'bg-bad', caseId: r.case_id,
     title: <>{r.title} <span className="font-mono text-sm font-normal text-ink-3">{r.case_id}</span></>,
     body: <>{before}, {now}{why ? `: ${why}` : ''}</>,
-    chip: <Badge tone="fail">regressed</Badge>,
+    chip: <Badge tone="fail">Regressed</Badge>,
     to: t ? `/trials/${t}` : `/runs/${latestId}`,
   }
 }

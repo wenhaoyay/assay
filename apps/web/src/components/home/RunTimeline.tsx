@@ -3,7 +3,7 @@
 import * as d3 from 'd3'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { ms, pct, pp } from '../../lib/format'
+import { ms, pct, pp, plural } from '../../lib/format'
 import { useHotkey } from '../../lib/hotkeys'
 import { useMotionOn } from '../../lib/prefs'
 import type { CaseMatrix, Lineage } from '../../lib/types'
@@ -67,7 +67,7 @@ export function RunTimeline({ lineage, offTopic, gate, matrix, defaultRun, metri
     const [lo, hi] = p95s.length ? (d3.extent(p95s) as [number, number]) : [0, 1000]
     const y = isP ? d3.scaleLinear().domain([0, 1]).range([HEIGHT - M.b, M.t])
       : d3.scaleLinear().domain([Math.max(0, lo - (hi - lo || lo * 0.2) * 0.6), hi + (hi - lo || hi * 0.2) * 0.6]).nice().range([HEIGHT - M.b, M.t])
-    const fmtY = isP ? d3.format('.0%') : (v: d3.NumberValue) => `${(+v / 1000).toFixed(1)}s`
+    const fmtY = isP ? d3.format('.0%') : (v: d3.NumberValue) => `${(+v / 1000).toFixed(1)} s`
 
     svg.append('g').attr('class', 'gridline').attr('transform', `translate(${M.l},0)`)
       .call(d3.axisLeft(y).ticks(5).tickSize(-(W - M.l - M.r)).tickFormat(() => ''))
@@ -212,8 +212,8 @@ export function RunTimeline({ lineage, offTopic, gate, matrix, defaultRun, metri
       <span className="text-ink-2" data-testid="timeline-readout">
         Runs <span className="font-mono font-semibold text-ink">#{f.run_id} → #{l.run_id}</span>: pass rate{' '}
         <Delta value={f.pass_rate != null && l.pass_rate != null ? l.pass_rate - f.pass_rate : null} format={(_, v) => pp(v, 0)} />
-        {changed !== null && <> · <span className="font-mono">{changed}</span> question{changed === 1 ? '' : 's'} changed status</>}
-        {dp95 !== null && <> · p95 <Delta value={dp95} higherIsBetter={false} noise={40} format={(a) => ms(a)} /></>}
+        {changed !== null && <> · {plural(changed, 'question')} changed status</>}
+        {dp95 !== null && <> · speed (p95) <Delta value={dp95} higherIsBetter={false} noise={40} format={(a) => ms(a)} /></>}
       </span>
     )
   }
@@ -235,7 +235,7 @@ export function RunTimeline({ lineage, offTopic, gate, matrix, defaultRun, metri
           )}
           <div className="mb-3 flex gap-6">
             <div><div className="t-label">Pass rate</div><div className="t-fig mt-1">{pct(selPoint.pass_rate)}</div></div>
-            <div><div className="t-label">p95</div><div className="t-fig mt-1">{selPoint.p95_latency_ms != null ? ms(selPoint.p95_latency_ms) : <span className="text-sm font-normal text-ink-3">not reported</span>}</div></div>
+            <div><div className="t-label">Speed (p95)</div><div className="t-fig mt-1">{selPoint.p95_latency_ms != null ? ms(selPoint.p95_latency_ms) : <span className="text-sm font-normal text-ink-3">Not reported</span>}</div></div>
           </div>
           {cells.length > 0 && <><Fingerprint cells={cells} size="md" vt={`fp-run-${selPoint.run_id}`} /><FingerprintLegend className="mt-2" /></>}
           <div className="mt-3 flex items-center gap-2 text-sm">
@@ -250,5 +250,5 @@ export function RunTimeline({ lineage, offTopic, gate, matrix, defaultRun, metri
 
 /** The metric switch for the timeline's heading. */
 export function MetricSwitch({ value, onChange }: { value: Metric; onChange: (m: Metric) => void }) {
-  return <Segmented size="sm" value={value} onChange={onChange} label="Timeline metric" options={[{ id: 'pass', label: 'Pass rate' }, { id: 'p95', label: 'p95 speed' }]} />
+  return <Segmented size="sm" value={value} onChange={onChange} label="Timeline metric" options={[{ id: 'pass', label: 'Pass rate' }, { id: 'p95', label: 'Speed (p95)' }]} />
 }

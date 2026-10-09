@@ -20,6 +20,7 @@ from assay.report import markdown_summary
 from assay.store import causes as cz
 from assay.store import models as m
 from assay.store import service as svc
+from assay.textutil import noun
 
 from .. import serializers as ser
 from ..deps import get_session
@@ -88,11 +89,11 @@ def create_experiment(body: ExperimentIn, s: Session = Depends(get_session)) -> 
         except KeyError:
             unknown.append(eid)
     if unknown:
-        raise HTTPException(422, f"Unknown evaluator(s): {', '.join(unknown)}")
+        raise HTTPException(422, f"Unknown {noun(len(unknown), 'check')}: {', '.join(unknown)}.")
     judges = [e for e in body.evaluators if get_evaluator(e).kind == "llm_judge"]
     if judges and not body.judge:
-        raise HTTPException(422, f"Judge evaluators selected ({', '.join(judges)}) but no judge configured. "
-                                 "Pick a judge provider, or remove the judge evaluators.")
+        raise HTTPException(422, f"These checks need a grading model: {', '.join(judges)}. "
+                                 "Choose one, or untick them.")
     tv = svc.get(s, m.TargetVersion, body.target_version_id)
     from assay.store.workspace import judge_allowed
 
@@ -260,15 +261,15 @@ async def reevaluate(run_id: int, body: ReevaluateIn, response: Response,
                      s: Session = Depends(get_session)) -> dict[str, Any]:
     run = svc.get(s, m.Run, run_id)
     if run.status in ("queued", "running", "cancelling"):
-        raise HTTPException(409, "Wait for the run to finish before re-evaluating it.")
+        raise HTTPException(409, "Wait for the run to finish before re-grading it.")
     evaluators = body.evaluators if body.evaluators is not None else svc.get(s, m.Experiment, run.experiment_id).config["evaluators"]
     unknown = [e for e in evaluators if e not in REGISTRY]
     if unknown:
-        raise HTTPException(422, f"Unknown evaluator(s): {', '.join(unknown)}")
+        raise HTTPException(422, f"Unknown {noun(len(unknown), 'check')}: {', '.join(unknown)}.")
     judge = body.judge if body.judge is not None else svc.get(s, m.Experiment, run.experiment_id).config.get("judge")
     judges = [e for e in evaluators if REGISTRY[e].kind == "llm_judge"]
     if judges and not judge:
-        raise HTTPException(422, f"Judge evaluators selected ({', '.join(judges)}) but no judge configured.")
+        raise HTTPException(422, f"These checks need a grading model: {', '.join(judges)}. Choose one, or untick them.")
     from assay.store.workspace import judge_allowed
 
     if reason := judge_allowed(s, run.snapshot.get("target", {}).get("id"), judge):
@@ -367,7 +368,7 @@ def override_failure(trial_id: int, body: FailureOverride, s: Session = Depends(
     if body.failure_types is not None:
         bad = [f for f in body.failure_types if f not in FAILURE_TYPES]
         if bad:
-            raise HTTPException(422, f"Unknown failure type(s): {', '.join(bad)}")
+            raise HTTPException(422, f"Unknown {noun(len(bad), 'failure type')}: {', '.join(bad)}.")
     t.failure_types_override = body.failure_types
     t.failure_note = body.note
     svc.refresh_summary(s, svc.get(s, m.Run, t.run_id))
@@ -395,7 +396,7 @@ def set_cause(trial_id: int, body: CauseIn, s: Session = Depends(get_session)) -
 
     t = svc.get(s, m.Trial, trial_id)
     if body.cause is not None and body.cause not in CAUSES:
-        raise HTTPException(422, f"Unknown cause: {body.cause}")
+        raise HTTPException(422, f"Unknown cause: {body.cause}.")
     t.cause_override = body.cause
     s.flush()
     return {"cause": cz.trial_cause(s, t)}
@@ -441,7 +442,7 @@ async def reread(run_id: int, s: Session = Depends(get_session)) -> dict[str, An
 def get_trace(trial_id: int, s: Session = Depends(get_session)) -> dict[str, Any]:
     trace = svc.trace_for(s, trial_id)
     if trace is None:
-        raise HTTPException(404, "No trace stored for this trial")
+        raise HTTPException(404, "No trace stored for this try.")
     return trace.model_dump(mode="json")
 
 
@@ -467,7 +468,7 @@ def _check_gate(config: dict[str, Any]) -> None:
     try:
         evaluate_gates(config, {}, {})
     except (ValueError, KeyError, TypeError, AttributeError) as exc:
-        raise HTTPException(422, f"Invalid gate config: {exc}") from exc
+        raise HTTPException(422, "This gate has a rule the server cannot read. Check each metric name and limit.") from exc
 
 
 def _gate(g: m.RegressionGate) -> dict[str, Any]:
@@ -512,7 +513,7 @@ class ApplyGate(BaseModel):
 @router.post("/runs/{run_id}/gate")
 def apply_gate(run_id: int, body: ApplyGate, s: Session = Depends(get_session)) -> dict[str, Any]:
     if body.gate_id is None and body.config is None:
-        raise HTTPException(422, "Give gate_id or config")
+        raise HTTPException(422, "Pick a gate, or give its rules.")
     config = body.config if body.config is not None else svc.get(s, m.RegressionGate, body.gate_id).config
     _check_gate(config)
     gr = svc.apply_gate(s, run_id, config, body.baseline_run_id, body.gate_id)

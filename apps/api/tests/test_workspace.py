@@ -72,7 +72,7 @@ def test_home_matrix_comparability_and_search(client):
     other = launch(c, s["candidate_target_version_id"], s["dataset_version_id"], "no-judge",
                    evaluators=["must_mention"], trials=1, judge=None)
     comp = c.get(f"/api/runs/{other['id']}/comparability?other={base['id']}").json()
-    assert any("different judges" in i for i in comp["issues"])
+    assert any("different grading models" in i for i in comp["issues"])
     assert any("Different checks" in i for i in comp["issues"])
     assert other["comparability_key"] != base["comparability_key"]
     assert base["comparability_key"] == cand["comparability_key"]
@@ -132,7 +132,7 @@ def test_local_judges_only_blocks_cloud_judges(client):
     body = {"project_id": s["project_id"], "name": "x", "target_version_id": s["candidate_target_version_id"],
             "dataset_version_id": s["dataset_version_id"], "evaluators": ["correctness"]}
     r = c.post("/api/experiments", json={**body, "judge": {"provider_config_id": cloud["id"]}})
-    assert r.status_code == 422 and "local judges only" in r.json()["detail"]
+    assert r.status_code == 422 and "local grading models only" in r.json()["detail"]
     assert c.post("/api/experiments", json={**body, "judge": {"provider_config_id": local["id"]}}).status_code == 201
     est = c.post("/api/estimate", json={"target_version_id": s["candidate_target_version_id"],
                                         "dataset_version_id": s["dataset_version_id"], "evaluators": ["correctness"],

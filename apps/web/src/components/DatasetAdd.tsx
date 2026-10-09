@@ -1,9 +1,10 @@
-// Add a set of test questions to a chatbot: import a file, type a few, or start empty.
+// Add a dataset of questions to a chatbot: import a file, type a few, or start empty.
 // The chatbot is always chosen explicitly (it decides where New run lists the set).
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Download, FileUp, ListPlus, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { api } from '../lib/api'
+import { plural } from '../lib/format'
 import { projectOption, useProjects } from '../lib/projects'
 import type { Dataset } from '../lib/types'
 import { Button, ErrorState, Field, Input, Segmented, Select, Textarea } from './ui'
@@ -12,7 +13,7 @@ import { LabelHelp } from './LabelHelp'
 
 type Mode = 'file' | 'type' | 'empty'
 
-/** One question per line -> cases with only a question (expectations added later). */
+/** One question per line becomes a question with no expectations yet. */
 export function questionsToCases(text: string) {
   return text.split('\n').map((l) => l.trim()).filter(Boolean).map((q, i) => ({
     id: `q_${String(i + 1).padStart(2, '0')}_${q.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 40) || 'question'}`,
@@ -58,14 +59,14 @@ export function DatasetAdd({ projectId: fixedProject, defaultProjectId = '', onD
   })
   const lines = typed.split('\n').filter((l) => l.trim()).length
   const ready = !!projectId && (mode === 'file' ? !!file : mode === 'type' ? lines > 0 && !!name.trim() : !!name.trim())
-  const why = !projectId ? 'Choose the chatbot these questions are for.' : mode === 'file' && !file ? 'Choose a file.' : mode === 'type' && !lines ? 'Type at least one question.' : !ready ? 'Give the set a name.' : null
+  const why = !projectId ? 'Choose the chatbot these questions are for.' : mode === 'file' && !file ? 'Choose a file.' : mode === 'type' && !lines ? 'Type at least one question.' : !ready ? 'Give the dataset a name.' : null
 
   return (
     <div className="space-y-3">
       {!fixedProject && (
-        <Field label={<LabelHelp label="For which chatbot?"><p>New run lists a chatbot's own question sets first.</p></LabelHelp>}>
+        <Field label={<LabelHelp label="For which chatbot?"><p>New run lists a chatbot’s own datasets first.</p></LabelHelp>}>
           <Select value={projectId} onChange={(e) => setPicked(e.target.value ? Number(e.target.value) : '')} aria-label="Chatbot for the dataset">
-            <option value="">Choose a chatbot...</option>
+            <option value="">Choose a chatbot…</option>
             {projects.visible.map((p) => <option key={p.id} value={p.id}>{projectOption(p)}</option>)}
           </Select>
         </Field>
@@ -77,23 +78,23 @@ export function DatasetAdd({ projectId: fixedProject, defaultProjectId = '', onD
           <Field label={<LabelHelp label="JSON, YAML or CSV" title="File columns"><p>CSV columns can be plain words: <i>Question</i>, <i>Must mention</i>, <i>Must never say</i>, <i>Should refuse?</i>, <i>Correct answer</i>, <i>Topic</i>.</p></LabelHelp>}>
             <FileInput key={fileKey} accept=".json,.yaml,.yml,.csv" aria-label="Dataset file" onFiles={(f) => setFile(f[0] ?? null)} />
           </Field>
-          <Input placeholder="Name (optional: the file's own name otherwise)" value={name} onChange={(e) => setName(e.target.value)} aria-label="Dataset name" />
+          <Input placeholder="Name (optional: the file’s own name otherwise)" value={name} onChange={(e) => setName(e.target.value)} aria-label="Dataset name" />
           {!compact && <TextLink href="/api/datasets/template.csv" size="sm"><Download className="size-3" />Spreadsheet template for colleagues (opens in Excel)</TextLink>}
         </>
       )}
       {mode === 'type' && (
         <>
           <Input placeholder="Name, e.g. First questions" value={name} onChange={(e) => setName(e.target.value)} aria-label="Dataset name" />
-          <div className="text-xs font-medium text-ink-2"><LabelHelp label="Questions, one per line" title="Questions without expectations"><p>Each line becomes a question with no expectations yet: rule checks show "not applicable" until you add what a correct answer must say (open the set afterwards).</p></LabelHelp></div>
+          <div className="text-xs font-medium text-ink-2"><LabelHelp label="Questions, one per line" title="Questions without expectations"><p>Each line becomes a question with no expectations yet: rule checks show “not applicable” until you add what a correct answer must say (open the dataset afterwards).</p></LabelHelp></div>
           <Textarea rows={5} value={typed} onChange={(e) => setTyped(e.target.value)} aria-label="Questions, one per line"
             placeholder={'One question per line, the way users ask:\nWhich REM profile does SCRS use?\nWhat does material status Z3 block?'} />
         </>
       )}
-      {mode === 'empty' && <Input placeholder="Name of the new, empty set" value={name} onChange={(e) => setName(e.target.value)} aria-label="Dataset name" />}
+      {mode === 'empty' && <Input placeholder="Name of the new, empty dataset" value={name} onChange={(e) => setName(e.target.value)} aria-label="Dataset name" />}
       <div className="flex items-center gap-2">
         <Button variant="primary" disabled={!ready} loading={add.isPending} onClick={() => add.mutate()}>
           {mode === 'file' ? <FileUp className="size-3.5" /> : mode === 'type' ? <ListPlus className="size-3.5" /> : <Plus className="size-3.5" />}
-          {mode === 'file' ? 'Import' : mode === 'type' ? `Add ${lines || ''} question${lines === 1 ? '' : 's'}` : 'Create'}
+          {mode === 'file' ? 'Import' : mode === 'type' ? (lines ? `Add ${plural(lines, 'question')}` : 'Add questions') : 'Add dataset'}
         </Button>
         {why && <span className="text-xs text-ink-2">{why}</span>}
       </div>

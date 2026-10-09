@@ -25,7 +25,7 @@ export function VersionBadge({ v }: { v: Pick<DatasetVersion, 'version' | 'statu
       <StatusBadge status={v.status} />
       {v.status === 'frozen' && (
         <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs text-ink-2" title="Used by a run. It can no longer change; edits create a new version.">
-          <Lock className="size-3" aria-hidden /> used by <span className="font-mono">{v.run_count}</span> run{v.run_count === 1 ? '' : 's'}
+          <Lock className="size-3" aria-hidden /> used by {plural(v.run_count, 'run')}
         </span>
       )}
     </span>
@@ -47,8 +47,8 @@ export function DatasetsPage() {
   return (
     <>
       <PageHeader title="Datasets" help={<>
-        <p>Versioned golden datasets: test cases with the outcomes a person expects. A version used by a run is frozen for good; editing it makes a new version.</p>
-        <p><span className="font-semibold">Who decides what is correct? You do.</span> Assay cannot infer ground truth: every expected outcome in a dataset was written, imported or approved by a person. AI-generated cases stay in a review queue until someone approves them.</p>
+        <p>Versioned datasets: questions with the answers a person expects. A version used by a run is frozen for good; editing it makes a new version.</p>
+        <p><span className="font-semibold">Who decides what is correct? You do.</span> Assay cannot infer ground truth: every expected outcome in a dataset was written, imported or approved by a person. AI-drafted questions stay in a review queue until someone approves them.</p>
       </>} />
       <div className="space-y-12">
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-10">
@@ -58,12 +58,12 @@ export function DatasetsPage() {
         </Card>
       </div>
       {datasets.isLoading ? <Loading /> : datasets.isError ? <ErrorState error={datasets.error} /> : all.length === 0 ? (
-        <Empty title="No datasets yet. A gauge with nothing to read.">Add questions above, or run <Code>assay seed</Code> for the 58-case Acme golden set.</Empty>
+        <Empty title="No datasets yet">A gauge with nothing to read is just a dial: add questions above, or run <Code>assay seed</Code> for the 58-question Acme dataset.</Empty>
       ) : (
-        <Card padded={false} title="Your datasets" meta={`${shown.length}`} help={<p>Each dataset belongs to one chatbot; change it here. A set that runs have used can only be archived (its questions stay with those runs); an unused one can be deleted.</p>}
+        <Card padded={false} title="Your datasets" meta={`${shown.length}`} help={<p>Each dataset belongs to one chatbot; change it here. A dataset that runs have used can only be archived (its questions stay with those runs); an unused one can be deleted.</p>}
           actions={archivedCount > 0 && <Button size="sm" variant="ghost" onClick={() => setShowArchived((v) => !v)}>{showArchived ? 'Hide' : 'Show'} {archivedCount} archived</Button>}>
           <ScrollTable className="[&_table]:min-w-[760px]">
-            <thead><tr className="whitespace-nowrap"><th className="t-label">Dataset</th><th className="t-label">Chatbot</th><th className="t-label">Latest version</th><th className="t-label text-right">Cases</th><th className="t-label">Review queue</th><th className="w-40" /></tr></thead>
+            <thead><tr className="whitespace-nowrap"><th className="t-label">Dataset</th><th className="t-label">Chatbot</th><th className="t-label">Latest version</th><th className="t-label text-right">Questions</th><th className="t-label">Review queue</th><th className="w-40" /></tr></thead>
             <tbody>
               {shown.map((d) => <DatasetRow key={d.id} d={d} projects={projects.all} />)}
             </tbody>
@@ -75,16 +75,16 @@ export function DatasetsPage() {
   )
 }
 
-/** Where golden questions can come from, each one click away. */
+/** Where a dataset's questions can come from, each one click away. */
 function WaysToBuild() {
   const ways: [string, ReactNode][] = [
-    ['Approve good answers', <>Open a dataset → <i>Build</i>: mark a bot's answers right or wrong; Assay suggests what a correct answer must mention.</>],
+    ['Approve good answers', <>Open a dataset → <i>Build</i>: mark a bot’s answers right or wrong; Assay suggests what a correct answer must mention.</>],
     ['Prompt kit', <>Copy a ready prompt into your own ChatGPT or Claude with your documents; the result lands in the review queue.</>],
     ['Real questions', <>Upload chat history; similar questions are grouped by how often they were asked.</>],
     ['Colleagues', <>Send the <TextLink href="/api/datasets/template.csv" className="underline">spreadsheet template</TextLink> or use expert interview mode.</>],
   ]
   return (
-    <Card title="Ways to build a set" boxed className="flex flex-col" help={<p>The machine does the typing; you vouch for every case. Each way ends in the same place: cases a person has approved.</p>}>
+    <Card title="Ways to build a dataset" boxed className="flex flex-col" help={<p>The machine does the typing; you vouch for every question. Each way ends in the same place: questions a person has approved.</p>}>
       <dl className="divide-y divide-line text-sm">
         {ways.map(([k, v]) => (
           <div key={k} className="grid gap-x-4 gap-y-0.5 py-2.5 first:pt-0 last:pb-0 sm:grid-cols-[9.5rem_minmax(0,1fr)]">
@@ -109,7 +109,7 @@ function DatasetRow({ d, projects }: { d: Dataset; projects: Project[] }) {
       <tr className={clsx('hover:bg-surface-2/60', d.archived && 'opacity-60')}>
         <td>
           <Link to={`/datasets/${d.id}`} className="font-medium hover:underline">{d.name}</Link>
-          {d.archived && <Badge className="ml-2">archived</Badge>}
+          {d.archived && <Badge className="ml-2">Archived</Badge>}
           <div className="max-w-md truncate text-xs text-ink-2">{d.description || d.latest?.change_summary}</div>
         </td>
         <td>
@@ -122,7 +122,7 @@ function DatasetRow({ d, projects }: { d: Dataset; projects: Project[] }) {
         <td>{d.unreviewed_candidates > 0 ? <Badge tone="warn">{d.unreviewed_candidates} unreviewed</Badge> : <span className="text-xs text-ink-3">-</span>}</td>
         <td className="text-right">
           {d.archived ? <Button size="sm" variant="ghost" onClick={() => patch.mutate({ archived: false })}><ArchiveRestore className="size-3.5" />Restore</Button>
-            : used ? <Button size="sm" variant="ghost" title="Runs used this set: archiving hides it and keeps their questions" onClick={() => patch.mutate({ archived: true })}><Archive className="size-3.5" />Archive</Button>
+            : used ? <Button size="sm" variant="ghost" title="Runs used this dataset: archiving hides it and keeps their questions" onClick={() => patch.mutate({ archived: true })}><Archive className="size-3.5" />Archive</Button>
             : <Button size="sm" variant="ghost" onClick={() => setConfirm(true)}><Trash2 className="size-3.5" />Delete</Button>}
         </td>
       </tr>
@@ -162,7 +162,7 @@ export function DatasetPage() {
   const projects = useQuery({ queryKey: ['projects'], queryFn: () => api.get<Project[]>('/api/projects') })
   const matrix = useQuery({ queryKey: ['matrix', id], queryFn: () => api.get<CaseMatrix>(`/api/datasets/${id}/matrix?limit=12`) })
   const project = projects.data?.find((p) => p.id === ds.data?.project_id)
-  useCrumbs([...(project ? [{ label: project.name, to: `/p/${project.id}` }] : [{ label: 'Datasets', to: '/datasets' }]), { label: ds.data?.name ?? '...' }], `dataset-${id}-${ds.data?.name}-${project?.name}`)
+  useCrumbs([...(project ? [{ label: project.name, to: `/p/${project.id}` }] : [{ label: 'Datasets', to: '/datasets' }]), { label: ds.data?.name ?? '…' }], `dataset-${id}-${ds.data?.name}-${project?.name}`)
   if (ds.isLoading) return <Loading />
   if (ds.isError) return <ErrorState error={ds.error} />
   const d = ds.data!
@@ -174,13 +174,13 @@ export function DatasetPage() {
         title={d.name}
         help={<>
           {d.description && <p>{d.description}</p>}
-          <p>Cases lists the questions of the chosen version and what a right answer needs. Build turns a bot's answers into golden cases. Results across runs shows every case in every run. Generate drafts candidates from documents for your review.</p>
-          <p>A version a run used is frozen: editing a case saves to a new draft version.</p>
+          <p>Questions lists the questions of the chosen version and what a right answer needs. Build turns a bot’s answers into questions with expected answers. Results across runs shows every question in every run. Generate &amp; review drafts questions from documents for you to approve.</p>
+          <p>A version a run used is frozen: editing a question saves to a new draft version.</p>
         </>}
         actions={
           <>
             <Select aria-label="Version" value={versionId} onChange={(e) => switchTo(Number(e.target.value))} className="w-72">
-              {[...d.versions].reverse().map((v) => <option key={v.id} value={v.id}>v{v.version} · {v.case_count} cases · {v.status === 'frozen' ? `frozen, used by ${v.run_count} run${v.run_count === 1 ? '' : 's'}` : 'draft'}</option>)}
+              {[...d.versions].reverse().map((v) => <option key={v.id} value={v.id}>v{v.version} · {plural(v.case_count, 'question')} · {v.status === 'frozen' ? `frozen, used by ${plural(v.run_count, 'run')}` : 'draft'}</option>)}
             </Select>
             <a className={linkButton()} href={`/api/dataset-versions/${versionId}/export?format=yaml`}><Download className="size-3.5" /> YAML</a>
             <a className={linkButton()} href={`/api/dataset-versions/${versionId}/export?format=json`}><Download className="size-3.5" /> JSON</a>
@@ -190,7 +190,7 @@ export function DatasetPage() {
       {notice && <div className="mb-6"><Notice tone="warn" title="New version created">{notice}</Notice></div>}
       <ScrollTabs
         tabs={[
-          { id: 'cases', label: `Cases${version.data ? ` (${version.data.case_count})` : ''}` },
+          { id: 'cases', label: `Questions${version.data ? ` (${version.data.case_count})` : ''}` },
           { id: 'build', label: <span className="inline-flex items-center gap-1.5"><Hammer className="size-3.5" /> Build</span> },
           { id: 'history', label: 'Results across runs' },
           { id: 'generate', label: <span className="inline-flex items-center gap-1.5"><Sparkles className="size-3.5" /> Generate &amp; review{d.unreviewed_candidates ? <Badge tone="warn">{d.unreviewed_candidates}</Badge> : null}</span> },
@@ -214,9 +214,9 @@ export function DatasetPage() {
         {tab === 'history' && <HistoryPanel matrix={matrix.data} loading={matrix.isLoading} focus={params.get('case')} />}
         {tab === 'generate' && versionId && <GeneratePanel datasetId={d.id} versionId={versionId} onPromoted={(r) => { if (r.branched) setNotice(r.notice ?? null); switchTo(r.id); setTab('cases') }} />}
         {tab === 'versions' && (
-          <Card padded={false} title="Versions" meta={`${d.versions.length}`} help={<p>Every saved version of this dataset, newest first. Click one to open its cases. The hash identifies the exact content a run used.</p>}>
+          <Card padded={false} title="Versions" meta={`${d.versions.length}`} help={<p>Every saved version of this dataset, newest first. Click one to open its questions. The hash identifies the exact content a run used.</p>}>
             <ScrollTable className="[&_table]:min-w-[760px]">
-              <thead><tr className="whitespace-nowrap"><th className="t-label">Version</th><th className="t-label">Status</th><th className="t-label text-right">Cases</th><th className="t-label">Parent</th><th className="t-label">Change summary</th><th className="t-label">Hash</th><th className="t-label">Created</th></tr></thead>
+              <thead><tr className="whitespace-nowrap"><th className="t-label">Version</th><th className="t-label">Status</th><th className="t-label text-right">Questions</th><th className="t-label">Parent</th><th className="t-label">Change summary</th><th className="t-label">Hash</th><th className="t-label">Created</th></tr></thead>
               <tbody>
                 {[...d.versions].reverse().map((v) => (
                   <tr key={v.id} className={clsx('cursor-pointer hover:bg-surface-2/60', v.id === versionId && 'bg-surface-2/60')} onClick={() => { switchTo(v.id); setTab('cases') }}>
@@ -245,7 +245,7 @@ function expectedSummary(c: TestCase): string[] {
   if (e.answer.must_mention.length) out.push(`must mention ${e.answer.must_mention.length}`)
   if (e.answer.must_not_claim.length) out.push(`must not claim ${e.answer.must_not_claim.length}`)
   if (e.answer.regex.length) out.push('pattern')
-  if (e.relevant_documents.length) out.push(`${e.relevant_documents.length} document${e.relevant_documents.length === 1 ? '' : 's'} needed`)
+  if (e.relevant_documents.length) out.push(`${plural(e.relevant_documents.length, 'document')} needed`)
   if (e.required_tools.length || e.tool_calls.length) out.push('tool use')
   if (Object.keys(e.expected_outcome).length) out.push('outcome')
   if (e.refusal_expected === true) out.push('should decline')
@@ -256,7 +256,7 @@ function CaseHistory({ matrix, caseId }: { matrix?: CaseMatrix; caseId: string }
   if (!matrix) return null
   const row = matrix.cells[caseId] ?? {}
   const runs = matrix.runs.filter((r) => row[String(r.id)])
-  if (!runs.length) return <span className="text-xs text-ink-3">not run</span>
+  if (!runs.length) return <span className="text-xs text-ink-3">Not run</span>
   return (
     <span className="inline-flex items-center gap-[3px]" title={runs.map((r) => `#${r.id}: ${row[String(r.id)].passed}/${row[String(r.id)].total}`).join('\n')}>
       {runs.slice(-8).map((r) => {
@@ -264,7 +264,7 @@ function CaseHistory({ matrix, caseId }: { matrix?: CaseMatrix; caseId: string }
         return <Link key={r.id} to={`/runs/${r.id}?tab=cases&case=${encodeURIComponent(caseId)}`} onClick={(e) => e.stopPropagation()} aria-label={`Run ${r.id}: ${v.passed} of ${v.total} passed`}
           className={clsx('size-2.5 rounded-[3px]', v.passed === v.total ? 'bg-good' : v.passed === 0 ? 'bg-bad' : 'bg-flaky', r.judge === 'heuristic' && 'hatched')} />
       })}
-      {matrix.always_fail.includes(caseId) && <Badge tone="bad" className="ml-1">always fails</Badge>}
+      {matrix.always_fail.includes(caseId) && <Badge tone="bad" className="ml-1">Always fails</Badge>}
     </span>
   )
 }
@@ -272,11 +272,11 @@ function CaseHistory({ matrix, caseId }: { matrix?: CaseMatrix; caseId: string }
 function HistoryPanel({ matrix, loading, focus }: { matrix?: CaseMatrix; loading: boolean; focus: string | null }) {
   const [filter, setFilter] = useState<'all' | 'changed' | 'always_fail' | 'flaky'>('all')
   if (loading || !matrix) return <Loading />
-  if (!matrix.runs.length) return <Empty title="No runs on this dataset yet. Nothing has been measured against it.">Each completed run adds a column here.</Empty>
+  if (!matrix.runs.length) return <Empty title="No runs on this dataset yet">Nothing has been measured against it: each completed run adds a column here.</Empty>
   return (
-    <Card padded={false} title="Every case in every run" meta={`${matrix.cases.length} × ${matrix.runs.length}`} help={<>
-      <p>{matrix.cases.length} cases (rows) by {matrix.runs.length} runs (columns, oldest on the left). Each cell is how many tries of that case passed in that run; hatched cells were graded by the heuristic judge.</p>
-      <p>A case that fails in every run, whatever the version, is often a wrong or outdated golden answer rather than a bad bot.</p>
+    <Card padded={false} title="Every question in every run" meta={`${matrix.cases.length} × ${matrix.runs.length}`} help={<>
+      <p>{plural(matrix.cases.length, 'question')} (rows) by {plural(matrix.runs.length, 'run')} (columns, oldest on the left). Each cell is how many tries of that question passed in that run; hatched cells were graded by heuristic grading.</p>
+      <p>A question that fails in every run, whatever the version, is often a wrong or outdated expected answer rather than a bad bot.</p>
     </>}
       actions={<Segmented size="sm" value={filter} onChange={setFilter} options={[{ id: 'all', label: 'All' }, { id: 'changed', label: 'Changed' }, { id: 'flaky', label: 'Flaky' }, { id: 'always_fail', label: `Always failing ${matrix.always_fail.length}` }]} />}>
       <div className="border-b border-line py-2"><MatrixLegend /></div>
@@ -300,23 +300,23 @@ function CasesPanel({ version, onEdited, matrix, focus }: { version: DatasetVers
   return (
     <div className="space-y-6">
       {version.status === 'frozen' && (
-        <Notice tone="info" title="This version is frozen">A run used it, so it stays exactly as it was. Editing a case saves your change to a new draft version.</Notice>
+        <Notice tone="info" title="This version is frozen">A run used it, so it stays exactly as it was. Editing a question saves your change to a new draft version.</Notice>
       )}
       {(lint.data?.issues.length ?? 0) > 0 && (
-        <p className="text-xs text-warn-ink">{plural(lint.data!.issues.length, 'possible problem')} in this set (duplicates, phrases too generic to test anything, cases that always fail). <Link className="underline" to={`?v=${version.id}&tab=build`}>See them on Build</Link>.</p>
+        <p className="text-xs text-warn-ink">{plural(lint.data!.issues.length, 'possible problem')} in this dataset (duplicates, phrases too generic to test anything, questions that always fail). <Link className="underline" to={`?v=${version.id}&tab=build`}>See them on Build</Link>.</p>
       )}
       {editing && <CaseEditor versionId={version.id} initial={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={(r) => { setEditing(null); onEdited(r) }} />}
       <div className="flex flex-wrap items-center gap-2">
-        <Input className="max-w-72" placeholder="Search id, question, tag" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search cases" />
+        <Input className="max-w-72" placeholder="Search id, question, tag" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search questions" />
         <Select className="max-w-52" value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Category">
           <option value="">All categories</option>
           {categories.map((c) => <option key={c}>{c}</option>)}
         </Select>
         <span className="text-xs text-ink-2"><span className="font-mono">{shown.length}</span> of <span className="font-mono">{cases.length}</span></span>
-        <Button className="ml-auto" variant={editing ? 'secondary' : 'primary'} onClick={() => setEditing('new')}><Plus className="size-3.5" /> Add case</Button>
+        <Button className="ml-auto" variant={editing ? 'secondary' : 'primary'} onClick={() => setEditing('new')}><Plus className="size-3.5" /> Add question</Button>
       </div>
       {cases.length === 0 ? (
-        <Empty title="No cases in this version. An empty exam is easy to pass.">Add one manually, import a file, or generate candidates from your documents (they will need your review).</Empty>
+        <Empty title="No questions in this version">An empty exam is easy to pass: add one manually, import a file, or generate candidates from your documents (they will need your review).</Empty>
       ) : (
         <Card padded={false}>
           <ScrollTable className="[&_table]:min-w-[760px]">
@@ -391,7 +391,7 @@ export function CaseEditor({ versionId, initial, onClose, onSaved }: {
   })
 
   return (
-    <Card boxed title={initial ? `Edit ${initial.id}` : 'New case'} actions={<Button size="sm" variant="ghost" onClick={onClose}>Close</Button>}>
+    <Card boxed title={initial ? `Edit ${initial.id}` : 'New question'} actions={<Button size="sm" variant="ghost" onClick={onClose}>Close</Button>}>
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
@@ -403,7 +403,7 @@ export function CaseEditor({ versionId, initial, onClose, onSaved }: {
             </Field>
           </div>
           <Field label="User question"><Textarea rows={3} className="font-sans text-sm" value={question} onChange={(e) => setQuestion(e.target.value)} /></Field>
-          <Field label={<LabelHelp label="Reference answer"><p>What a correct answer says. Used by the correctness and completeness judges.</p></LabelHelp>}><Textarea rows={3} className="font-sans text-sm" value={reference} onChange={(e) => setReference(e.target.value)} /></Field>
+          <Field label={<LabelHelp label="Reference answer"><p>What a correct answer says. Used by the correctness and completeness checks.</p></LabelHelp>}><Textarea rows={3} className="font-sans text-sm" value={reference} onChange={(e) => setReference(e.target.value)} /></Field>
         </div>
         <div className="space-y-3">
           <Field label={<LabelHelp label="Must mention" title="Must mention"><p>One phrase per line; every line must appear in the answer (whole words, capitals do not matter). Write a|b for alternatives.</p><p>Click words from the reference answer below to add them.</p></LabelHelp>}><Textarea rows={3} value={mention} onChange={(e) => setMention(e.target.value)} /></Field>
@@ -412,16 +412,16 @@ export function CaseEditor({ versionId, initial, onClose, onSaved }: {
           <PlainMatchers onAdd={(p) => setPatterns((x) => [...x, p])} />
           {patterns.length > 0 && <div className="flex flex-wrap gap-1">{patterns.map((p) => <Badge key={p} className="font-mono">{p}<button type="button" aria-label="Remove pattern" className="ml-1" onClick={() => setPatterns((x) => x.filter((y) => y !== p))}>×</button></Badge>)}</div>}
           <Field label={<LabelHelp label="Must not claim"><p>One phrase per line; the answer fails if any appears.</p></LabelHelp>}><Textarea rows={2} value={forbid} onChange={(e) => setForbid(e.target.value)} /></Field>
-          <Field label="Should the assistant decline?">
+          <Field label="Should the chatbot decline?">
             <Select value={refusal} onChange={(e) => setRefusal(e.target.value)}>
-              <option value="">Not specified</option><option value="false">No - it should answer</option><option value="true">Yes - it should decline</option>
+              <option value="">Not specified</option><option value="false">No: it should answer</option><option value="true">Yes: it should decline</option>
             </Select>
           </Field>
           <TextLink size="sm" onClick={() => setAdvanced((v) => !v)}>
-            {advanced ? 'Hide advanced' : 'Advanced: relevant documents, tools and arguments, outcome, schema, evaluator config'}
+            {advanced ? 'Hide advanced' : 'Advanced: relevant documents, tools and arguments, outcome, schema, check settings'}
           </TextLink>
           {advanced && (
-            <Field label={<LabelHelp label="Advanced (JSON)" title="Fields of expected"><p>relevant_documents, required_tools, tool_calls [{'{'}name, arguments, symmetric{'}'}], forbidden_tools, tool_policy, expected_outcome, max_extra_tool_calls, required_citations, min_citations, answer.regex, answer.json_schema...</p></LabelHelp>} error={jsonError ?? undefined}>
+            <Field label={<LabelHelp label="Advanced (JSON)" title="Fields of expected"><p>relevant_documents, required_tools, tool_calls [{'{'}name, arguments, symmetric{'}'}], forbidden_tools, tool_policy, expected_outcome, max_extra_tool_calls, required_citations, min_citations, answer.regex, answer.json_schema and so on.</p></LabelHelp>} error={jsonError ?? undefined}>
               <Textarea mono rows={14} value={advancedText} onChange={(e) => { setAdvancedText(e.target.value); setJsonError(null) }} spellCheck={false} />
             </Field>
           )}
@@ -429,7 +429,7 @@ export function CaseEditor({ versionId, initial, onClose, onSaved }: {
       </div>
       {save.isError && !jsonError && <div className="mt-3"><ErrorState error={save.error} /></div>}
       <div className="mt-4 flex gap-2">
-        <Button variant="primary" disabled={!id.trim() || !question.trim()} loading={save.isPending} onClick={() => save.mutate()}>Save case</Button>
+        <Button variant="primary" disabled={!id.trim() || !question.trim()} loading={save.isPending} onClick={() => save.mutate()}>Save question</Button>
         <Button variant="ghost" onClick={onClose}>Cancel</Button>
       </div>
     </Card>
@@ -445,7 +445,7 @@ function GeneratePanel({ datasetId, versionId, onPromoted }: { datasetId: number
   const [selected, setSelected] = useState<number[]>([])
   const settings = useQuery({ queryKey: ['settings'], queryFn: () => api.get<{ values: Settings }>('/api/settings') })
   const [picked, setProvider] = useState<number | ''>('')
-  // Until you pick, the default model for drafting test cases (Settings > Defaults).
+  // Until you pick, the default model for drafting questions (Settings > Defaults).
   const provider = picked || (settings.data?.values.default_generator?.provider_config_id ?? '')
   const prefs = usePrefs()
   const [reviewer, setReviewer] = useState(() => prefs.annotator)
@@ -476,9 +476,9 @@ function GeneratePanel({ datasetId, versionId, onPromoted }: { datasetId: number
 
   return (
     <div className="space-y-6">
-      <Notice tone="warn" title="Generated cases are candidates, not ground truth">
+      <Notice tone="warn" title="Drafted questions are candidates, not ground truth">
         A model drafts questions and answers from your documents. Each one stays <span className="font-semibold">unreviewed</span> until a person approves,
-        edits or rejects it; only approved cases can be added to a dataset version. Check the evidence quote: Assay flags quotes it cannot find in the document.
+        edits or rejects it; only approved questions can be added to a dataset version. Check the evidence quote: Assay flags quotes it cannot find in the document.
       </Notice>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <Card boxed title="1. Reference documents" help={<p>Upload Markdown, TXT, JSON or PDF, then tick the documents to draft questions from.</p>}>
@@ -488,7 +488,7 @@ function GeneratePanel({ datasetId, versionId, onPromoted }: { datasetId: number
             {(docs.data ?? []).map((d) => (
               <li key={d.id}>
                 <Checkbox checked={selected.includes(d.id)} onChange={(on) => setSelected((s) => (on ? [...s, d.id] : s.filter((x) => x !== d.id)))}
-                  label={<><span className="font-mono text-xs">{d.filename}</span> <span className="text-xs text-ink-3"><span className="font-mono">{d.chars}</span> chars</span></>} />
+                  label={<><span className="font-mono text-xs">{d.filename}</span> <span className="text-xs text-ink-3"><span className="font-mono">{d.chars}</span> characters</span></>} />
               </li>
             ))}
             {docs.data?.length === 0 && <li className="text-ink-2">No documents uploaded yet (Markdown, TXT, JSON or PDF).</li>}
@@ -496,7 +496,7 @@ function GeneratePanel({ datasetId, versionId, onPromoted }: { datasetId: number
         </Card>
         <Card boxed title="2. Generate">
           <div className="space-y-3">
-            <Field label={<LabelHelp label="Generator model"><p>Your documents are sent to this provider. A local Ollama model keeps them on this machine.</p></LabelHelp>}>
+            <Field label={<LabelHelp label="Drafting model"><p>Your documents are sent to this provider. A local Ollama model keeps them on this computer.</p></LabelHelp>}>
               <Select value={provider} onChange={(e) => setProvider(e.target.value ? Number(e.target.value) : '')}>
                 {(providers.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </Select>
@@ -528,7 +528,7 @@ function GeneratePanel({ datasetId, versionId, onPromoted }: { datasetId: number
         {review.isError && <div className="mb-3"><ErrorState error={review.error} /></div>}
         {!reviewer && <p className="mb-3 text-xs text-warn-ink">Enter your name to approve or reject: every decision records who made it.</p>}
         {cands.isLoading ? <Loading /> : (cands.data ?? []).length === 0 ? (
-          <Empty title="Nothing in this queue." />
+          <Empty title="No questions in this queue" />
         ) : (
           <ul className="space-y-3">
             {cands.data!.map((c) => (
@@ -536,8 +536,8 @@ function GeneratePanel({ datasetId, versionId, onPromoted }: { datasetId: number
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge status={c.status} />
                   <Badge>{c.kind}</Badge>
-                  {c.edited && <Badge tone="info">edited</Badge>}
-                  {c.approved_in_version_id && <Badge tone="good">in dataset</Badge>}
+                  {c.edited && <Badge tone="info">Edited</Badge>}
+                  {c.approved_in_version_id && <Badge tone="good">In dataset</Badge>}
                   <span className="font-mono text-xs text-ink-3">{c.document}</span>
                   {c.reviewer && <span className="text-xs text-ink-2">reviewed by {c.reviewer}</span>}
                 </div>
@@ -545,7 +545,7 @@ function GeneratePanel({ datasetId, versionId, onPromoted }: { datasetId: number
                 <div className="mt-1 text-sm text-ink-2"><span className="text-ink-3">Proposed answer: </span>{c.case.expected.answer.reference ?? '-'}</div>
                 {c.evidence.map((e, i) => (
                   <div key={i} className="mt-2 rounded border-l-2 border-line-strong bg-surface-2 px-2 py-1 text-xs">
-                    <span className="text-ink-3">Evidence: </span>{e.quote ? `"${e.quote}"` : '(none - declining is the expected behaviour)'}
+                    <span className="text-ink-3">Evidence: </span>{e.quote ? `“${e.quote}”` : '(none: declining is the expected behaviour)'}
                     {e.warnings.map((w) => <div key={w} className="mt-1 font-medium text-warn-ink">{w}</div>)}
                   </div>
                 ))}
@@ -586,7 +586,7 @@ function PlainMatchers({ onAdd }: { onAdd: (pattern: string) => void }) {
   }
   return (
     <div className="rounded-lg border border-line p-2">
-      <div className="mb-1 text-xs font-medium text-ink-2"><LabelHelp label="Or a rule in plain words" title="Rules in plain words"><p>Assay writes the pattern (shown below the rule) so "91" does not match "910", and capitals do not matter.</p></LabelHelp></div>
+      <div className="mb-1 text-xs font-medium text-ink-2"><LabelHelp label="Or a rule in plain words" title="Rules in plain words"><p>Assay writes the pattern (shown below the rule) so “91” does not match “910”, and capitals do not matter.</p></LabelHelp></div>
       <div className="flex flex-wrap gap-2">
         <Select className="w-48" value={kind} onChange={(e) => setKind(e.target.value as typeof kind)} aria-label="Rule kind">
           <option value="any">contains any of</option><option value="word">contains the whole word</option><option value="number">contains the exact number</option>

@@ -3,6 +3,7 @@
 // matrix, so they move as soon as a new label lands.
 import clsx from 'clsx'
 import { motion } from 'motion/react'
+import { plural } from '../../lib/format'
 import type { Agreement } from '../../lib/types'
 import { useMotionOn } from '../../lib/prefs'
 import { Needle, SampleSize } from '../instrument'
@@ -50,7 +51,7 @@ export function AgreementGauge({ a, small, sampleNote = true, size = 170 }: { a:
           {f.half !== null && f.kappa !== null && <span className="num font-mono text-sm text-ink-3">± {f.half.toFixed(2)}</span>}
         </div>
         <div className="mt-1 text-sm text-ink-2">
-          {f.po !== null ? <><span className="num font-mono">{Math.round(f.po * 100)}%</span> raw agreement over <span className="num font-mono">{f.n}</span> label{f.n === 1 ? '' : 's'}</> : 'no labels yet'}
+          {f.po !== null ? <><span className="num font-mono">{Math.round(f.po * 100)}%</span> raw agreement over {plural(f.n, 'label')}</> : 'no labels yet'}
         </div>
         {f.kappa !== null && (
           <div className={clsx('mt-0.5 text-sm font-medium', word.tone === 'good' ? 'text-good-ink' : word.tone === 'warn' ? 'text-warn-ink' : 'text-bad-ink')} data-testid="trust-word">{word.text}</div>
@@ -66,17 +67,17 @@ export function AgreementGauge({ a, small, sampleNote = true, size = 170 }: { a:
   )
 }
 
-/** You (rows) against the judge (columns). Diagonal cells agree; the others are where it cannot be trusted. */
+/** You (rows) against the grading model (columns). Diagonal cells agree; the others are where it cannot be trusted. */
 export function TwoByTwo({ a, testPrefix = 'cell' }: { a: Agreement; testPrefix?: string }) {
   const motionOn = useMotionOn()
   const rows = LABELS.filter((h) => h !== 'UNKNOWN' || Object.values(a.confusion[h] ?? {}).some((v) => v > 0))
   const cols = LABELS.filter((j) => j !== 'UNKNOWN' || rows.some((h) => (a.confusion[h]?.[j] ?? 0) > 0))
-  const name = (l: string) => (l === 'UNKNOWN' ? 'unsure' : l.toLowerCase())
+  const name = (l: string) => (l === 'UNKNOWN' ? 'not sure' : l.toLowerCase())
   return (
     <div className="grid gap-1.5" style={{ gridTemplateColumns: `max-content repeat(${cols.length}, minmax(0, 1fr))` }}
-      role="table" aria-label="Confusion matrix (rows: you, columns: judge)" data-testid="two-by-two">
+      role="table" aria-label="Confusion matrix (rows: you, columns: grading model)" data-testid="two-by-two">
       <span />
-      {cols.map((j) => <span key={j} className="t-label pb-1 text-center" role="columnheader">Judge: {name(j)}</span>)}
+      {cols.map((j) => <span key={j} className="t-label pb-1 text-center" role="columnheader">Grading model: {name(j)}</span>)}
       {rows.map((h) => (
         <div key={h} className="contents" role="row">
           <span className="t-label self-center pr-2" role="rowheader">You: {name(h)}</span>
@@ -88,7 +89,7 @@ export function TwoByTwo({ a, testPrefix = 'cell' }: { a: Agreement; testPrefix?
               <div key={j} role="cell" data-testid={`${testPrefix}-${h}-${j}`}
                 className={clsx('min-h-24 rounded-xl p-2.5', unsure ? 'bg-surface-2' : agree ? 'bg-good-wash' : 'bg-bad-wash')}>
                 <div className="t-fig">{v}</div>
-                <div className="text-xs text-ink-2">{unsure ? 'unsure' : agree ? 'agree' : 'disagree'}</div>
+                <div className="text-xs text-ink-2">{unsure ? 'not sure' : agree ? 'agree' : 'disagree'}</div>
                 <div className="mt-1.5 flex flex-wrap gap-[3px]" aria-hidden>
                   {Array.from({ length: Math.min(v, 60) }, (_, i) => (
                     <motion.i key={i} className={clsx('block size-[7px] rounded-full', unsure ? 'bg-untested' : agree ? 'bg-good' : 'bg-bad')}

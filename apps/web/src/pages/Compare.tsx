@@ -105,7 +105,7 @@ function CompareView({ c }: { c: Comparison }) {
   const [view, setView] = useState<'picture' | 'table'>('picture')
   const judgeIds = new Set(evs.data?.judges ?? [])
   const anyHeuristic = [c.baseline_run, c.candidate_run].some((r) => r.judge?.provider === 'heuristic')
-  const isHeuristic = (metric: string) => anyHeuristic && (judgeIds.has(metric) || /\(judge\)$/.test(c.metrics.find((m) => m.metric === metric)?.label ?? ''))
+  const isHeuristic = (metric: string) => anyHeuristic && (judgeIds.has(metric) || /\(grading model\)$/.test(c.metrics.find((m) => m.metric === metric)?.label ?? ''))
   const overall = c.metrics.find((m) => m.metric === 'overall_pass_rate') ?? null
   const win = reading(overall ?? ({ delta: null } as ComparisonRow)).text === 'likely better'
   const [celebrate] = useState(() => {
@@ -140,7 +140,7 @@ function CompareView({ c }: { c: Comparison }) {
         <div className="space-y-2">
           {offTopic.map((r) => (
             <Notice key={r.id} tone="warn" title={<>Run <span className="font-mono">#{r.id}</span> asked {r.off_topic}'s questions</>}>
-              Its questions were written for another chatbot, so its pass rate says little about this one. Compare runs that asked this chatbot's own questions.
+              Its questions were written for another chatbot, so its pass rate says little about this one. Compare runs that asked this chatbot’s own questions.
             </Notice>
           ))}
           {(issues.data?.issues.length ?? 0) > 0 && (
@@ -150,7 +150,7 @@ function CompareView({ c }: { c: Comparison }) {
           )}
           {loadDiffers && (
             <Notice tone="warn" title={<>Run <span className="font-mono">#{c.baseline_run.id}</span> asked <span className="font-mono">{c.baseline_run.concurrency}</span> at a time, run <span className="font-mono">#{c.candidate_run.id}</span> asked <span className="font-mono">{c.candidate_run.concurrency}</span></>}>
-              The latency difference may be load, not the bot: questions asked together wait for each other. Speed rows are marked; compare speed only between runs at the same setting (pass rates are unaffected).
+              The speed difference may be load, not the bot: questions asked together wait for each other. Speed rows are marked; compare speed only between runs at the same setting (pass rates are unaffected).
             </Notice>
           )}
           {onlyOne > 0 && (
@@ -171,7 +171,7 @@ function CompareView({ c }: { c: Comparison }) {
         <Card title="Every metric" meta={<SampleSize n={c.n_shared_cases} unit="paired" />}
           help={<>
             <p>The change in each check, with its 95% interval from resampling questions. A line clear of the zero mark is a real change; one crossing zero could be noise.</p>
-            <p>Hatched rows were scored by the word-overlap heuristic, not a model: a cheap signal that cannot see paraphrase. Re-grade both runs with a grading model to judge meaning.</p>
+            <p>Hatched rows were scored by the word-overlap heuristic, not a model: a cheap signal that cannot see paraphrase. Re-grade both runs with a grading model to check meaning.</p>
             <p>Speed, tokens and cost below are measured once, with no interval: the arrow is which way the number moved, the colour whether that is better or worse.</p>
           </>}
           actions={<Segmented size="sm" value={view} onChange={setView} options={[{ id: 'picture', label: 'Picture' }, { id: 'table', label: 'Table' }]} />}>
@@ -193,7 +193,7 @@ function CompareView({ c }: { c: Comparison }) {
       {nPaired > 0 && <Power flipShare={flipShare} n0={diffs.length || c.n_shared_cases} />}
 
       <div className="grid gap-x-10 gap-y-12 xl:grid-cols-2">
-        <Card title="Pass rate by category" help={<><p>Each category's pass rate in both runs: the blue dot is #{c.baseline_run.id}, the orange dot #{c.candidate_run.id}.</p><p>Small categories move a lot from one question: read the question count before the change.</p></>}>
+        <Card title="Pass rate by category" help={<><p>Each category’s pass rate in both runs: the blue dot is #{c.baseline_run.id}, the orange dot #{c.candidate_run.id}.</p><p>Small categories move a lot from one question: read the question count before the change.</p></>}>
           <ul className="divide-y divide-line">
             {c.by_category.map((r) => (
               <li key={r.category} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">

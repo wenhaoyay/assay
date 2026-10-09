@@ -1,7 +1,7 @@
-"""Local grading models through Ollama: is it running, what fits this machine, and downloads.
+"""Local grading models through Ollama: is it running, what fits this computer, and downloads.
 
 Ollama and the models it downloads are third-party software. Assay only talks to the Ollama
-already running on this machine (``/api/version``, ``/api/tags``, ``/api/pull``); it never
+already running on this computer (``/api/version``, ``/api/tags``, ``/api/pull``); it never
 downloads or installs Ollama itself, and a model download starts only after the person
 acknowledged the third-party notice (``ollama_notice_ack`` in the workspace settings).
 """
@@ -28,7 +28,7 @@ DEFAULT_URL = "http://localhost:11434"
 # The CPU timings are what an ordinary laptop manages; a graphics card is several times faster.
 SUGGESTIONS: list[dict[str, Any]] = [
     {"model": "llama3.2:1b", "size_gb": 1.3, "needs_gb": 2.5, "cpu_s": 6, "gpu_s": 1,
-     "note": "Very small: fast, but a weak judge. Use it to try the setup, then calibrate."},
+     "note": "Very small: fast, but a weak grading model. Use it to try the setup, then calibrate."},
     {"model": "llama3.2:3b", "size_gb": 2.0, "needs_gb": 4, "cpu_s": 12, "gpu_s": 2,
      "note": "Small: a reasonable start on a laptop without a graphics card."},
     {"model": "llama3.1:8b", "size_gb": 4.9, "needs_gb": 7, "cpu_s": 30, "gpu_s": 4,
@@ -112,8 +112,8 @@ async def status(base_url: str = DEFAULT_URL) -> dict[str, Any]:
                        "cloud": str(m.get("name", "")).endswith(("-cloud", ":cloud"))}
                       for m in (tags.json().get("models") or [])]
             return {"running": True, "version": v.json().get("version"), "models": models, "base_url": url}
-    except Exception as exc:
-        return {"running": False, "error": type(exc).__name__, "models": [], "base_url": url}
+    except Exception:
+        return {"running": False, "error": "Ollama did not answer.", "models": [], "base_url": url}
 
 
 # Model downloads in progress (or just finished), by model name. In memory: a restart forgets them,

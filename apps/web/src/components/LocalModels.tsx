@@ -1,5 +1,5 @@
-// Run a grading model on this PC with Ollama: install (external site), is it running, which
-// model fits this machine, download after the third-party notice, connect, then calibrate.
+// Run a grading model on this computer with Ollama: install (external site), is it running, which
+// model fits this computer, download after the third-party notice, connect, then calibrate.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { BookOpen, Check, Cloud, Download, ExternalLink, RefreshCw } from 'lucide-react'
@@ -31,12 +31,12 @@ export function ThirdPartyNotice() {
     <div className="space-y-1.5 text-sm text-ink-2">
       <p><b className="font-semibold">Ollama and the models it downloads are third-party software.</b> They are not made, endorsed, reviewed or supported by Assay. The install link opens an external website.</p>
       <ul className="list-disc space-y-1 pl-4">
-        <li>You download and install them <b className="font-semibold">at your own risk</b>. Check each model's licence and terms, and your organisation's rules on installing software and on data (IT approval may be required).</li>
+        <li>You download and install them <b className="font-semibold">at your own risk</b>. Check each model’s licence and terms, and your organisation’s rules on installing software and on data (IT approval may be required).</li>
         <li>Assay gives <b className="font-semibold">no warranty</b> for the availability, accuracy, safety or performance of third-party models, and is not responsible for their output.</li>
-        <li>Downloads are large (1–10 GB) and running a model uses this PC's memory, disk and power.</li>
-        <li>Models whose names end in <code>-cloud</code> or <code>:cloud</code> <b className="font-semibold">run on the provider's servers</b>: questions and answers leave this PC, even though they are reached through the local Ollama.</li>
+        <li>Downloads are large (1–10 GB) and running a model uses this computer’s memory, disk and power.</li>
+        <li>Models whose names end in <code>-cloud</code> or <code>:cloud</code> <b className="font-semibold">run on the provider’s servers</b>: questions and answers leave this computer, even though they are reached through the local Ollama.</li>
       </ul>
-      <p className="text-xs text-ink-2">This notice is information, not legal advice. Have your organisation review it if Assay is used beyond your own PC.</p>
+      <p className="text-xs text-ink-2">This notice is information, not legal advice. Have your organisation review it if Assay is used beyond your own computer.</p>
     </div>
   )
 }
@@ -68,7 +68,7 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
     mutationFn: async (model: string) => {
       const pc = await api.post<ProviderConfig>('/api/models', { name: `Ollama ${model}`, provider: 'ollama', model, base_url: status.data?.base_url })
       let checkError: string | null = null
-      try { await api.post(`/api/models/${pc.id}/check`) } catch (e) { checkError = e instanceof Error ? e.message : 'The check failed.' }
+      try { await api.post(`/api/models/${pc.id}/check`) } catch (e) { checkError = e instanceof Error ? e.message : 'The test failed.' }
       return { pc, checkError }
     },
     onSuccess: onChange,
@@ -88,9 +88,9 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
   const rec = a?.suggestions.find((s) => s.model === a.recommended)
 
   return (
-    <Card title="Run a grading model on this PC (Ollama)"
+    <Card title="Run a grading model on this computer (Ollama)"
       help={<>
-        <p>Free per call, and the answers being graded never leave this PC. Slower than a cloud model.</p>
+        <p>Free per call, and the answers being graded never leave this computer. Slower than a cloud model.</p>
         <p>The four steps light up as they are done: install, running, a model downloaded, connected as a grading model. The full guide covers choosing a model, LM Studio and what to do when something goes wrong.</p>
       </>}
       actions={<Button size="sm" variant="ghost" onClick={() => setGuide(true)}><BookOpen className="size-3.5" />Full guide</Button>}>
@@ -105,8 +105,8 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
 
       {!st?.running ? (
         <div className="space-y-3">
-          <Notice tone="info" title={status.isLoading ? 'Looking for Ollama on this PC...' : `Ollama is not answering at ${st?.base_url ?? 'localhost:11434'}`}
-            action={<Button size="sm" onClick={() => status.refetch()} loading={status.isFetching}><RefreshCw className="size-3.5" />Check again</Button>}>
+          <Notice tone="info" title={status.isLoading ? 'Looking for Ollama on this computer…' : `Ollama is not answering at ${st?.base_url ?? 'localhost:11434'}`}
+            action={<Button size="sm" onClick={() => status.refetch()} loading={status.isFetching}><RefreshCw className="size-3.5" />Test again</Button>}>
             1. Install it from the Ollama website (an external, third-party site). 2. Open the Ollama app; it then runs in the background. This page notices within a few seconds.
           </Notice>
           <TextLink href={OLLAMA_URL} target="_blank" rel="noreferrer noopener" className="gap-1.5">
@@ -120,8 +120,8 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
       {a && (
         <div className="space-y-2">
           <div className="flex items-center gap-1.5 text-sm text-ink-2">
-            <span><span className="font-medium text-ink">Which model fits this PC:</span> <span className="font-mono">{a.memory.free_gb ?? '?'}</span> GB of <span className="font-mono">{a.memory.total_gb ?? '?'}</span> GB memory free, {a.gpu ? `graphics: ${a.gpu}` : 'no graphics card found (models run on the processor, slowly)'}.</span>
-            {rec && <Help title="Time against cost"><p>Grading 100 answers on 2 meaning checks is 200 calls. With {rec.model} here: about {Math.round((200 * rec.seconds_per_check) / 60)} min, free. With a cloud model: about {Math.max(1, Math.round((200 * 2.5) / 4 / 60))} min at 4 in parallel, paid per call (see a cloud model's Check for its cost per 100 calls).</p><p>Greyed rows need more free memory than this PC has now.</p></Help>}
+            <span><span className="font-medium text-ink">Which model fits this computer:</span> <span className="font-mono">{a.memory.free_gb ?? '?'}</span> GB of <span className="font-mono">{a.memory.total_gb ?? '?'}</span> GB memory free, {a.gpu ? `graphics: ${a.gpu}` : 'no graphics card found (models run on the processor, slowly)'}.</span>
+            {rec && <Help title="Time against cost"><p>Grading 100 answers on 2 meaning checks is 200 calls. With {rec.model} here: about {Math.round((200 * rec.seconds_per_check) / 60)} min, free. With a cloud model: about {Math.max(1, Math.round((200 * 2.5) / 4 / 60))} min at 4 in parallel, paid per call (see a cloud model’s test for its cost per 100 calls).</p><p>Greyed rows need more free memory than this computer has now.</p></Help>}
           </div>
           <ScrollTable className="[&_table]:min-w-[640px]">
             <thead><tr className="whitespace-nowrap"><th className="t-label">Model</th><th className="t-label text-right">Download</th><th className="t-label text-right">Needs memory</th><th className="t-label text-right">Per call here</th><th /></tr></thead>
@@ -129,14 +129,14 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
               {a.suggestions.map((s) => (
                 <tr key={s.model} className={clsx(!s.fits && !installed.has(s.model) && 'opacity-55')}>
                   <td>
-                    <code className="font-mono text-xs">{s.model}</code>{s.model === a.recommended && <Badge tone="accent" className="ml-1.5">suggested</Badge>}
-                    <div className="text-xs text-ink-2">{s.note}{!s.fits && (installed.has(s.model) ? ' Installed: free memory is tight now, so it may run slower.' : ' Needs more free memory than this PC has now.')}</div>
+                    <code className="font-mono text-xs">{s.model}</code>{s.model === a.recommended && <Badge tone="accent" className="ml-1.5">Suggested</Badge>}
+                    <div className="text-xs text-ink-2">{s.note}{!s.fits && (installed.has(s.model) ? ' Installed: free memory is tight now, so it may run slower.' : ' Needs more free memory than this computer has now.')}</div>
                   </td>
                   <td className="num whitespace-nowrap text-right font-mono">~{s.size_gb} GB</td>
                   <td className="num whitespace-nowrap text-right font-mono">~{s.needs_gb} GB</td>
                   <td className="num whitespace-nowrap text-right font-mono">~{s.seconds_per_check} s</td>
                   <td className="text-right">
-                    {installed.has(s.model) ? (connected.has(s.model) ? <Badge tone="good"><Check className="size-3" />connected</Badge>
+                    {installed.has(s.model) ? (connected.has(s.model) ? <Badge tone="good"><Check className="size-3" />Connected</Badge>
                       : <Button size="sm" loading={connect.isPending && connect.variables === s.model} onClick={() => connect.mutate(s.model)}>Use for grading</Button>)
                       : <Button size="sm" disabled={!st?.running || !acked || downloading} title={!acked ? 'Accept the third-party notice below first' : undefined} loading={startPull.isPending && startPull.variables === s.model} onClick={() => startPull.mutate(s.model)}><Download className="size-3.5" />Download</Button>}
                   </td>
@@ -153,8 +153,8 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
           {(st?.models ?? []).filter((m) => !a.suggestions.some((s) => s.model === m.name)).map((m) => (
             <span key={m.name} className="inline-flex items-center gap-1">
               <code>{m.name}</code>
-              {m.cloud ? <Badge tone="warn"><Cloud className="size-3" />cloud: data leaves this PC</Badge> : null}
-              {connected.has(m.name) ? <Badge tone="good">connected</Badge> : <Button size="sm" variant="ghost" onClick={() => connect.mutate(m.name)}>Use</Button>}
+              {m.cloud ? <Badge tone="warn"><Cloud className="size-3" />Cloud: data leaves this computer</Badge> : null}
+              {connected.has(m.name) ? <Badge tone="good">Connected</Badge> : <Button size="sm" variant="ghost" onClick={() => connect.mutate(m.name)}>Use</Button>}
             </span>
           ))}
         </div>
@@ -169,7 +169,7 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
       )}
       {progress.data?.error && <div><Notice tone="bad" title={progress.data.status === 'lost' ? 'The download stopped' : 'The download failed'}>{progress.data.error}</Notice></div>}
       {progress.isError && <div><ErrorState error={progress.error} /></div>}
-      {connect.data?.checkError && <div><Notice tone="warn" title="Connected, but the check failed">{connect.data.checkError}</Notice></div>}
+      {connect.data?.checkError && <div><Notice tone="warn" title="Connected, but the test failed">{connect.data.checkError}</Notice></div>}
       {ack.isError && <div><ErrorState error={ack.error} /></div>}
       {startPull.isError && <div><ErrorState error={startPull.error} /></div>}
       {connect.isError && <div><ErrorState error={connect.error} /></div>}
@@ -178,7 +178,7 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
         <Panel className="bg-surface-2">
           <div className="mb-2 text-sm font-semibold">Before the first download</div>
           <ThirdPartyNotice />
-          <Checkbox className="mt-3" checked={ticked} onChange={setTicked} label="I have read this notice and accept it" />
+          <Checkbox className="mt-3" checked={ticked} onChange={setTicked} label="Confirm you have read this notice and accept it" />
           <Button className="mt-3" size="sm" variant="primary" disabled={!ticked} loading={ack.isPending} onClick={() => ack.mutate()}>Continue to downloads</Button>
         </Panel>
       )}
@@ -210,27 +210,27 @@ function LocalGuide() {
         <h3 className="mb-1 font-semibold text-ink">Set it up</h3>
         <ol className="list-decimal space-y-1 pl-4">
           <li>Install Ollama from <a className="text-accent-ink underline" href={OLLAMA_URL} target="_blank" rel="noreferrer noopener">ollama.com/download</a> (external site) and open the app.</li>
-          <li>Here, in Settings → Models &amp; keys, the Ollama card ticks <i>running</i> within a few seconds.</li>
-          <li>Accept the third-party notice, then <b className="font-semibold">Download</b> the suggested model. The table shows the size and the expected time per grading call on this PC.</li>
-          <li><b className="font-semibold">Use for grading</b>: Assay connects it and runs a 5-call check (speed, JSON reliability).</li>
-          <li>Calibrate: label about 30 answers in Calibration; the judge bake-off compares it with other models on your labels.</li>
+          <li>Here, in Settings &gt; Models &amp; keys, the Ollama card ticks <i>running</i> within a few seconds.</li>
+          <li>Accept the third-party notice, then <b className="font-semibold">Download</b> the suggested model. The table shows the size and the expected time per grading call on this computer.</li>
+          <li><b className="font-semibold">Use for grading</b>: Assay connects it and runs a 5-call test (speed, JSON reliability).</li>
+          <li>Calibrate: label about 30 answers in Calibration; the bake-off compares it with other models on your labels.</li>
         </ol>
       </section>
       <section>
         <h3 className="mb-1 font-semibold text-ink">Choosing a model</h3>
-        <p>Pick the largest model that fits in free memory and still answers in about half a minute. Close other large programs to free memory before running a big model. On a PC without a graphics card, a 3B model is a practical start; 8B is a better judge if you can wait.</p>
+        <p>Pick the largest model that fits in free memory and still answers in about half a minute. Close other large programs to free memory before running a big model. On a computer without a graphics card, a 3B model is a practical start; 8B is a better grading model if you can wait.</p>
       </section>
       <section>
         <h3 className="mb-1 font-semibold text-ink">LM Studio instead</h3>
-        <p>LM Studio (also third-party) serves models through an OpenAI-compatible address, usually <code>http://localhost:1234/v1</code>. Connect it under <i>Connect a provider → LM Studio</i>; it counts as local because the address is on this PC.</p>
+        <p>LM Studio (also third-party) serves models through an OpenAI-compatible address, usually <code>http://localhost:1234/v1</code>. Connect it under <i>Add a grading model &gt; LM Studio</i>; it counts as local because the address is on this computer.</p>
       </section>
       <section>
         <h3 className="mb-1 font-semibold text-ink">When something goes wrong</h3>
         <ul className="list-disc space-y-1 pl-4">
-          <li><b className="font-semibold">Not answering at localhost:11434</b>: open the Ollama app; if another program uses port 11434, close it or point the model's base URL at Ollama's address.</li>
+          <li><b className="font-semibold">Not answering at localhost:11434</b>: open the Ollama app; if another program uses port 11434, close it or point the model’s base URL at Ollama’s address.</li>
           <li><b className="font-semibold">Out of memory / very slow</b>: choose a smaller model, close other programs, or grade fewer answers at a time.</li>
           <li><b className="font-semibold">Download stopped</b>: press Download again; Ollama resumes where it stopped.</li>
-          <li><b className="font-semibold">Answers marked "not evaluated"</b>: the model replied without valid JSON or timed out. Run its Check; small models fail the JSON test more often.</li>
+          <li><b className="font-semibold">Answers marked “not evaluated”</b>: the model replied without valid JSON or timed out. Run its test; small models fail the JSON test more often.</li>
         </ul>
       </section>
       <section className="rounded-xl border border-line bg-surface-2 p-3">
