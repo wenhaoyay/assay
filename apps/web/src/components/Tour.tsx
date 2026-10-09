@@ -100,7 +100,7 @@ export function Tour({ open, onClose }: { open: boolean; onClose: () => void }) 
             <div className="mt-3 flex items-center gap-2">
               <div className="flex gap-1">{steps.map((_, k) => <span key={k} className={k === i ? 'h-1.5 w-4 rounded-full bg-accent' : 'size-1.5 rounded-full bg-line-strong'} />)}</div>
               <span className="ml-auto flex items-center gap-1 text-ink-3 max-sm:hidden"><Kbd>←</Kbd><Kbd>→</Kbd></span>
-              <Button size="sm" variant="ghost" disabled={i === 0} onClick={() => setI(i - 1)}><ArrowLeft className="size-3.5" /></Button>
+              <Button size="sm" variant="ghost" disabled={i === 0} onClick={() => setI(i - 1)}><ArrowLeft className="size-3.5" />Back</Button>
               {i < steps.length - 1
                 ? <Button size="sm" variant="primary" onClick={() => setI(i + 1)}>Next <ArrowRight className="size-3.5" /></Button>
                 : <Button size="sm" variant="primary" onClick={onClose}>Done</Button>}

@@ -1,18 +1,15 @@
 // Hand-drawn SVG visualisations (Recharts covers the plain bar charts). Each one turns numbers
 // the screen already shows into a picture; the numbers stay next to it.
 import clsx from 'clsx'
-import { ArrowDown, ArrowUp, Minus } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { direction, fmtDelta as rawDelta, fmtValue, reading } from '../lib/compare'
-import { FAILURE_LABELS, pct, pp } from '../lib/format'
-
-/** A comparison row's change: rates as spaced percentage points (+23.6 pp, −2.0 pp), the rest as compare.ts words it. */
-const fmtDelta = (r: ComparisonRow) => (r.unit === 'rate' && r.delta !== null ? pp(r.delta) : rawDelta(r))
+import { direction, fmtDelta, fmtValue, reading } from '../lib/compare'
+import { FAILURE_LABELS, pct } from '../lib/format'
 import { useMotionOn } from '../lib/prefs'
 import type { CaseMatrix, ComparisonRow, Stage } from '../lib/types'
 import { useWidth } from './compare/useWidth'
+import { RowDelta } from './compare/delta'
 import { Needle } from './instrument'
 import { Badge, STATE_DOT, Term } from './ui'
 
@@ -109,7 +106,7 @@ export function ForestPlot({ rows, isHeuristic, onPick }: { rows: ComparisonRow[
                   initial={{ cx: x(0) }} animate={{ cx: x(r.delta ?? 0) }} transition={motionOn ? { ...tr, duration: 0.9, ease: [0.34, 1.56, 0.64, 1] as const } : tr} />
               </svg>
               <span className="pr-1 text-right leading-tight">
-                <span className={clsx('num block font-mono text-sm', read.tone === 'good' && 'text-good-ink', read.tone === 'bad' && 'text-bad-ink', read.tone === 'neutral' && 'text-ink-2')}>{fmtDelta(r)}</span>
+                <span className="block text-sm"><RowDelta row={r} /></span>
                 <span className="block text-label text-ink-3">
                   {read.text === 'within noise' ? <Term k="within_noise">within noise</Term> : read.text === 'likely better' ? <Term k="likely_better">likely better</Term> : read.text === 'likely worse' ? <Term k="likely_worse">likely worse</Term> : read.text}
                 </span>
@@ -139,7 +136,6 @@ export function DeltaList({ rows, caution }: { rows: ComparisonRow[]; caution?: 
       {pts.map((r, i) => {
         const d = direction(r)
         const rel = r.relative ?? 0
-        const Arrow = r.delta! > 0 ? ArrowUp : r.delta! < 0 ? ArrowDown : Minus
         const warn = caution?.(r.metric)
         return (
           <div key={r.metric} className={clsx('grid grid-cols-[minmax(0,170px)_minmax(0,1fr)_minmax(150px,auto)] items-center gap-3 px-1 py-1.5 text-sm max-md:grid-cols-[minmax(0,1fr)_auto]', warn && 'hatched-light')} data-testid={`metric-${r.metric}`}
@@ -154,9 +150,7 @@ export function DeltaList({ rows, caution }: { rows: ComparisonRow[]; caution?: 
             </div>
             <span className="num flex items-center justify-end gap-2 whitespace-nowrap text-right font-mono">
               <span className="text-xs text-ink-3">{fmtValue(r, r.baseline)} → {fmtValue(r, r.candidate)}</span>
-              <span className={clsx('inline-flex items-center text-sm', d === 'better' && 'text-good-ink', d === 'worse' && 'text-bad-ink', d === 'same' && 'text-ink-3')}>
-                <Arrow className="size-3.5" aria-label={r.delta! > 0 ? 'up' : r.delta! < 0 ? 'down' : 'same'} />{fmtDelta(r).replace(/^[+\-−]/, '')}
-              </span>
+              <span className="text-sm"><RowDelta row={r} /></span>
             </span>
           </div>
         )
@@ -250,13 +244,13 @@ export function StagePipeline({ stages, onPick, selected }: { stages: Stage[]; o
   if (!stages.length) return <p className="text-sm text-ink-3">No stage was exercised by the checks in this run.</p>
   const max = Math.max(1, ...stages.map((s) => s.failures))
   return (
-    <div className="flex flex-wrap items-stretch gap-1.5" data-tour="stages">
+    <div className="grid grid-cols-2 items-stretch gap-2 sm:flex sm:flex-wrap sm:gap-1.5" data-tour="stages">
       {stages.map((s, i) => (
-        <div key={s.id} className="flex items-center gap-1.5">
-          {i > 0 && <span className="text-ink-3" aria-hidden>›</span>}
+        <div key={s.id} className="flex items-center gap-1.5 max-sm:last:odd:col-span-2">
+          {i > 0 && <span className="text-ink-3 max-sm:hidden" aria-hidden>›</span>}
           <motion.button type="button" onClick={() => onPick?.(s)}
             initial={motionOn ? { opacity: 0, y: 6 } : false} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
-            className={clsx('min-w-[118px] rounded-lg border px-3 py-2 text-left transition-colors',
+            className={clsx('min-w-[118px] rounded-lg border px-3 py-2 text-left transition-colors max-sm:w-full',
               selected === s.id ? 'border-accent ring-2 ring-accent/25' : 'border-line hover:border-line-strong')}
             style={{ background: s.failures ? `color-mix(in srgb, var(--bad) ${Math.round(6 + (s.failures / max) * 20)}%, var(--surface))` : 'var(--surface)' }}
             title={Object.entries(s.types).map(([t, n]) => `${FAILURE_LABELS[t] ?? t}: ${n}`).join('\n') || `Checks: ${s.checks.join(', ')}`}>

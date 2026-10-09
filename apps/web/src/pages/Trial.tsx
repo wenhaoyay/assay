@@ -105,11 +105,8 @@ function TrialView({ t: tr, heuristic, projectId, failIdx, failN, onNext }: { t:
             <AddFailureToDataset projectId={projectId} question={tr.question} answer={answer} runId={tr.run_id} trialId={tr.id} reference={c?.expected.answer.reference} />
           )}
           {siblings.length > 1 && siblings.map((s) => (
-            <Link key={s.id} to={`/trials/${s.id}`} title={`try ${s.trial_index + 1}: ${s.status} ([ and ] step between tries)`} aria-current={s.id === tr.id ? 'page' : undefined}
-              className={clsx('inline-flex h-7 items-center gap-1.5 rounded-lg border px-2.5 text-xs transition-colors',
-                s.id === tr.id ? 'border-accent/50 bg-accent-wash text-accent-ink' : 'border-line bg-surface text-ink-2 hover:border-line-strong')}>
-              <StateDot state={stateOf(s.status)} />try {s.trial_index + 1}
-            </Link>
+            <Chip key={s.id} to={`/trials/${s.id}`} selected={s.id === tr.id} title={`try ${s.trial_index + 1}: ${s.status} ([ and ] step between tries)`} aria-current={s.id === tr.id ? 'page' : undefined}
+              icon={<StateDot state={stateOf(s.status)} />}>try {s.trial_index + 1}</Chip>
           ))}
           {failN > 0 && (
             <Button size="sm" onClick={onNext} title="Next failing question (J); previous: K">
@@ -158,13 +155,13 @@ function TrialView({ t: tr, heuristic, projectId, failIdx, failN, onNext }: { t:
               </Card>
             )}
             <ToolCalls r={r} />
+            <RawResponse tr={tr} />
           </div>
           <div className="min-w-0 space-y-12">
             <Telemetry tr={tr} />
             <Card title="Execution trace" help={<p>Every step the bot reported, with its timing. Click a step for its input, output, tokens and the passages or tool arguments it carried. The slowest step is marked.</p>}>
               {tr.trace ? <TraceViewer spans={tr.trace.spans} /> : <Empty title="No trace stored" />}
             </Card>
-            <RawResponse tr={tr} />
           </div>
         </div>
       </div>

@@ -19,12 +19,14 @@ import { TraceViewer } from '../components/TraceViewer'
 import { Confetti, Stamp, StagePipeline } from '../components/viz'
 import {
   Badge, Button, Card, Consistency, DotStrip, Empty, ErrorState, Field, Figs, GaugeArt, Help, InlineError, Input, Json, Loading, Notice,
-  PageSkeleton, Segmented, Select, Skeleton, StateDot, stateOf, Stat, StatusBadge, Table, Tabs, Term, linkButton, useLongWork,
+  PageSkeleton, Segmented, Select, Skeleton, StateDot, stateOf, Stat, StatusBadge, Table, Term, linkButton, useLongWork,
 } from '../components/ui'
+import { PpDelta } from '../components/compare/delta'
+import { ScrollTabs } from '../components/Layout'
 import { api, qs } from '../lib/api'
 import { whereLabel } from '../lib/models'
 import { useCrumbs } from '../lib/crumbs'
-import { duration, FAILURE_LABELS, fmtDay, ms, num, pct, score, usd, when } from '../lib/format'
+import { duration, FAILURE_LABELS, fmtDay, ms, num, pct, pp, score, usd, when } from '../lib/format'
 import { isCompleted, isLive, questionsOf } from '../lib/runstate'
 import { useHotkey, useListNav } from '../lib/hotkeys'
 import { groupByCase, type CaseGroup } from '../lib/trials'
@@ -118,7 +120,7 @@ export function RunPage() {
   } else if (base && delta !== null && !r.off_topic) {
     const ci = overallCmp?.ci
     needle = <Needle mode="delta" value={delta} low={ci?.ci_low} high={ci?.ci_high} size={190} label={`Pass rate change vs run ${base.id}`} />
-    needleNote = <>vs <Link className="font-mono hover:underline" to={`/runs/${base.id}`}>#{base.id}</Link>: <span className={clsx('num font-mono font-semibold', delta > 0.005 ? 'text-good-ink' : delta < -0.005 ? 'text-bad-ink' : 'text-ink')}>{delta > 0 ? '+' : ''}{(delta * 100).toFixed(1)}pp</span>
+    needleNote = <>vs <Link className="font-mono hover:underline" to={`/runs/${base.id}`}>#{base.id}</Link>: <span className={clsx('num font-mono font-semibold', delta > 0.005 ? 'text-good-ink' : delta < -0.005 ? 'text-bad-ink' : 'text-ink')}>{pp(delta)}</span>
       {ci && ci.ci_low !== null && ci.ci_high !== null && <>, interval <span className="num font-mono">{signedPp(ci.ci_low)}</span> to <span className="num font-mono">{signedPp(ci.ci_high)}</span></>}</>
   } else {
     needle = <Needle mode="level" value={s?.overall.value ?? null} gate={floor} size={190} label="Pass rate" />
@@ -195,7 +197,7 @@ export function RunPage() {
 
       <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
         <div className="min-w-0 flex-[1_1_24rem]">
-          <Tabs
+          <ScrollTabs
             tabs={[
               { id: 'summary', label: 'Summary' },
               { id: 'cases', label: 'Cases' },
@@ -242,7 +244,7 @@ export function RunPage() {
   )
 }
 
-const signedPp = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(Math.round(v * 100))}pp`
+const signedPp = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(Math.round(v * 100))} pp`
 
 /** When a live run finishes: the gate's verdict, its stamp and the release receipt. */
 function FinishedGate({ r }: { r: RunDetail }) {
@@ -268,7 +270,7 @@ function FinishedGate({ r }: { r: RunDetail }) {
   )
 }
 
-const pp1 = (v: number) => `${(v * 100).toFixed(1)}pp`
+const pp1 = (v: number) => `${(v * 100).toFixed(1)} pp`
 function fmtMetric(metric: string, v: number): string {
   if (metric.includes('latency')) return ms(v)
   if (metric.includes('cost')) return usd(v)
@@ -309,7 +311,7 @@ function GateCard({ r }: { r: RunDetail }) {
               <span className="flex min-w-0 items-center gap-2"><StatusBadge status={g.status} /><code className="break-all font-mono text-xs">{g.gate}</code></span>
               <span className="num pl-0.5 text-xs text-ink-2 sm:text-right">
                 {g.value === null ? (g.reason ?? 'n/a') : g.kind === 'relative'
-                  ? `${g.value <= 0 ? `up ${pp1(-g.value)}` : `down ${pp1(g.value)}`} vs baseline (max drop ${pp1(g.limit)})`
+                  ? <><PpDelta value={-g.value} /> vs baseline (max drop {pp1(g.limit)})</>
                   : `${fmtMetric(g.metric, g.value)} ${g.rule === 'min' ? '>=' : '<='} ${fmtMetric(g.metric, g.limit)}`}
               </span>
             </motion.div>
@@ -339,7 +341,7 @@ function GateCard({ r }: { r: RunDetail }) {
 interface Fig { key: string; label: string; value: number | null | undefined; text: (v: number) => string; delta: (v: number, b: number) => number; fmtDelta: (abs: number, d: number, b: number) => string; higher: boolean; noise: number; missing: string; help: ReactNode }
 
 function figures(m: Metrics): Fig[] {
-  const rate = (abs: number) => `${(abs * 100).toFixed(1)}pp`
+  const rate = (abs: number) => `${(abs * 100).toFixed(1)} pp`
   return [
     { key: 'overall_pass_rate', label: 'Pass rate', value: m.overall_pass_rate, text: (v) => pct(v), delta: (v, b) => v - b, fmtDelta: rate, higher: true, noise: 0.0005, missing: 'pass rate', help: null },
     { key: 'tool_accuracy', label: 'Tool accuracy', value: m.tool_accuracy, text: (v) => pct(v), delta: (v, b) => v - b, fmtDelta: rate, higher: true, noise: 0.0005, missing: 'tool accuracy (no question names the tool it needs)', help: <p>Right tool, right arguments, over the questions that need a tool.</p> },
@@ -386,7 +388,7 @@ function SummaryTab({ r, s, base, cmpCats }: { r: RunDetail; s: RunSummary; base
           <p className="mt-3 flex flex-wrap items-center gap-x-1.5 text-sm text-ink-3" data-testid="not-measured">
             <Lightbulb className="size-3.5 shrink-0" />
             Not measured: {[...missing.map((f) => f.missing), ...(heur ? ['correctness and groundedness by a grading model (this run used the word-overlap heuristic)'] : [])].join('; ')}.
-            {missing.length > 0 && r.target_id && <TextLink size="sm" to={`/targets/${r.target_id}#reading`}>How to turn it on</TextLink>}
+            {missing.length > 0 && r.target_id && <TextLink size="sm" to={`/targets/${r.target_id}#reading`} viewTransition>How to turn it on</TextLink>}
             {heur && <TextLink size="sm" to="?tab=config">Re-grade with a model</TextLink>}
           </p>
         )}
@@ -415,7 +417,7 @@ function SummaryTab({ r, s, base, cmpCats }: { r: RunDetail; s: RunSummary; base
                 </p>
               )}
               <Table>
-                <thead><tr><th className="t-label w-16 text-right!">k</th><th className="t-label text-right!"><Term k="pass_at_k">pass@k</Term></th><th className="t-label text-right!"><Term k="pass_hat_k">pass^k</Term></th><th className="t-label text-right!">Questions</th></tr></thead>
+                <thead><tr><th className="t-label w-16 text-right">k</th><th className="t-label text-right"><Term k="pass_at_k">pass@k</Term></th><th className="t-label text-right"><Term k="pass_hat_k">pass^k</Term></th><th className="t-label text-right">Questions</th></tr></thead>
                 <tbody>{rel.map((x) => <tr key={x.k}><td className="num text-right font-mono">{x.k}</td><td className="num text-right font-mono">{pct(x.pass_at_k)}</td><td className="num text-right font-mono">{pct(x.pass_hat_k)}</td><td className="num text-right font-mono">{x.n_cases}</td></tr>)}</tbody>
               </Table>
               {flaky.length > 0 && <p className="mt-2 text-xs text-warn-ink"><Term k="flaky">Flaky</Term> ({flaky.length}): {flaky.map((c, i) => <span key={c}>{i > 0 && ', '}<Link className="font-mono underline" to={`?tab=cases&case=${c}`} data-case={c}>{c}</Link></span>)}</p>}
@@ -451,7 +453,7 @@ export function CaseTable({ groups, showChecks = true, keyboard = true, highligh
   const [active] = useListNav(groups.length, (i) => open(groups[i]), keyboard)
   return (
     <Table>
-      <thead><tr><th className="t-label">Question</th><th className="t-label">Tries</th><th className="t-label">{showChecks ? 'Likely cause' : ''}</th><th className="t-label text-right!">Speed</th></tr></thead>
+      <thead><tr><th className="t-label">Question</th><th className="t-label">Tries</th><th className="t-label">{showChecks ? 'Likely cause' : ''}</th><th className="t-label text-right">Speed</th></tr></thead>
       <tbody>
         {groups.map((g, i) => {
           const v = causes && g.firstFailing ? causes[g.firstFailing.id] : undefined
@@ -582,7 +584,7 @@ function FailuresTab({ runId, s, baseId }: { runId: number; s: RunSummary; baseI
       )}
       {q.isLoading ? <Loading /> : (
         <Table>
-          <thead><tr><th className="t-label w-[38%]">Question</th><th className="t-label">Tries</th><th className="t-label">Likely cause</th>{baseId && <th className="t-label text-right!">#{baseId} → now</th>}<th className="t-label text-right!">Speed</th></tr></thead>
+          <thead><tr><th className="t-label w-[38%]">Question</th><th className="t-label">Tries</th><th className="t-label">Likely cause</th>{baseId && <th className="t-label text-right">#{baseId} → now</th>}<th className="t-label text-right">Speed</th></tr></thead>
           <tbody>
             {rows.length === 0 && <tr><td colSpan={5}><div className="flex flex-col items-center gap-2 py-8 text-ink-3"><GaugeArt size={48} />No failing question matches. Suspiciously quiet.</div></td></tr>}
             {rows.map(({ g, v, rate, b }, i) => {
@@ -647,7 +649,7 @@ function MetricsTab({ s, heuristic }: { s: RunSummary; heuristic: boolean }) {
         <Card key={kind} title={KIND_LABEL[kind] ?? kind} padded={false}
           help={<>{kind === 'llm_judge' && heuristic && <p>This run used the heuristic judge: these are word-overlap scores, hatched, not a model's reading of meaning.</p>}{METRICS_HELP}</>}>
           <Table>
-            <thead><tr><th className="t-label">Check</th><th className="t-label text-right!">Pass rate</th><th className="t-label"><Term k="ci">95% interval</Term></th><th className="t-label text-right!">Mean score</th><th className="t-label text-right!">Decided</th><th className="t-label">Skipped</th></tr></thead>
+            <thead><tr><th className="t-label">Check</th><th className="t-label text-right">Pass rate</th><th className="t-label"><Term k="ci">95% interval</Term></th><th className="t-label text-right">Mean score</th><th className="t-label text-right">Decided</th><th className="t-label">Skipped</th></tr></thead>
             <tbody>
               {Object.entries(s.evaluators).filter(([, m]) => m.kind === kind).map(([id, m]) => {
                 const heur = heuristic && kind === 'llm_judge'

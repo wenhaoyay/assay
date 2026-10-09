@@ -9,7 +9,7 @@ import { api } from '../lib/api'
 import { fmtDay, plural } from '../lib/format'
 import { usePrefs } from '../lib/prefs'
 import type { Dataset, DatasetVersion, EditResult, Project, RunHeader, TestCase, TrialRow } from '../lib/types'
-import { Badge, Button, Card, Dialog, Empty, ErrorState, Field, Help, Input, Kbd, Loading, Notice, Panel, ProgressBar, Select, Textarea } from './ui'
+import { Badge, Button, Card, Dialog, Empty, ErrorState, Field, Help, Input, Kbd, Loading, Notice, PanelButton, ProgressBar, Select, Textarea } from './ui'
 import { Checkbox, Chip, FileInput } from './form'
 import { LabelHelp } from './LabelHelp'
 
@@ -112,13 +112,11 @@ export function BuildPanel({ dataset, version, project, onEdited }: { dataset: D
           <ToolTile icon={ClipboardCopy} title="Prompt kit" body="A ready prompt for your own ChatGPT or Claude, with your documents; the result lands in the review queue." onClick={() => setTool('kit')} />
           <ToolTile icon={MessageSquareQuote} title="Real questions" body="Upload chat history; near-identical questions are grouped by how often they were asked." onClick={() => setTool('real')} />
           <ToolTile icon={Keyboard} title="Expert interview" body="One question at a time: what must a right answer say, and never say? Keyboard only." onClick={() => setTool('interview')} />
-          <Panel padded={false}>
-            <a href="/api/datasets/template.csv" className={TILE}>
-              <Users className="size-4 text-accent-ink" />
-              <div className="mt-1.5 text-sm font-semibold">Spreadsheet for colleagues</div>
-              <div className="text-xs text-ink-2">A CSV template with examples, filled in Excel; import it on the Datasets page.</div>
-            </a>
-          </Panel>
+          <PanelButton href="/api/datasets/template.csv">
+            <Users className="size-4 text-accent-ink" />
+            <div className="mt-1.5 text-sm font-semibold">Spreadsheet for colleagues</div>
+            <div className="text-xs text-ink-2">A CSV template with examples, filled in Excel; import it on the Datasets page.</div>
+          </PanelButton>
         </div>
       </Card>
       <Dialog open={tool === 'kit'} onClose={() => setTool(null)} title="Prompt kit: draft cases with your own AI assistant" width={760}>
@@ -134,17 +132,13 @@ export function BuildPanel({ dataset, version, project, onEdited }: { dataset: D
   )
 }
 
-const TILE = 'flex h-full w-full flex-col items-start rounded-xl p-3 text-left transition-colors duration-(--dur-ui) hover:bg-surface-2'
-
 function ToolTile({ icon: Icon, title, body, onClick }: { icon: typeof Users; title: string; body: string; onClick: () => void }) {
   return (
-    <Panel padded={false}>
-      <button type="button" onClick={onClick} className={TILE}>
-        <Icon className="size-4 text-accent-ink" />
-        <div className="mt-1.5 text-sm font-semibold">{title}</div>
-        <div className="text-xs text-ink-2">{body}</div>
-      </button>
-    </Panel>
+    <PanelButton onClick={onClick}>
+      <Icon className="size-4 text-accent-ink" />
+      <div className="mt-1.5 text-sm font-semibold">{title}</div>
+      <div className="text-xs text-ink-2">{body}</div>
+    </PanelButton>
   )
 }
 

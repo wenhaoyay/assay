@@ -141,7 +141,7 @@ describe('verdict sentence', () => {
   it('says better only when the interval excludes zero, and names big cost moves', () => {
     const s = verdictSentence({ overall: rate({}), regressions: 2, improvements: 9, rows: [rate({ metric: 'average_cost_usd', label: 'Est. cost / query', unit: 'cost', delta: 0.001, relative: 0.9, ci: null })] })
     expect(s.tone).toBe('good')
-    expect(s.text).toMatch(/^Better: pass rate up \+20.0pp, beyond noise\. 2 cases regressed, 9 improved\. Also: cost up 90%\.$/)
+    expect(s.text).toMatch(/^Better: pass rate up \+20.0 pp, beyond noise\. 2 cases regressed, 9 improved\. Also: cost up 90%\.$/)
     const noise = verdictSentence({ overall: rate({ delta: 0.02, ci: { delta: 0.02, ci_low: -0.05, ci_high: 0.09, n: 58, excludes_zero: false } }), regressions: 1, improvements: 1 })
     expect(noise.text).toMatch(/^No reliable difference/)
     expect(noise.tone).toBe('neutral')

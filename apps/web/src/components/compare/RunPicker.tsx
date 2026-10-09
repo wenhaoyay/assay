@@ -5,8 +5,7 @@ import { useState } from 'react'
 import { pct } from '../../lib/format'
 import type { RunHeader } from '../../lib/types'
 import { Menu } from '../form'
-import { Input } from '../ui'
-import { Stamp } from '../viz'
+import { Input, StatusBadge } from '../ui'
 
 const judgeName = (r: RunHeader) => (r.judge ? (r.judge.provider === 'heuristic' ? 'heuristic judge' : r.judge.model) : 'no judge')
 
@@ -16,9 +15,8 @@ export function RunPicker({ runs, value, onChange, side }: { runs: RunHeader[]; 
   const list = runs.filter((r) => !q || `${r.id} ${r.experiment} ${r.target} ${r.variant_label}`.toLowerCase().includes(q.toLowerCase()))
   const dot = side === 'baseline' ? 'bg-series-1' : 'bg-series-2'
   return (
-    // The menu's own wrapper is the picker's width: it fills its column and may shrink.
-    <div className="min-w-0 flex-1 [&>div]:block [&>div]:w-full">
-      <Menu role="dialog" width="100%"
+    <div className="min-w-0 flex-1">
+      <Menu role="dialog" width="100%" rootClassName="block w-full"
         trigger={({ open, props }) => (
           <button type="button" {...props} aria-label={side}
             className="flex min-h-[60px] w-full items-center gap-3 rounded-xl border border-line bg-surface px-3.5 py-2.5 text-left shadow-card transition-colors hover:border-line-strong">
@@ -26,13 +24,13 @@ export function RunPicker({ runs, value, onChange, side }: { runs: RunHeader[]; 
             <span className="min-w-0 flex-1">
               <span className="t-label block">{side}{cur && <> · <span className="font-mono">#{cur.id}</span></>}</span>
               {cur ? (
-                <span className="mt-0.5 block truncate text-sm text-ink" title={`${cur.experiment} · ${cur.target} v${cur.target_version} · ${cur.n_cases} × ${cur.trials_per_case} · ${judgeName(cur)}`}>
-                  {cur.variant_label || cur.experiment}
-                  <span className="text-ink-3"> · {cur.target} v<span className="font-mono">{cur.target_version}</span> · <span className="font-mono">{cur.n_cases}×{cur.trials_per_case}</span> · {judgeName(cur)}</span>
+                <span className="mt-0.5 block" title={`${cur.experiment} · ${cur.target} v${cur.target_version} · ${cur.n_cases} × ${cur.trials_per_case} · ${judgeName(cur)}`}>
+                  <span className="block truncate text-sm text-ink">{cur.variant_label || cur.experiment}</span>
+                  <span className="block truncate text-xs text-ink-3">{cur.target} v<span className="font-mono">{cur.target_version}</span> · <span className="font-mono">{cur.n_cases}×{cur.trials_per_case}</span> · {judgeName(cur)}</span>
                 </span>
               ) : <span className="mt-0.5 block text-sm text-ink-3">Choose a run…</span>}
             </span>
-            {side === 'candidate' && cur?.gate_status && <span className="shrink-0 origin-right scale-[0.8] max-sm:hidden"><Stamp status={cur.gate_status} runId={cur.id} /></span>}
+            {side === 'candidate' && cur?.gate_status && <span className="shrink-0 max-sm:hidden"><StatusBadge status={cur.gate_status} /></span>}
             <ChevronDown className={clsx('size-4 shrink-0 text-ink-3 transition-transform duration-(--dur-ui)', open && 'rotate-180')} />
           </button>
         )}>

@@ -8,6 +8,7 @@ import type { ExploreTrial } from '../../lib/types'
 import { TextLink } from '../form'
 import { SampleSize } from '../instrument'
 import { Card } from '../ui'
+import { ScrollCue } from '../Layout'
 import { CaseChip, ChartTip, NothingPasses, useWidth, type TipState } from './bits'
 import { decided } from './data'
 
@@ -146,7 +147,7 @@ export function FlowSankey({ trials }: { trials: ExploreTrial[] }) {
       </>}>
       <div ref={box} data-testid="run-sankey">
         {!G ? <NothingPasses>No scored tries yet.</NothingPasses> : (
-          <div className="scroll-thin overflow-x-auto"><svg width={SW} height={H} className="block">
+          <ScrollCue><div className="scroll-thin overflow-x-auto"><svg width={SW} height={H} className="block">
             <g ref={linksRef} fill="none">
               {(G.links as SL[]).map((l) => {
                 const k = `${(l.source as SN).name}→${(l.target as SN).name}`
@@ -171,7 +172,7 @@ export function FlowSankey({ trials }: { trials: ExploreTrial[] }) {
                 </g>
               )
             })}
-          </svg></div>
+          </svg></div></ScrollCue>
         )}
         <ChartTip tip={tip} />
         {picked && (

@@ -14,7 +14,6 @@ import { Badge, Button, Card, Dialog, ErrorState, Help, Notice, Panel, ProgressB
 
 const OLLAMA_URL = 'https://ollama.com/download'
 // TextLink's props do not list target/rel (they reach the anchor through the rest spread).
-const EXTERNAL = { target: '_blank', rel: 'noreferrer noopener' } as object
 
 interface Status { running: boolean; version?: string; models: { name: string; size_gb: number; cloud: boolean }[]; base_url: string; error?: string }
 interface Advice {
@@ -98,8 +97,8 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
       <div className="space-y-6">
       <ol className="flex flex-wrap gap-2">
         {steps.map((s, i) => (
-          <li key={s.label} className={clsx('flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs', s.done ? 'border-good/40 text-good-ink' : 'border-line text-ink-3')}>
-            <span className={clsx('flex size-4 items-center justify-center rounded-full font-mono text-label font-semibold', s.done ? 'bg-good text-on-solid' : 'bg-surface-3')}>{s.done ? <Check className="size-2.5" /> : i + 1}</span>{s.label}
+          <li key={s.label}>
+            <Badge tone={s.done ? 'pass' : 'neutral'}>{s.done ? <Check className="size-3" /> : <span className="font-mono">{i + 1}</span>}{s.label}</Badge>
           </li>
         ))}
       </ol>
@@ -110,7 +109,7 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
             action={<Button size="sm" onClick={() => status.refetch()} loading={status.isFetching}><RefreshCw className="size-3.5" />Check again</Button>}>
             1. Install it from the Ollama website (an external, third-party site). 2. Open the Ollama app; it then runs in the background. This page notices within a few seconds.
           </Notice>
-          <TextLink href={OLLAMA_URL} {...EXTERNAL} className="gap-1.5">
+          <TextLink href={OLLAMA_URL} target="_blank" rel="noreferrer noopener" className="gap-1.5">
             ollama.com/download <ExternalLink className="size-3.5" /><span className="text-xs font-normal text-ink-3">(opens an external site)</span>
           </TextLink>
         </div>

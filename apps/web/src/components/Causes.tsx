@@ -252,7 +252,7 @@ export function CompareCauses({ fixed, broke, baseline, candidate }: { fixed: Ca
   )
   return (
     <Card title="By cause" help={<><p>Did the change fix what you meant it to? Fixed lists why the newly passing questions failed before; Broke lists why the newly failing ones fail now.</p><CauseHelpBody /></>}>
-      <div data-testid="compare-causes" className="grid items-stretch gap-6 md:grid-cols-2">
+      <div data-testid="compare-causes" className="grid items-start gap-6 md:grid-cols-2">
         {panel(<>Fixed: why they failed in #{baseline}</>, 'good', fixed, 'Nothing newly passing.')}
         {panel(<>Broke: why they fail in #{candidate}</>, 'bad', broke, 'Nothing newly failing.')}
       </div>

@@ -71,21 +71,25 @@ const CHIP_ON = {
 /**
  * A toggle or filter chip: one shape (28 px pill), one selected style. `tone` colours the selected
  * state only when the colour means something (a "failed" filter is `bad`); otherwise leave it.
- * `count` is a figure after the label.
+ * `count` is a figure after the label. Give it `to` (a route) or `href` and it is a link chip: the
+ * same pill as a link, with no pressed state.
  */
-export function Chip({ selected = false, tone = 'accent', count, icon, children, className, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & {
+type ChipProps = {
   selected?: boolean
   tone?: keyof typeof CHIP_ON
   count?: ReactNode
   icon?: ReactNode
-}) {
-  return (
-    <button type="button" aria-pressed={selected} {...rest}
-      className={clsx('inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 text-xs font-medium transition-colors duration-(--dur-fast) disabled:cursor-not-allowed disabled:opacity-50',
-        selected ? CHIP_ON[tone] : 'border-line-strong bg-surface text-ink-2 hover:bg-surface-2 hover:text-ink', className)}>
-      {icon}{children}{count !== undefined && count !== null && <span className="num font-mono text-label opacity-70">{count}</span>}
-    </button>
-  )
+  to?: string
+  href?: string
+  viewTransition?: boolean
+}
+export function Chip({ selected = false, tone = 'accent', count, icon, children, className, to, href, viewTransition, ...rest }: Omit<ButtonHTMLAttributes<HTMLButtonElement>, keyof ChipProps> & ChipProps) {
+  const cls = clsx('inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 text-xs font-medium transition-colors duration-(--dur-fast) disabled:cursor-not-allowed disabled:opacity-50',
+    selected ? CHIP_ON[tone] : 'border-line-strong bg-surface text-ink-2 hover:bg-surface-2 hover:text-ink', className)
+  const body = <>{icon}{children}{count !== undefined && count !== null && <span className="num font-mono text-label opacity-70">{count}</span>}</>
+  if (to) return <Link to={to} viewTransition={viewTransition} className={cls} {...(rest as AnchorHTMLAttributes<HTMLAnchorElement>)}>{body}</Link>
+  if (href) return <a href={href} className={cls} {...(rest as AnchorHTMLAttributes<HTMLAnchorElement>)}>{body}</a>
+  return <button type="button" aria-pressed={selected} {...rest} className={cls}>{body}</button>
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -96,15 +100,21 @@ export function Chip({ selected = false, tone = 'accent', count, icon, children,
  * Accent text that acts: a route (`to`), an address (`href`) or a button (`onClick`). One look:
  * accent ink, underline on hover. `quiet` for a secondary one (grey until hovered).
  */
-export function TextLink({ to, href, size = 'md', quiet = false, className, children, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & {
+export function TextLink({ to, href, size = 'md', quiet = false, className, children, target, rel, viewTransition, ...rest }: Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'target'> & {
   to?: string
   href?: string
   size?: 'sm' | 'md'
   quiet?: boolean
+  /** An address that opens in a new tab: `rel` defaults to `noreferrer noopener`. */
+  target?: '_blank' | '_self'
+  rel?: string
+  /** A route change that cross-fades (the default for page links elsewhere). */
+  viewTransition?: boolean
 }) {
   const cls = clsx('inline-flex items-center gap-1 font-medium underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50', size === 'sm' ? 'text-xs' : 'text-sm', quiet ? 'text-ink-3 hover:text-ink' : 'text-accent-ink', className)
-  if (to) return <Link to={to} className={cls} {...(rest as AnchorHTMLAttributes<HTMLAnchorElement>)}>{children}</Link>
-  if (href) return <a href={href} className={cls} {...(rest as AnchorHTMLAttributes<HTMLAnchorElement>)}>{children}</a>
+  const anchor = rest as unknown as AnchorHTMLAttributes<HTMLAnchorElement>
+  if (to) return <Link to={to} viewTransition={viewTransition} target={target} rel={rel} className={cls} {...anchor}>{children}</Link>
+  if (href) return <a href={href} target={target} rel={rel ?? (target === '_blank' ? 'noreferrer noopener' : undefined)} className={cls} {...anchor}>{children}</a>
   return <button type="button" className={cls} {...rest}>{children}</button>
 }
 
@@ -148,13 +158,16 @@ export function SelectCard({ selected, onSelect, title, children, icon, classNam
  * or any content when `role="dialog"` (a picker with its own search). A click on a `MenuItem`
  * closes it; Esc and a click outside close it too. Pass a function as children to get `close`.
  */
-export function Menu({ trigger, children, align = 'left', width, role = 'menu', className }: {
+export function Menu({ trigger, children, align = 'left', width, role = 'menu', className, rootClassName }: {
   trigger: (t: { open: boolean; toggle: () => void; props: ButtonHTMLAttributes<HTMLButtonElement> }) => ReactNode
   children: ReactNode | ((close: () => void) => ReactNode)
   align?: 'left' | 'right'
   width?: number | string
   role?: 'menu' | 'dialog'
+  /** The panel. */
   className?: string
+  /** The wrapper around the trigger and panel (inline-block by default; `block w-full` to fill a column). */
+  rootClassName?: string
 }) {
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
@@ -181,7 +194,7 @@ export function Menu({ trigger, children, align = 'left', width, role = 'menu', 
     items[e.key === 'ArrowDown' ? (at + 1) % items.length : (at - 1 + items.length) % items.length].focus()
   }
   return (
-    <div ref={root} className="relative inline-block">
+    <div ref={root} className={clsx('relative', rootClassName ?? 'inline-block')}>
       {trigger({ open, toggle, props: { onClick: toggle, 'aria-haspopup': role === 'menu' ? 'menu' : 'dialog', 'aria-expanded': open } })}
       {open && (
         <motion.div role={role} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DUR.fast }}

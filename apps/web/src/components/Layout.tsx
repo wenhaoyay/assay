@@ -90,7 +90,7 @@ export function ScrollCue({ children, selector = '.overflow-x-auto', className }
 export function ScrollTabs<T extends string>({ tabs, value, onChange }: { tabs: { id: T; label: ReactNode }[]; value: T; onChange: (t: T) => void }) {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    ref.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.scrollIntoView({ inline: 'nearest', block: 'nearest' })
+    ref.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.scrollIntoView?.({ inline: 'nearest', block: 'nearest' })
   }, [value])
   return (
     <div ref={ref}>
@@ -186,16 +186,20 @@ function TopBar({ onPalette, onShortcuts }: { onPalette: () => void; onShortcuts
   return (
     <div data-topbar className="sticky top-0 z-(--z-nav) flex h-[52px] items-center gap-2.5 border-b border-line bg-page/80 px-8 backdrop-blur-md max-sm:px-4">
       <nav aria-label="Breadcrumb" className="flex min-w-0 flex-1 items-center gap-1.5 text-sm text-ink-3">
-        {crumbs.map((c, i) => (
-          <Fragment key={i}>
-            {i > 0 && <ChevronRight className="size-3.5 shrink-0 text-ink-3" aria-hidden />}
-            {c.to && i < crumbs.length - 1 ? (
-              <Link to={c.to} viewTransition className="truncate text-ink-3 hover:text-ink">{c.label}</Link>
-            ) : (
-              <span className={clsx('truncate', i === crumbs.length - 1 ? 'font-medium text-ink' : 'text-ink-3')}>{c.label}</span>
-            )}
-          </Fragment>
-        ))}
+        {crumbs.map((c, i) => {
+          // On a narrow screen only the parent and the current page show.
+          const far = i < crumbs.length - 2 && 'max-sm:hidden'
+          return (
+            <Fragment key={i}>
+              {i > 0 && <ChevronRight className={clsx('size-3.5 shrink-0 text-ink-3', i < crumbs.length - 1 && 'max-sm:hidden')} aria-hidden />}
+              {c.to && i < crumbs.length - 1 ? (
+                <Link to={c.to} viewTransition className={clsx('truncate text-ink-3 hover:text-ink', far)}>{c.label}</Link>
+              ) : (
+                <span className={clsx('truncate', i === crumbs.length - 1 ? 'font-medium text-ink' : 'text-ink-3', far)}>{c.label}</span>
+              )}
+            </Fragment>
+          )
+        })}
       </nav>
       <button type="button" onClick={onPalette} data-tour="palette"
         className="flex h-8 w-60 items-center gap-2 rounded-lg border border-line bg-surface px-2.5 text-sm text-ink-3 shadow-btn-raised transition-colors duration-(--dur-ui) hover:border-line-strong hover:text-ink-2 max-lg:w-auto">

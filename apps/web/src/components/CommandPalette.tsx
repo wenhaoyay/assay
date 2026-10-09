@@ -153,20 +153,20 @@ export function CommandPalette({ open, onClose, onShortcuts, onTour }: { open: b
                   <li key={it.id}>
                     {header && <div className="t-label px-3 pb-1 pt-2.5">{header}</div>}
                     <button type="button" data-cmd-index={i} role="option" aria-selected={i === active} onMouseMove={() => setActive(i)} onClick={it.run}
-                      className={clsx('relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors duration-100', i === active ? 'bg-surface-2 text-ink shadow-[inset_0_0_0_1px_var(--line)]' : 'text-ink-2')}>
+                      className={clsx('relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors duration-(--dur-fast)', i === active ? 'bg-surface-2 text-ink shadow-[inset_0_0_0_1px_var(--line)]' : 'text-ink-2')}>
                       <Icon className={clsx('size-4 shrink-0', i === active ? 'text-accent-ink' : 'text-ink-3')} aria-hidden />
                       <span className="min-w-0 flex-1 truncate">{it.label}</span>
-                      {it.hint && <span className="truncate text-xs text-ink-3">{it.hint}</span>}
+                      {it.hint && <span className="truncate text-xs text-ink-3 max-sm:hidden">{it.hint}</span>}
                       {i === active && <ArrowRight className="size-3.5 text-accent-ink" aria-hidden />}
                     </button>
                   </li>
                 )
               })}
             </ul>
-            <div className="flex items-center gap-3 border-t border-line bg-surface-2/60 px-4 py-2 text-xs text-ink-3">
+            <div className="flex items-center gap-3 whitespace-nowrap border-t border-line bg-surface-2/60 px-4 py-2 text-xs text-ink-3">
               <span className="flex items-center gap-1"><Kbd>↑</Kbd><Kbd>↓</Kbd> move</span>
               <span className="flex items-center gap-1"><Kbd>Enter</Kbd> open</span>
-              <span className="ml-auto flex items-center gap-1"><Kbd>?</Kbd> all shortcuts · <HelpGlyph /> beside a heading explains it</span>
+              <span className="ml-auto flex items-center gap-1 max-sm:hidden"><Kbd>?</Kbd> all shortcuts · <HelpGlyph /> beside a heading explains it</span>
             </div>
           </motion.div>
         </motion.div>

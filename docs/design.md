@@ -137,11 +137,11 @@ in `index.css`; there is no `z-[NN]`, hex, `text-white` or `bg-white` in a compo
 
 **Structure**
 - `PageHeader` (`title`, `help`, `actions`, `eyebrow`): the page title (serif) and its `?`. One per page.
-- `SectionHead` (`title`, `help`, `meta`, `actions`, `rule`): the heading row (18/600 `.t-h`, `?`, count or `<SampleSize>` as `meta`, actions at the right that wrap below). Use it for any heading that is not inside a `Card`.
+- `SectionHead` (`title`, `help`, `meta`, `actions`, `rule`): the heading row (one fixed minimum height, so two side by side align) (18/600 `.t-h`, `?`, count or `<SampleSize>` as `meta`, actions at the right that wrap below). Use it for any heading that is not inside a `Card`.
 - `Card` (`title`, `help`, `meta`, `actions`, `boxed`, `padded`): a section under a heading row (it renders `SectionHead`). `boxed` only for forms, grids of cards, side panels. `subtitle` is deprecated: use `help`.
-- `Panel` (`padded`, plus div props): the boxed surface (radius, border, shadow, `--card-p`). For a card with no heading, a tile, a form block. No hover movement.
-- `Table` (`className`): scrolling table wrapper; headers `.t-label`, figures right-aligned.
-- `Figs` + `Stat` (`label`, `value` or `numeric` + `format`, `sub`, `delta`, `help`, `tone`, `hatched`): a row of figures.
+- `Panel` (`padded`, plus div props): the boxed surface (radius, border, shadow, `--card-p`). For a card with no heading, a tile, a form block. No hover movement. `PanelButton` (`onClick` | `to` | `href`): the same surface as a tile that acts (focus ring, colour change, no lift): Golden's tools, Connect's templates.
+- `Table` (`className`): scrolling table wrapper; headers `.t-label`, left by default. Give a numeric column's `<th>` and cells `text-right` (no `!`).
+- `Figs` + `Stat` (`label`, `value` or `numeric` + `format`, `sub`, `delta`, `help`, `tone`, `hatched`, `nowrap`): a row of figures; `nowrap` keeps the label on one line.
 - `Notice` (`tone`, `title`, `action`): an inline message. `ErrorState` (`error`, `retry`): a failed fetch. `InlineError`: next to the button that failed. `toast(msg, tone)`: transient.
 
 **Help and empty**
@@ -151,15 +151,15 @@ in `index.css`; there is no `z-[NN]`, hex, `text-white` or `bg-white` in a compo
 
 **Controls**
 - `Button` (`variant`: primary, secondary, ghost, danger; `size`: sm, md, lg; `loading`): at most one primary per screen. `linkButton(variant, size)` gives a link the same look.
-- `TextLink` (`to` | `href` | `onClick`, `size`, `quiet`) (`form`): the accent text action ("Read it again", "Clear"). Not a boxed button.
+- `TextLink` (`to` | `href` | `onClick`, `size`, `quiet`, `target`, `rel`, `viewTransition`) (`form`): the accent text action ("Read it again", "Clear"). Not a boxed button.
 - `Input`, `Textarea` (`mono` only for JSON, curl or code), `Select` (token chevron), `Field` (`label`, `hint`, `error`): text controls. Sentences are sans.
 - `Checkbox` (`checked`, `onChange(bool)`, `label`, `hint`) (`form`): every checkbox, in lists and tables too.
 - `Toggle` (`checked`, `onChange`, `label`, `hint`): an on/off setting that applies at once.
 - `FileInput` (`onFiles`, `accept`, `multiple`, `label`) (`form`): file picker (a button and the chosen name).
-- `Segmented` (`options`, `value`, `onChange`, `size` sm default, `label`): pick one of 2 to 5 short options. `Tabs` (`tabs`, `value`, `onChange`): switch a page's views.
-- `Chip` (`selected`, `tone`, `count`, `icon`, `onClick`) (`form`): a toggle or filter chip; `tone` colours the selected state only when the colour means something (a failed filter is `bad`).
+- `Segmented` (`options`, `value`, `onChange`, `size` sm default, `label`): pick one of 2 to 5 short options. `Tabs` (`tabs`, `value`, `onChange`, `className`): switch a page's views.
+- `Chip` (`selected`, `tone`, `count`, `icon`, `onClick`, or `to` / `href` for a link chip) (`form`): a toggle or filter chip; `tone` colours the selected state only when the colour means something (a failed filter is `bad`).
 - `SelectCard` (`selected`, `onSelect`, `title`, children, `icon`) (`form`): one option among a few as a card; wrap the set in `role="radiogroup"`. Changes colour, never lifts.
-- `Menu` (`trigger`, `align`, `width`, `role`) with `MenuItem` (`icon`, `danger`) (`form`): every popover (Share, run picker, colour picker). `trigger` receives `props` to spread on its button; `role="dialog"` for a picker with its own search.
+- `Menu` (`trigger`, `align`, `width`, `role`, `className` for the panel, `rootClassName` for the wrapper) with `MenuItem` (`icon`, `danger`) (`form`): every popover (Share, run picker, colour picker). `trigger` receives `props` to spread on its button; `role="dialog"` for a picker with its own search.
 - `Dialog` (`open`, `onClose`, `title`, `width`): modal. Focus moves in (put `data-autofocus` on the right control), Tab is trapped, Esc closes, focus returns. The primary action is last, right-aligned; "Cancel" only closes.
 - `ProgressBar` (`value` 0 to 1, `tone`).
 

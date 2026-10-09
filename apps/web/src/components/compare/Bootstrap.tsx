@@ -12,7 +12,7 @@ import { useWidth } from './useWidth'
 const N = 600
 const H_RUN = 280 // while resampling and after
 const H_IDLE = 120 // before the first press: the axis and the measured change, nothing to draw yet
-const M = { l: 16, r: 16, b: 30, t: 12 }
+const M = { l: 16, r: 30, b: 30, t: 12 }
 const ppf = (v: number, digits = 0) => pp(v, digits)
 
 interface Readout { n: number; lo: number; hi: number; zero: number; done: boolean }
@@ -44,11 +44,16 @@ export function Bootstrap({ diffs, nQuestions }: { diffs: number[]; nQuestions: 
     svg.append('g').attr('class', 'axis').attr('transform', `translate(0,${base})`)
       .call(d3.axisBottom(x).ticks(Math.max(3, Math.floor(chartW / 90))).tickFormat((d) => ppf(+d)))
     svg.append('line').attr('x1', x(0)).attr('x2', x(0)).attr('y1', M.t).attr('y2', base).attr('stroke', 'var(--bad)').attr('stroke-dasharray', '4 3')
-    svg.append('text').attr('x', x(0) + 6).attr('y', M.t + 10).style('fill', 'var(--bad-ink)').text('no change')
+    // The two labels sit on opposite sides of their lines (the measured change away from zero, "no
+    // change" the other way); only when edge room forces both to one side does the second drop a row.
+    const mLeft = obs < 0 ? x(obs) - M.l > 105 : x(obs) > chartW - 105
+    const zLeft = obs < 0 ? x(0) > chartW - 80 : x(0) - M.l > 70
+    const stack = mLeft === zLeft && Math.abs(x(obs) - x(0)) < 190
+    svg.append('text').attr('x', zLeft ? x(0) - 6 : x(0) + 6).attr('y', M.t + (stack ? 26 : 10)).attr('text-anchor', zLeft ? 'end' : 'start')
+      .style('fill', 'var(--bad-ink)').text('no change')
     const band = svg.append('rect').attr('y', M.t).attr('height', base - M.t).attr('fill', 'var(--ink-3)').attr('opacity', 0)
     svg.append('line').attr('x1', x(obs)).attr('x2', x(obs)).attr('y1', M.t).attr('y2', base).attr('stroke', 'var(--accent)').attr('stroke-width', 2)
-    const right = x(obs) > chartW - 150
-    svg.append('text').attr('x', right ? x(obs) - 6 : x(obs) + 6).attr('y', M.t + 10).attr('text-anchor', right ? 'end' : 'start')
+    svg.append('text').attr('x', mLeft ? x(obs) - 6 : x(obs) + 6).attr('y', M.t + 10).attr('text-anchor', mLeft ? 'end' : 'start')
       .style('fill', 'var(--accent-ink)').text(`measured ${ppf(obs, 1)}`)
     if (run === 0) return
     // Bins a dot wide; the stack step shrinks if the tallest stack would not fit.

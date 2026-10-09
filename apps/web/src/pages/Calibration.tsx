@@ -73,7 +73,7 @@ export function CalibrationPage() {
         />
       <div className="space-y-6">
         <div className="flex flex-wrap items-end">
-          <div className="min-w-0 flex-1 basis-80"><Tabs tabs={[{ id: 'label', label: 'Label answers' }, { id: 'agreement', label: 'Agreement' }, { id: 'bakeoff', label: 'Judge bake-off' }]} value={tab} onChange={(t) => setParams({ tab: t })} /></div>
+          <Tabs className="min-w-0 flex-1 basis-80" tabs={[{ id: 'label', label: 'Label answers' }, { id: 'agreement', label: 'Agreement' }, { id: 'bakeoff', label: 'Judge bake-off' }]} value={tab} onChange={(t) => setParams({ tab: t })} />
           <div className="flex flex-wrap items-center gap-2 border-b border-line pb-1.5 pl-6 max-sm:pl-0 max-sm:pt-3">
             <Select className="w-44" value={dimension} onChange={(e) => setDimension(e.target.value)} aria-label="Dimension">{DIMENSIONS.map((d) => <option key={d} value={d}>{d.replace(/_/g, ' ')}</option>)}</Select>
             <Select className="w-60" value={judge} onChange={(e) => setJudge(e.target.value)} aria-label="Judge model">
@@ -193,7 +193,7 @@ function LabelTab({ dimension, stats }: { dimension: string; stats?: Calibration
       <Confetti fire={celebrate} />
       <div className="min-w-0 space-y-6" data-tour="flashcard">
         <div className="space-y-3">
-        <SectionHead rule className="min-h-11!" title="Label answers" help={<>
+        <SectionHead rule title="Label answers" help={<>
           <p>Real answers from your runs, graded by a judge. Judge each one yourself: <Kbd>P</Kbd> pass, <Kbd>F</Kbd> fail, <Kbd>U</Kbd> unsure. After each label you see what the judge said.</p>
           <p>The judge's verdict stays hidden until you label, so it cannot anchor your judgement.</p>
           <p>Label what a careful expert would say, not what you think the judge will say. Disagreements are the useful part: they show where the judge cannot be trusted.</p>
@@ -228,7 +228,7 @@ function LabelTab({ dimension, stats }: { dimension: string; stats?: Calibration
         )}
       </div>
       <div className="min-w-0 space-y-6" data-testid="live-agreement">
-        <SectionHead rule className="min-h-11!" title="Agreement" help={KAPPA_HELP} meta={stats?.judge_filter || undefined} />
+        <SectionHead rule title="Agreement" help={KAPPA_HELP} meta={stats?.judge_filter || undefined} />
         {stats ? <AgreementGauge a={stats.agreement} small={stats.small_sample} /> : <Loading rows={3} />}
         {stats && <TwoByTwo a={stats.agreement} testPrefix="live" />}
       </div>
@@ -313,8 +313,8 @@ function BakeoffTab({ dimension }: { dimension: string }) {
           <>
             <div className="flex flex-wrap gap-2">
               {[{ id: 'heuristic', name: 'Heuristic (word overlap)', local: true }, ...(models.data ?? []).map((m) => ({ id: String(m.id), name: m.name, local: !!m.local, where: whereLabel(m) }))].map((m) => (
-                <Chip key={m.id} selected={picked.includes(m.id)} onClick={() => toggle(m.id)} icon={picked.includes(m.id) ? <Check className="size-3.5" /> : <span className="size-3.5" />}>
-                  {m.name}<Badge>{'where' in m ? m.where : 'local'}</Badge>
+                <Chip key={m.id} selected={picked.includes(m.id)} onClick={() => toggle(m.id)} count={'where' in m ? m.where : 'local'} icon={picked.includes(m.id) ? <Check className="size-3.5" /> : undefined}>
+                  {m.name}
                 </Chip>
               ))}
             </div>
@@ -350,7 +350,7 @@ function BakeoffTab({ dimension }: { dimension: string }) {
             {shown.results && (
               <>
                 <Table>
-                  <thead><tr><th>Judge</th><th><Term k="kappa">Agreement (kappa)</Term></th><th className="text-right">Accuracy</th><th className="text-right">F1 (fail)</th><th className="text-right">No verdict</th><th className="text-right">Speed</th><th className="text-right">Cost</th></tr></thead>
+                  <thead><tr><th className="t-label">Judge</th><th className="t-label"><Term k="kappa">Agreement (kappa)</Term></th><th className="t-label text-right">Accuracy</th><th className="t-label text-right">F1 (fail)</th><th className="t-label text-right">No verdict</th><th className="t-label text-right">Speed</th><th className="t-label text-right">Cost</th></tr></thead>
                   <tbody>
                     {[...shown.results.judges].sort((a, b) => (b.agreement.kappa ?? -2) - (a.agreement.kappa ?? -2)).map((j, i) => (
                       <motion.tr key={j.name} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.08 }} className={clsx(j.name.startsWith('heuristic') && 'hatched')}>

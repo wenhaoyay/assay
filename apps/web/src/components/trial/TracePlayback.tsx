@@ -51,7 +51,8 @@ export function TracePlayback({ spans, answer, onRetrieval }: { spans: Span[]; a
   const [box, w] = useWidth(900)
   const svgRef = useRef<SVGSVGElement>(null)
   const clip = `tp-${useId().replace(/[^a-zA-Z0-9]/g, '')}`
-  const chartW = Math.max(200, w - LABEL_W)
+  const labelW = w < 520 ? 96 : LABEL_W // narrow screens: names truncate, the chart keeps room
+  const chartW = Math.max(140, w - labelW)
   const H = rows.length * RH + AXIS_H
   const [tf, setTf] = useState<d3.ZoomTransform>(d3.zoomIdentity)
   const [T, setT] = useState(() => (motionOn ? 0 : total))
@@ -154,7 +155,7 @@ export function TracePlayback({ spans, answer, onRetrieval }: { spans: Span[]; a
       </>}>
       <div ref={box} className="relative" data-testid="trace-playback">
         <div className="flex">
-          <ul className="shrink-0" style={{ width: LABEL_W }}>
+          <ul className="shrink-0" style={{ width: labelW }}>
             {rows.map((r) => (
               <li key={r.s.span_id} className="flex items-center gap-2" style={{ height: RH, paddingLeft: Math.min(r.depth, 4) * 14 }} title={`${KIND[r.s.type] ?? r.s.type}: ${r.s.name}`}>
                 <span className="size-2 shrink-0 rounded-full" style={{ background: r.s.status === 'error' ? 'var(--bad)' : COLOR[r.s.type] ?? 'var(--ink-3)' }} />

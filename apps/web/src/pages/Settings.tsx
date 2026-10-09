@@ -18,7 +18,6 @@ import { LocalModelsCard } from '../components/LocalModels'
 import { Pricing } from './Evaluators'
 
 // TextLink's props do not list target/rel (they reach the anchor through the rest spread).
-const EXTERNAL = { target: '_blank', rel: 'noreferrer' } as object
 
 type STab = 'models' | 'defaults' | 'appearance' | 'shape' | 'templates' | 'pricing' | 'server'
 
@@ -143,8 +142,8 @@ function ModelCard({ m, settings, onChange }: { m: ProviderConfig; settings?: Se
       </AnimatePresence>
       <div className="mt-3 flex flex-wrap gap-1.5">
         <Button size="sm" loading={run.isPending} onClick={() => run.mutate()}><RefreshCw className="size-3.5" />Check (5 calls)</Button>
-        {!isJudge && <Button size="sm" variant="ghost" loading={setDefault.isPending && setDefault.variables === 'default_judge'} onClick={() => setDefault.mutate('default_judge')}>Make default grading model</Button>}
-        {!isGen && <Button size="sm" variant="ghost" loading={setDefault.isPending && setDefault.variables === 'default_generator'} onClick={() => setDefault.mutate('default_generator')}>Use to draft test cases</Button>}
+        {!isJudge && <Button size="sm" loading={setDefault.isPending && setDefault.variables === 'default_judge'} onClick={() => setDefault.mutate('default_judge')}>Make default grading model</Button>}
+        {!isGen && <Button size="sm" loading={setDefault.isPending && setDefault.variables === 'default_generator'} onClick={() => setDefault.mutate('default_generator')}>Use to draft test cases</Button>}
         {!m.used_by_runs && <Button size="sm" variant="danger" className="ml-auto" loading={del.isPending} onClick={() => del.mutate()}><Trash2 className="size-3.5" />Remove</Button>}
       </div>
       {del.isError && <div className="mt-2"><ErrorState error={del.error} /></div>}
@@ -211,7 +210,7 @@ function ConnectProvider({ entry, keyring, onClose, onDone }: { entry: CatalogEn
                     </div>
                   )}
                   {storeKey.isError && <ErrorState error={storeKey.error} />}
-                  {entry.key_url && <TextLink href={entry.key_url} size="sm" {...EXTERNAL}>Get a key <ExternalLink className="size-3" /></TextLink>}
+                  {entry.key_url && <TextLink href={entry.key_url} size="sm" target="_blank" rel="noreferrer noopener">Get a key <ExternalLink className="size-3" /></TextLink>}
                 </div>
               )}
             </div>
@@ -326,7 +325,7 @@ function ServerTab() {
         <dt className="t-label self-center">Status</dt><dd className="flex items-center gap-2"><span className={clsx('size-2 rounded-full', health.isSuccess ? 'bg-good' : 'bg-bad')} />{health.isSuccess ? 'running' : 'unreachable'}</dd>
         <dt className="t-label self-center">Version</dt><dd className="num font-mono">{s.data?.server.version}</dd>
         <dt className="t-label self-center">Database</dt><dd>{s.data?.server.database} <span className="font-mono text-xs text-ink-3">{s.data?.server.database_url}</span></dd>
-        <dt className="t-label self-center">API reference</dt><dd><TextLink href="/docs" {...EXTERNAL}>OpenAPI docs <ExternalLink className="size-3" /></TextLink></dd>
+        <dt className="t-label self-center">API reference</dt><dd><TextLink href="/docs" target="_blank" rel="noreferrer noopener">OpenAPI docs <ExternalLink className="size-3" /></TextLink></dd>
       </dl>
     </Card>
   )

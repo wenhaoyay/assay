@@ -257,7 +257,7 @@ export function Delta({ value, format, higherIsBetter = true, noise = 0.005, suf
 export function Receipt({ title, sub, children, className }: { title: ReactNode; sub?: ReactNode; children: ReactNode; className?: string }) {
   return (
     <div className={clsx('receipt', className)} data-testid="receipt">
-      <div className="t-h text-center">{title}</div>
+      <div className="t-label text-center text-ink-2">{title}</div>
       {sub && <div className="mt-0.5 text-center text-xs text-ink-3">{sub}</div>}
       <hr />
       {children}

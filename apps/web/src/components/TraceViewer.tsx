@@ -91,7 +91,7 @@ export function TraceViewer({ spans, showEvaluators = true }: { spans: Span[]; s
       </div>
       {showEvaluators && checks.length > 0 && (
         <div>
-          <div className="t-label mb-1.5">Checks that graded this answer</div>
+          <div className="mb-1.5 text-sm font-medium text-ink-2">Checks that graded this answer</div>
           <div className="flex flex-wrap gap-1.5">
             {checks.map((c) => {
               const pass = (c.output_summary ?? '').startsWith('pass')

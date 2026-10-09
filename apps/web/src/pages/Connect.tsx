@@ -11,7 +11,7 @@ import { useState, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { CleanupMethodHelp, ConnectionHelp, MethodHelp } from '../components/helpTexts'
 import { JsonTree } from '../components/JsonTree'
-import { Badge, Button, Card, ErrorState, Field, Input, Json, Notice, PageHeader, PageSkeleton, Panel, Segmented, Select, Table, Textarea, Toggle, toast } from '../components/ui'
+import { Badge, Button, Card, ErrorState, Field, Input, Json, Notice, PageHeader, PageSkeleton, PanelButton, Segmented, Select, Table, Textarea, Toggle, toast } from '../components/ui'
 import { Checkbox, Chip, FileInput, SelectCard, TextLink } from '../components/form'
 import { LabelHelp } from '../components/LabelHelp'
 import { api } from '../lib/api'
@@ -243,12 +243,10 @@ function StepRoute({ route, onRoute, templates, onTemplate, standard, setStandar
         <Card title="Or start from a template" meta={`${templates.length}`} help={<p>Fills the steps from a known setup. Your saved connections appear here too.</p>}>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {templates.map((t) => (
-              <Panel key={t.id} padded={false}>
-                <button type="button" onClick={() => onTemplate(t)} className="flex h-full w-full flex-col items-start rounded-xl p-3 text-left transition-colors duration-(--dur-ui) hover:bg-surface-2">
-                  <div className="flex items-center gap-2 text-sm font-medium">{t.name}{!t.builtin && <Badge tone="accent">yours</Badge>}</div>
-                  <div className="mt-0.5 line-clamp-2 text-xs text-ink-2">{t.description}</div>
-                </button>
-              </Panel>
+              <PanelButton key={t.id} onClick={() => onTemplate(t)}>
+                <div className="flex items-center gap-2 text-sm font-medium">{t.name}{!t.builtin && <Badge tone="accent">yours</Badge>}</div>
+                <div className="mt-0.5 line-clamp-2 text-xs text-ink-2">{t.description}</div>
+              </PanelButton>
             ))}
           </div>
         </Card>

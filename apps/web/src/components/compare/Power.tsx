@@ -52,7 +52,7 @@ export function Power({ flipShare, n0 }: { flipShare: number; n0: number }) {
           <label htmlFor={id} className="t-label block">Questions in the set: <b className="font-mono font-medium text-ink">{n}</b></label>
           <input id={id} type="range" min={20} max={600} step={1} value={n} onChange={(e) => setN(+e.target.value)} className="w-full accent-[var(--accent)]" data-testid="power-slider" />
           <p className="t-readout" aria-live="polite" data-testid="power-readout">
-            With <span className="font-mono">{n}</span> questions you can trust changes of about <b className="font-mono font-medium text-accent-ink">{Math.round(mde(n) * 100)}&nbsp;pp</b> or more.{' '}
+            With <span className="font-mono">{n}</span> questions you can trust changes of about <b className="font-mono font-medium text-accent-ink">{Math.round(mde(n) * 100)}</b>&nbsp;pp or more.{' '}
             <span className="text-ink-2">Seeing a 5 pp change takes about <span className="font-mono">{need5.toLocaleString()}</span>.</span>
           </p>
         </div>

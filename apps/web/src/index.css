@@ -389,6 +389,12 @@ pre.code {
   word-break: break-word;
 }
 
+/* Headers read left by default; a utility (`text-right` on a numeric column's header) wins because
+   this sits in the base layer. */
+@layer base {
+  .gl-table th { text-align: left; }
+}
+
 /* Table rows follow the density setting. */
 .gl-table td,
 .gl-table th {
@@ -502,6 +508,7 @@ tr.hl {
   border: 1px solid var(--line);
   border-radius: 4px;
   padding: 22px 20px 30px;
+  margin-bottom: 10px; /* room for the torn edge, which hangs below the paper */
   box-shadow: var(--shadow);
 }
 .receipt::after {

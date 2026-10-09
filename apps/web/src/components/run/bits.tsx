@@ -3,7 +3,7 @@
 import clsx from 'clsx'
 import { useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
-import { Link } from 'react-router-dom'
+import { Chip } from '../form'
 import { GaugeArt } from '../ui'
 
 export type ChipTone = 'good' | 'bad' | 'warn' | 'neutral'
@@ -13,15 +13,14 @@ export function CaseChip({ caseId, trialId, tone = 'neutral', children, color, t
   caseId: string; trialId: number; tone?: ChipTone; children?: ReactNode; color?: string; title?: string
 }) {
   return (
-    <Link to={`/trials/${trialId}`} data-case={caseId} title={title ?? caseId} viewTransition
-      className={clsx('inline-flex h-7 max-w-72 items-center gap-1.5 truncate rounded-full border px-2.5 text-xs font-medium transition-colors duration-(--dur-fast) hover:bg-surface-2',
+    <Chip to={`/trials/${trialId}`} viewTransition data-case={caseId} title={title ?? caseId}
+      className={clsx('max-w-72',
         tone === 'good' && 'border-good/40 text-good-ink',
         tone === 'bad' && 'border-bad/40 text-bad-ink',
-        tone === 'warn' && 'border-warn/50 text-warn-ink',
-        tone === 'neutral' && 'border-line-strong text-ink-2')}
+        tone === 'warn' && 'border-warn/50 text-warn-ink')}
       style={color ? { borderColor: color } : undefined}>
       <span className="truncate">{children ?? <span className="font-mono">{caseId}</span>}</span>
-    </Link>
+    </Chip>
   )
 }
 

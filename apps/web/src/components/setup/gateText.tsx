@@ -28,7 +28,7 @@ function unit(metric: string): 'ms' | 'usd' | 'n' | 'rate' {
 /** A limit as people say it: 0.7 -> 70%, 3000 ms -> 3.0 s. */
 export function limitText(metric: string, value: number, drop = false): string {
   const u = unit(metric)
-  if (u === 'rate') return drop ? `${+(value * 100).toFixed(1)}pp` : `${+(value * 100).toFixed(1)}%`
+  if (u === 'rate') return drop ? `${+(value * 100).toFixed(1)} pp` : `${+(value * 100).toFixed(1)}%`
   if (u === 'ms') return value >= 1000 ? `${(value / 1000).toFixed(1)}\u00a0s` : `${Math.round(value)}\u00a0ms`
   if (u === 'usd') return `$${value}`
   return value.toLocaleString()

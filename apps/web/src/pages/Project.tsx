@@ -89,7 +89,7 @@ export function ProjectPage() {
       </PageHeader>
 
       {!latest ? (
-        <Empty title="No completed run yet" action={<Link to={`/runs/new?project=${p.id}`} className={linkButton('primary')}>Start the first run</Link>}>
+        <Empty title="No completed run yet" action={<Link to={`/runs/new?project=${p.id}`} viewTransition className={linkButton('primary')}>Start the first run</Link>}>
           Run a target of this chatbot on a dataset. Once two comparable runs exist, this page says whether it got better.
         </Empty>
       ) : (
@@ -136,7 +136,7 @@ export function ProjectPage() {
 
           <LatestVsPrevious h={h!} />
 
-          <Card title={<>Where failures start · run <Link className="font-mono text-accent-ink hover:underline" to={`/runs/${latest.id}`}>#{latest.id}</Link></>}
+          <Card title="Where failures start" meta={<Link className="font-mono text-accent-ink hover:underline" to={`/runs/${latest.id}`} viewTransition>run #{latest.id}</Link>}
             help={<>
               <p>The <Term k="stage">pipeline stages</Term> of the latest run, and how many failures start in each.</p>
               <p>Each failed trial is counted once per kind of failure it shows. The stage is where that kind of failure starts. Click a kind to see those answers.</p>
@@ -151,7 +151,7 @@ export function ProjectPage() {
           </div>
 
           <div className="grid gap-x-10 gap-y-12 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-            <Card title="Recent runs" padded={false} actions={<TextLink to="/runs">All runs</TextLink>}>
+            <Card title="Recent runs" padded={false} actions={<TextLink to="/runs" viewTransition>All runs</TextLink>}>
               <div className="pt-2"><RunsTable runs={h!.recent_runs.slice(0, 8)} compact /></div>
             </Card>
             <div className="space-y-12">
@@ -207,7 +207,7 @@ function Verdict({ pts, gate }: { pts: Point[]; gate: number | null }) {
   return (
     <p className={clsx('t-verdict mt-2.5 text-ink-2', READING_W)} data-testid="project-verdict">
       From {n(first.pass_rate)} {up ? 'to' : 'down to'} <span className={clsx('font-mono', lastGood ? 'text-good-ink' : up ? 'text-ink' : 'text-bad-ink')}>{pct(last.pass_rate, 0)}</span> {spanWords(first.at, last.at)}.{' '}
-      {dip && <span className="text-ink-3">The largest dip was on {dayLabel(dip.p.at)}: down <span className="font-mono">{Math.abs(dip.d * 100).toFixed(0)} pp</span> at run <span className="font-mono">#{dip.p.run_id}</span>{what ? <>, after “{what}”</> : null}.</span>}
+      {dip && <span className="text-ink-3">The largest dip was on {dayLabel(dip.p.at)}: down <span className="font-mono">{Math.abs(dip.d * 100).toFixed(0)}</span> pp at run <span className="font-mono">#{dip.p.run_id}</span>{what ? <>, after “{what}”</> : null}.</span>}
     </p>
   )
 }
@@ -217,13 +217,13 @@ function LatestVsPrevious({ h }: { h: ProjectHome }) {
   if (!v) return null
   const s = verdictSentence(v)
   return (
-    <Card title={<>Latest against previous · <span className="font-mono">#{v.baseline_run_id} → #{v.candidate_run_id}</span></>}
-      meta={<SampleSize n={v.n_shared_cases} unit="shared" />}
+    <Card title="Latest against previous"
+      meta={<><span className="font-mono">#{v.baseline_run_id} → #{v.candidate_run_id}</span> <SampleSize n={v.n_shared_cases} unit="shared" /></>}
       help={<>
         <p>The latest run against the previous comparable one, metric by metric, on the questions both asked.</p>
         <p>Each change carries its 95% interval. If the interval covers zero, the difference could be chance.</p>
       </>}
-      actions={<TextLink to={`/compare?baseline=${v.baseline_run_id}&candidate=${v.candidate_run_id}`}>Every metric, every case <ArrowRight className="size-3.5" /></TextLink>}>
+      actions={<TextLink to={`/compare?baseline=${v.baseline_run_id}&candidate=${v.candidate_run_id}`} viewTransition>Every metric, every case <ArrowRight className="size-3.5" /></TextLink>}>
       <p className={clsx('t-readout', s.tone === 'good' && 'text-good-ink', s.tone === 'bad' && 'text-bad-ink')}>{s.text}</p>
       <div className="mt-4"><MetricTable rows={v.rows} /></div>
     </Card>

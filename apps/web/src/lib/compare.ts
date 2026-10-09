@@ -1,6 +1,6 @@
 // How a comparison row is formatted and read. Kept separate from the page so it can be tested
 // and so the reading rules live in one place.
-import { ms, num, pct, relative, score, usd } from './format'
+import { ms, num, pct, pp, relative, score, usd } from './format'
 import type { ComparisonRow } from './types'
 
 const LOWER_BETTER = new Set(['latency', 'cost', 'count'])
@@ -17,7 +17,7 @@ export function fmtValue(row: Pick<ComparisonRow, 'unit'>, v: number | null): st
 
 export function fmtDelta(row: ComparisonRow): string {
   if (row.delta === null) return 'n/a'
-  if (row.unit === 'rate') return `${row.delta > 0 ? '+' : ''}${(row.delta * 100).toFixed(1)}pp`
+  if (row.unit === 'rate') return pp(row.delta)
   if (row.unit === 'score') return `${row.delta > 0 ? '+' : ''}${row.delta.toFixed(3)}`
   return relative(row.relative)
 }
@@ -59,12 +59,12 @@ export function verdictSentence(o: { overall: ComparisonRow | null; regressions:
   const r = o.overall
   if (!r || r.delta === null) return { text: 'Not enough shared cases to compare.', tone: 'neutral' }
   const read = reading(r)
-  const pp = `${r.delta > 0 ? '+' : ''}${(r.delta * 100).toFixed(1)}pp`
+  const change = pp(r.delta)
   const head =
-    read.text === 'likely better' ? `Better: pass rate up ${pp}, beyond noise.`
-    : read.text === 'likely worse' ? `Worse: pass rate down ${pp.replace('-', '')}, beyond noise.`
+    read.text === 'likely better' ? `Better: pass rate up ${change}, beyond noise.`
+    : read.text === 'likely worse' ? `Worse: pass rate down ${change.replace(/^[-−]/, '')}, beyond noise.`
     : r.delta === 0 ? 'No change in pass rate.'
-    : `No reliable difference: pass rate ${pp}, within noise.`
+    : `No reliable difference: pass rate ${change}, within noise.`
   const moved = `${o.regressions} case${o.regressions === 1 ? '' : 's'} regressed, ${o.improvements} improved.`
   const extras: string[] = []
   for (const row of o.rows ?? []) {

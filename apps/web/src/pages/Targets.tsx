@@ -185,30 +185,12 @@ export function TargetPage() {
           </Card>
           <Card title="Health" help={<p>The last health check, and figures from the latest runs of this connection.</p>}>
             <Figs>
-              <Stat label="Last check" value={<span className={clsx('font-sans text-base font-medium', lc && !lc.ok && 'text-bad-ink')}>{lc ? (lc.ok ? `ok · ${when(lc.at)}` : 'failed') : 'never'}</span>} />
+              <Stat label="Last check" value={<span className={clsx('font-sans text-base', lc ? 'font-medium' : 'font-normal text-ink-3', lc && !lc.ok && 'text-bad-ink')}>{lc ? (lc.ok ? `ok · ${when(lc.at)}` : 'failed') : 'never'}</span>} />
               <Stat label="Typical answer" value={health.data?.typical_latency_ms != null ? ms(health.data.typical_latency_ms) : <span className="font-sans text-base font-normal text-ink-3">no runs yet</span>} />
               <Stat label="Recent pass rate" value={health.data?.runs.length ? <Sparkline values={[...health.data.runs].reverse().map((r) => r.pass_rate)} width={120} height={28} label="pass rate of recent runs" /> : <span className="font-sans text-base font-normal text-ink-3">no runs yet</span>} />
             </Figs>
             {lc?.coverage && <p className="mt-3 text-xs text-ink-2">Reports: {lc.coverage.join(', ') || 'answer only'}.</p>}
             {health.data?.runs[0] && <p className="mt-1 text-xs text-ink-2">Latest run <Link className="font-mono text-accent-ink underline" to={`/runs/${health.data.runs[0].id}`}>#{health.data.runs[0].id}</Link>: <span className="font-mono">{pct(health.data.runs[0].pass_rate)}</span>.</p>}
-          </Card>
-          <Card title="Grading privacy" help={<p>Keeps this bot's answers on this computer when they are graded. Runs that pick a cloud grading model for this bot are refused.</p>}>
-            <Toggle disabled={flags.isPending} checked={!!target.local_judges_only} onChange={(val) => flags.mutate({ local_judges_only: val })}
-              label={<LabelHelp label="Local grading models only"><p>This bot's answers may only be graded by a model running on this machine (Ollama, LM Studio). Runs that pick a cloud model are refused.</p></LabelHelp>} />
-          </Card>
-          <Card title="Load and cost" help={<p>How hard test runs may press on this bot, and what one answer costs when the bot reports no token counts.</p>}>
-            <Toggle disabled={flags.isPending} checked={!!target.shared} onChange={(val) => flags.mutate({ shared: val })}
-              label={<LabelHelp label="Other people use this bot" title="A shared bot"><p>New runs then ask 2 questions at a time by default, and warn above that: test questions all at once would slow down real users' answers.</p></LabelHelp>} />
-            <div className="mt-4">
-              <Field label={<LabelHelp label="Cost per answer (USD, your estimate)" title="Cost per answer"><p>For bots that report no token counts (Assay cannot price them). With it, the spend cap and estimates can count this bot's answers.</p></LabelHelp>}
-                hint={target.cost_per_answer_usd != null ? <>Now <span className="font-mono">{usd(target.cost_per_answer_usd)}</span> per answer.</> : 'Not set: the spend cap cannot limit this bot.'}>
-                <div className="flex gap-2">
-                  <Input className="w-32" type="number" min={0} step="0.001" aria-label="Cost per answer" placeholder="e.g. 0.04"
-                    value={costText ?? (target.cost_per_answer_usd != null ? String(target.cost_per_answer_usd) : '')} onChange={(e) => setCostText(e.target.value)} />
-                  <Button size="sm" disabled={costText === null} loading={flags.isPending} onClick={() => { flags.mutate(costText ? { cost_per_answer_usd: Number(costText) } : { clear_cost_per_answer: true }); setCostText(null) }}>Save</Button>
-                </div>
-              </Field>
-            </div>
           </Card>
         </div>
         <div className="space-y-12">
@@ -237,6 +219,24 @@ export function TargetPage() {
                 ))}
               </tbody>
             </ScrollTable>
+          </Card>
+          <Card title="Grading privacy" help={<p>Keeps this bot's answers on this computer when they are graded. Runs that pick a cloud grading model for this bot are refused.</p>}>
+            <Toggle disabled={flags.isPending} checked={!!target.local_judges_only} onChange={(val) => flags.mutate({ local_judges_only: val })}
+              label={<LabelHelp label="Local grading models only"><p>This bot's answers may only be graded by a model running on this machine (Ollama, LM Studio). Runs that pick a cloud model are refused.</p></LabelHelp>} />
+          </Card>
+          <Card title="Load and cost" help={<p>How hard test runs may press on this bot, and what one answer costs when the bot reports no token counts.</p>}>
+            <Toggle disabled={flags.isPending} checked={!!target.shared} onChange={(val) => flags.mutate({ shared: val })}
+              label={<LabelHelp label="Other people use this bot" title="A shared bot"><p>New runs then ask 2 questions at a time by default, and warn above that: test questions all at once would slow down real users' answers.</p></LabelHelp>} />
+            <div className="mt-4">
+              <Field label={<LabelHelp label="Cost per answer (USD, your estimate)" title="Cost per answer"><p>For bots that report no token counts (Assay cannot price them). With it, the spend cap and estimates can count this bot's answers.</p></LabelHelp>}
+                hint={target.cost_per_answer_usd != null ? <>Now <span className="font-mono">{usd(target.cost_per_answer_usd)}</span> per answer.</> : 'Not set: the spend cap cannot limit this bot.'}>
+                <div className="flex gap-2">
+                  <Input className="w-32" type="number" min={0} step="0.001" aria-label="Cost per answer" placeholder="e.g. 0.04"
+                    value={costText ?? (target.cost_per_answer_usd != null ? String(target.cost_per_answer_usd) : '')} onChange={(e) => setCostText(e.target.value)} />
+                  <Button size="sm" disabled={costText === null} loading={flags.isPending} onClick={() => { flags.mutate(costText ? { cost_per_answer_usd: Number(costText) } : { clear_cost_per_answer: true }); setCostText(null) }}>Save</Button>
+                </div>
+              </Field>
+            </div>
           </Card>
         </div>
       </div>

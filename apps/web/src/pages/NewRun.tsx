@@ -188,7 +188,7 @@ export function NewRunPage() {
 
   return (
     <>
-      <PageHeader eyebrow="New run" title={<>Ask a version <em>every question</em>.</>}
+      <PageHeader title={<>Ask a version <em>every question</em>.</>}
         help={<>
           <p>Ask one chatbot version every question in a dataset and grade the answers. Objective checks run where a question defines them; a grading model only where meaning must be judged.</p>
           <p>Pick what to test and how thoroughly. The receipt on the right updates as you choose; changed lines reprint. Nothing is asked until you press the button under it.</p>
@@ -303,8 +303,8 @@ export function NewRunPage() {
           </Card>
 
           <Card title="3 · Grading and load">
-            <div className="grid gap-x-4 gap-y-5 md:grid-cols-3">
-              <SetupField label="Grading model" helpTitle="Grading model (judge)" readout={judgeReadout} help={<>
+            <div className="grid gap-x-4 gap-y-5 md:grid-cols-2 xl:grid-cols-4">
+              <SetupField className="flex min-w-0 flex-col gap-1 xl:col-span-2" label="Grading model" helpTitle="Grading model (judge)" readout={judgeReadout} help={<>
                 <p>Only for meaning checks: a model that reads each answer and judges whether it means the right thing. Objective checks need none.</p>
                 <p>The heuristic compares words with the reference: free, fast, not an LLM. A local model runs on this PC (free, slow on a CPU); a cloud model is fast and paid.</p>
               </>}>

@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type AnchorHTMLAttributes,
   type ButtonHTMLAttributes,
   type CSSProperties,
   type HTMLAttributes,
@@ -19,6 +20,7 @@ import {
   type TextareaHTMLAttributes,
 } from 'react'
 import { createPortal } from 'react-dom'
+import { Link } from 'react-router-dom'
 import { ApiError } from '../lib/api'
 import { GLOSSARY, type GlossaryKey } from '../lib/glossary'
 import { LONG_SECONDS, spanOf } from '../lib/format'
@@ -92,7 +94,7 @@ export function SectionHead({ title, help, meta, actions, rule = false, as: Tag 
   className?: string
 }) {
   return (
-    <header className={clsx('flex min-h-10 flex-wrap items-center justify-between gap-x-3 gap-y-2', rule && 'border-b border-line pb-2.5', className)}>
+    <header className={clsx('flex min-h-11 flex-wrap items-center justify-between gap-x-3 gap-y-2', rule && 'border-b border-line pb-2.5', className)}>
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
         {title && <Tag className="t-h min-w-0">{title}</Tag>}
         {help && <Help title={typeof title === 'string' ? title : 'About this'}>{help}</Help>}
@@ -115,6 +117,22 @@ export function Panel({ children, className, padded = true, ...rest }: HTMLAttri
       {children}
     </div>
   )
+}
+
+/**
+ * A Panel that acts: a button (`onClick`) or a link (`to` a route, `href` an address). The same surface as `Panel`, with a
+ * focus ring and a colour change on hover; it never lifts. Put the tile's title and text inside.
+ */
+export function PanelButton({ to, href, viewTransition, className, children, ...rest }: Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'className'> & {
+  to?: string
+  href?: string
+  viewTransition?: boolean
+  className?: string
+}) {
+  const cls = clsx('flex h-full w-full flex-col items-start rounded-xl border border-line bg-surface p-3 text-left shadow-card transition-colors duration-(--dur-ui) hover:border-line-strong hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50', className)
+  if (to) return <Link to={to} viewTransition={viewTransition} className={cls} {...(rest as unknown as AnchorHTMLAttributes<HTMLAnchorElement>)}>{children}</Link>
+  if (href) return <a href={href} className={cls} {...(rest as unknown as AnchorHTMLAttributes<HTMLAnchorElement>)}>{children}</a>
+  return <button type="button" className={cls} {...rest}>{children}</button>
 }
 
 /**
@@ -334,14 +352,15 @@ export function Toggle({ checked, onChange, label, hint, disabled }: { checked: 
   )
 }
 
-export function Tabs<T extends string>({ tabs, value, onChange }: {
+export function Tabs<T extends string>({ tabs, value, onChange, className }: {
   tabs: { id: T; label: ReactNode }[]
   value: T
   onChange: (t: T) => void
+  className?: string
 }) {
   const group = useId()
   return (
-    <div role="tablist" className="scroll-thin flex gap-1 overflow-x-auto border-b border-line">
+    <div role="tablist" className={clsx('scroll-thin flex gap-1 overflow-x-auto border-b border-line', className)}>
       {tabs.map((t) => (
         <button
           key={t.id}
@@ -530,7 +549,7 @@ export function Figs({ children, className }: { children: ReactNode; className?:
 }
 
 /** One figure: a small-caps label, the number in mono, a line under it. Put several in <Figs>. */
-export function Stat({ label, value, sub, title, tone, hatched, numeric, format, help, delta }: {
+export function Stat({ label, value, sub, title, tone, hatched, numeric, format, help, delta, nowrap }: {
   label: ReactNode
   value?: ReactNode
   sub?: ReactNode
@@ -541,10 +560,12 @@ export function Stat({ label, value, sub, title, tone, hatched, numeric, format,
   format?: (v: number | null) => string
   help?: ReactNode
   delta?: ReactNode
+  /** Keep the label on one line (it truncates, the full text is its tooltip) so neighbouring figures align. */
+  nowrap?: boolean
 }) {
   return (
     <div className={clsx('min-w-0 px-4 py-3.5 first:pl-0 max-lg:first:pl-4', hatched && 'hatched')} title={title}>
-      <div className="t-label flex items-center gap-1">{label}{help && <Help title={typeof label === 'string' ? label : 'About this figure'}>{help}</Help>}</div>
+      <div className={clsx('t-label flex items-center gap-1', nowrap && 'whitespace-nowrap')}>{nowrap ? <span className="min-w-0 truncate" title={typeof label === 'string' ? label : undefined}>{label}</span> : label}{help && <Help title={typeof label === 'string' ? label : 'About this figure'}>{help}</Help>}</div>
       <div className={clsx('t-fig mt-2 break-words', tone === 'good' && 'text-good-ink', tone === 'bad' && 'text-bad-ink')}>
         {numeric !== undefined && format ? <CountUp value={numeric} format={format} /> : value}
       </div>
@@ -554,10 +575,11 @@ export function Stat({ label, value, sub, title, tone, hatched, numeric, format,
   )
 }
 
+/** Headers are left-aligned; give a numeric column's `<th>` (and its cells) `text-right`. */
 export function Table({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <div className={clsx('scroll-thin overflow-x-auto', className)}>
-      <table className="gl-table w-full border-collapse text-sm [&_td]:border-t [&_td]:border-line [&_th]:text-left [&_th]:text-xs [&_th]:font-medium [&_th]:text-ink-3">
+      <table className="gl-table w-full border-collapse text-sm [&_td]:border-t [&_td]:border-line [&_th]:text-xs [&_th]:font-medium [&_th]:text-ink-3">
         {children}
       </table>
     </div>

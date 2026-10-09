@@ -14,7 +14,7 @@ function PassBar({ value, ci, heuristic = false, muted = false }: { value: numbe
   if (value === null || value === undefined) return null
   const [lo, hi] = ci ?? [null, null]
   return (
-    <span className="relative inline-block h-1.5 w-20 overflow-hidden rounded-full bg-surface-3 align-middle"
+    <span className="relative inline-block h-1.5 w-14 overflow-hidden rounded-full bg-surface-3 align-middle"
       title={lo !== null && hi !== null ? `${pct(value)} (95% interval ${pct(lo)} to ${pct(hi)})` : pct(value)}>
       {lo !== null && hi !== null && (
         <span className="absolute inset-y-0 bg-accent/25" style={{ left: `${lo * 100}%`, width: `${Math.max(1, (hi - lo) * 100)}%` }} />
@@ -37,19 +37,19 @@ export function RunsTable({ runs, compact = false, selectable = false, selected 
   const nav = useNavigate()
   const [active] = useListNav(runs.length, (i) => nav(`/runs/${runs[i].id}`, { viewTransition: true }), keyboard)
   return (
-    <ScrollTable className={clsx(!compact && '[&_table]:min-w-[1140px] [&_table]:table-fixed')}>
+    <ScrollTable className={clsx(!compact && '[&_table]:min-w-[900px] [&_table]:table-fixed [&_td]:px-2 [&_th]:px-2')}>
       {!compact && (
         <colgroup>
-          {selectable && <col className="w-10" />}
-          <col className="w-16" />
+          {selectable && <col className="w-9" />}
+          <col className="w-14" />
           <col />
-          <col className="w-44" />
-          <col className="w-44" />
-          <col className="w-44" />
-          <col className="w-20" />
-          <col className="w-20" />
+          <col className="w-32 min-[1400px]:w-44" />
+          <col className="w-36" />
+          <col className="w-36" />
+          <col className="w-[72px]" />
+          <col className="w-[72px]" />
           <col className="w-24" />
-          <col className="w-28" />
+          <col className="w-[104px]" />
         </colgroup>
       )}
       <thead>
@@ -92,9 +92,9 @@ export function RunsTable({ runs, compact = false, selectable = false, selected 
               </td>
               {!compact && <td className="truncate text-ink-2" title={`${r.target} v${r.target_version}`}>{r.target} <span className="font-mono text-xs text-ink-3">v{r.target_version}</span></td>}
               {!compact && (
-                <td className="whitespace-nowrap text-xs text-ink-2">
-                  <span className="num font-mono">{questionsOf(r) ?? 'n/a'}</span> × <span className="num font-mono">{r.trials_per_case}</span>
-                  {' '}{heur ? <Badge tone="heuristic">heuristic</Badge> : <span className="text-ink-3">{r.judge ? r.judge.model : 'no judge'}</span>}
+                <td className="text-xs text-ink-2">
+                  <span className="num font-mono whitespace-nowrap">{questionsOf(r) ?? 'n/a'}</span> × <span className="num font-mono">{r.trials_per_case}</span>
+                  {' '}<span className="text-ink-3">{heur ? 'heuristic' : r.judge ? r.judge.model : 'no judge'}</span>
                 </td>
               )}
               <td className="whitespace-nowrap text-right">

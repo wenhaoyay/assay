@@ -26,7 +26,7 @@ export function MetricTable({ rows }: { rows: ComparisonRow[] }) {
   return (
     <Table>
       <thead>
-        <tr><th>Metric</th><th className="text-right">Baseline</th><th className="text-right">Candidate</th><th className="text-right">Change</th><th className="text-right">95% interval of the change</th><th>Reading</th></tr>
+        <tr><th className="t-label">Metric</th><th className="t-label text-right">Baseline</th><th className="t-label text-right">Candidate</th><th className="t-label text-right">Change</th><th className="t-label text-right">95% interval of the change</th><th className="t-label">Reading</th></tr>
       </thead>
       <tbody>
         {rows.map((r) => {
@@ -210,7 +210,7 @@ function CompareView({ c }: { c: Comparison }) {
           <Card title="Large score changes" meta={c.score_changes.length} help={<><p>Single checks whose score moved by 0.25 or more on a question, in either direction.</p><p>Hatched rows were scored by the word-overlap heuristic.</p></>}>
             <div className="scroll-thin max-h-[420px] overflow-y-auto">
               <Table>
-                <thead><tr><th>Question</th><th>Check</th><th className="text-right">Baseline</th><th className="text-right">Candidate</th></tr></thead>
+                <thead><tr><th className="t-label">Question</th><th className="t-label">Check</th><th className="t-label text-right">Baseline</th><th className="t-label text-right">Candidate</th></tr></thead>
                 <tbody>{c.score_changes.slice(0, 50).map((s) => (
                   <tr key={s.case_id + s.evaluator_id} data-case={s.case_id} className={clsx(isHeuristic(s.evaluator_id) && 'hatched')}>
                     <td className="font-mono text-xs">{s.case_id}</td><td>{s.evaluator_id}</td>

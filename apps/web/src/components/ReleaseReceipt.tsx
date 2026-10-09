@@ -24,7 +24,7 @@ function checkValue(c: GateCheck): string {
   if (c.kind === 'relative') {
     const change = LOWER_IS_BETTER.test(c.metric) ? c.value : -c.value
     const sign = change >= 0 ? '+' : '−'
-    return timeLike ? `${sign}${ms(Math.abs(change))}` : `${sign}${Math.abs(change * 100).toFixed(1)}pp`
+    return timeLike ? `${sign}${ms(Math.abs(change))}` : `${sign}${Math.abs(change * 100).toFixed(1)} pp`
   }
   return timeLike ? ms(c.value) : pct(c.value, 0)
 }

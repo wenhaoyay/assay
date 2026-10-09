@@ -55,7 +55,7 @@ export function LiveFigures({ r, rows, now }: { r: RunHeader; rows: TrialRow[]; 
       <div><div className="t-label">Answered</div><div className="t-fig mt-1"><Odometer text={String(done)} /><span className="text-ink-3"> / {total}</span></div></div>
       <div>
         <div className="t-label">Pass rate so far</div>
-        <div className="t-fig mt-1">{n ? <><Odometer text={pct(pass / n)} /><span className="ml-1.5 font-mono text-xs text-ink-3">± {Math.round(((hi - lo) / 2) * 100)}pp</span></> : '–'}</div>
+        <div className="t-fig mt-1">{n ? <><Odometer text={pct(pass / n)} /><span className="ml-1.5 font-mono text-xs text-ink-3">± {Math.round(((hi - lo) / 2) * 100)} pp</span></> : '–'}</div>
       </div>
       <div><div className="t-label">{active ? 'Time left' : 'Took'}</div><div className="t-fig mt-1 num">{active ? (r.status === 'queued' && eta == null ? 'queued' : r.status === 'cancelling' ? 'stopping' : clock(left)) : clock(elapsed)}</div>
         {active && waiting && r.status !== 'cancelling' && <div className="mt-0.5 max-w-xs text-xs text-ink-3" data-testid="live-waiting">{waiting}</div>}</div>
