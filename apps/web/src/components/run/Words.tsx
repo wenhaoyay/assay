@@ -1,7 +1,7 @@
 // A6 words that predict failure: question words more common in failing questions than in passing
 // ones (smoothed log-odds), as pills; click one to list its questions.
-import clsx from 'clsx'
 import { useMemo, useState } from 'react'
+import { Chip } from '../form'
 import { SampleSize } from '../instrument'
 import { Card } from '../ui'
 import { CaseChip, NothingPasses } from './bits'
@@ -37,11 +37,10 @@ export function Words({ rows }: { rows: XRow[] }) {
     }
   }, [qs, rates])
   const pill = (x: (typeof top)[number], bad: boolean) => (
-    <button key={x.w} type="button" onClick={() => setPick(pick === x.w ? null : x.w)} aria-pressed={pick === x.w}
-      className={clsx('mb-1.5 mr-1.5 inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-sm transition-colors', pick === x.w ? 'border-ink' : 'border-transparent hover:border-line-strong')}
-      style={{ background: `color-mix(in srgb, ${bad ? 'var(--bad)' : 'var(--good)'} ${Math.round(Math.min(1, Math.abs(x.lo) / 2.5) * 22)}%, var(--surface))` }}>
-      <span>{x.w}</span><span className={clsx('num font-mono text-xs', bad ? 'text-bad-ink' : 'text-good-ink')}>{bad ? x.f : x.p}/{x.f + x.p}</span>
-    </button>
+    <Chip key={x.w} selected={pick === x.w} tone={bad ? 'bad' : 'good'} count={`${bad ? x.f : x.p}/${x.f + x.p}`} onClick={() => setPick(pick === x.w ? null : x.w)}
+      style={pick === x.w ? undefined : { background: `color-mix(in srgb, ${bad ? 'var(--bad)' : 'var(--good)'} ${Math.round(Math.min(1, Math.abs(x.lo) / 2.5) * 22)}%, var(--surface))` }}>
+      {x.w}
+    </Chip>
   )
   const list = pick ? cnt.get(pick)?.ids ?? [] : []
   return (
@@ -53,10 +52,10 @@ export function Words({ rows }: { rows: XRow[] }) {
       </>}>
       {!top.length && !bot.length ? <NothingPasses>No word turns up often enough to tell.</NothingPasses> : (
         <div data-testid="words">
-          <div className="t-label mb-1.5">More common in failing questions <span className="num font-mono normal-case tracking-normal">· {F}</span></div>
-          <div>{top.length ? top.map((x) => pill(x, true)) : <span className="text-xs text-ink-3">None stands out.</span>}</div>
-          <div className="t-label mb-1.5 mt-4">More common in passing ones</div>
-          <div>{bot.length ? bot.map((x) => pill(x, false)) : <span className="text-xs text-ink-3">None stands out.</span>}</div>
+          <div className="t-label mb-2">More common in failing questions <span className="num font-mono normal-case tracking-normal">· {F}</span></div>
+          <div className="flex flex-wrap gap-1.5">{top.length ? top.map((x) => pill(x, true)) : <span className="text-xs text-ink-3">None stands out.</span>}</div>
+          <div className="t-label mb-2 mt-5">More common in passing ones</div>
+          <div className="flex flex-wrap gap-1.5">{bot.length ? bot.map((x) => pill(x, false)) : <span className="text-xs text-ink-3">None stands out.</span>}</div>
           {pick && (
             <div className="mt-3 flex flex-wrap gap-1.5">
               {list.map((q) => { const v = rates.get(q.c) ?? 0; return <CaseChip key={q.c} caseId={q.c} trialId={q.id} tone={v < 0.5 ? 'bad' : 'good'} title={q.t.question}>{q.t.title}</CaseChip> })}

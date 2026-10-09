@@ -102,8 +102,10 @@ export function BakeoffScatter({ bakeoff, dimension }: { bakeoff: Bakeoff; dimen
             <svg width={width} height={H} role="img" aria-label={`${ax.name} against ${ay.name}: ${splits} answers split on pass or fail`} data-testid="bakeoff-scatter">
               {continuous ? [0, 0.2, 0.4, 0.6, 0.8, 1].map((t) => (
                 <g key={t}>
-                  <line x1={x(t)} x2={x(t)} y1={m.t} y2={H - m.b} stroke="var(--line)" strokeDasharray="2 4" />
-                  <line x1={m.l} x2={width - m.r} y1={y(t)} y2={y(t)} stroke="var(--line)" strokeDasharray="2 4" />
+                  <g className="gridline">
+                    <line x1={x(t)} x2={x(t)} y1={m.t} y2={H - m.b} />
+                    <line x1={m.l} x2={width - m.r} y1={y(t)} y2={y(t)} />
+                  </g>
                   <text x={x(t)} y={H - m.b + 16} textAnchor="middle" className="c-num">{t.toFixed(1)}</text>
                   <text x={m.l - 8} y={y(t) + 4} textAnchor="end" className="c-num">{t.toFixed(1)}</text>
                 </g>
@@ -115,7 +117,7 @@ export function BakeoffScatter({ bakeoff, dimension }: { bakeoff: Bakeoff; dimen
                   <text x={m.l - 8} y={y((lo + hi) / 2) + 4} textAnchor="end">{verdictWord(lab)}</text>
                 </g>
               ))}
-              <line x1={x(0)} y1={y(0)} x2={x(1)} y2={y(1)} stroke="var(--line-strong)" strokeDasharray="4 4" />
+              <g className="axis"><line x1={x(0)} y1={y(0)} x2={x(1)} y2={y(1)} strokeDasharray="4 4" /></g>
               <text x={width - m.r} y={H - 6} textAnchor="end" className="c-note">{ax.name} {continuous ? 'score' : 'verdict'} →</text>
               <text x={m.l} y={m.t - 14} className="c-note">↑ {ay.name} {continuous ? 'score' : 'verdict'}</text>
               {pts.map((p, k) => (
@@ -168,7 +170,7 @@ function DotDetail({ trialId, index, axes, shown, dimension }: { trialId: number
             <li key={a.id} className={clsx('rounded-r-lg border-l-[3px] px-3 py-2 text-sm', on ? 'bg-accent-wash/60' : 'bg-surface-2/60', l === 'FAIL' ? 'border-bad' : l === 'PASS' ? 'border-good' : 'border-line-strong')}>
               <div className="flex items-center gap-2">
                 <span className="font-medium text-ink">{a.name}</span>
-                <Badge tone={l === 'PASS' ? 'good' : l === 'FAIL' ? 'bad' : 'neutral'}>{verdictWord(l)}</Badge>
+                <Badge tone={l === 'PASS' ? 'pass' : l === 'FAIL' ? 'fail' : 'unscored'}>{verdictWord(l)}</Badge>
                 {a.scores?.[index] != null && <span className="num font-mono text-xs text-ink-3">{a.scores[index]!.toFixed(2)}</span>}
               </div>
               {reason && <div className="mt-1 text-ink-2">“{reason}”</div>}

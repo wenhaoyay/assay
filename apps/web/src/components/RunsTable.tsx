@@ -5,7 +5,9 @@ import { ms, pct, when } from '../lib/format'
 import { useListNav } from '../lib/hotkeys'
 import { questionsOf } from '../lib/runstate'
 import type { RunHeader } from '../lib/types'
-import { Badge, RunStatus, StatusBadge, Table } from './ui'
+import { Checkbox } from './form'
+import { Badge, RunStatus, StatusBadge } from './ui'
+import { ScrollTable } from './Layout'
 
 /** The pass rate as a short bar with its 95% interval behind it. Heuristic grades are hatched. */
 function PassBar({ value, ci, heuristic = false, muted = false }: { value: number | null | undefined; ci?: [number | null, number | null]; heuristic?: boolean; muted?: boolean }) {
@@ -35,10 +37,24 @@ export function RunsTable({ runs, compact = false, selectable = false, selected 
   const nav = useNavigate()
   const [active] = useListNav(runs.length, (i) => nav(`/runs/${runs[i].id}`, { viewTransition: true }), keyboard)
   return (
-    <Table>
+    <ScrollTable className={clsx(!compact && '[&_table]:min-w-[1140px] [&_table]:table-fixed')}>
+      {!compact && (
+        <colgroup>
+          {selectable && <col className="w-10" />}
+          <col className="w-16" />
+          <col />
+          <col className="w-44" />
+          <col className="w-44" />
+          <col className="w-44" />
+          <col className="w-20" />
+          <col className="w-20" />
+          <col className="w-24" />
+          <col className="w-28" />
+        </colgroup>
+      )}
       <thead>
         <tr className="whitespace-nowrap">
-          {selectable && <th className="w-8"><span className="sr-only">Compare</span></th>}
+          {selectable && <th className="w-10"><span className="sr-only">Compare</span></th>}
           <th className="t-label">Run</th>
           <th className="t-label">What ran</th>
           {!compact && <th className="t-label">Connection</th>}
@@ -60,25 +76,25 @@ export function RunsTable({ runs, compact = false, selectable = false, selected 
               className={clsx('transition-colors hover:bg-surface-2/60', active === i && 'kb-active', sel && 'bg-accent-wash/60')}>
               {selectable && (
                 <td>
-                  <input type="checkbox" checked={sel} onChange={() => onToggle?.(r.id)} aria-label={`Select run ${r.id} to compare`}
-                    disabled={!sel && selected.length >= 2} className="size-4 accent-[var(--accent)]" />
+                  <Checkbox checked={sel} onChange={() => onToggle?.(r.id)} aria-label={`Select run ${r.id} to compare`}
+                    disabled={!sel && selected.length >= 2} label={<span className="sr-only">Compare run {r.id}</span>} />
                 </td>
               )}
               <td className="font-mono text-xs"><Link className="text-accent-ink hover:underline" to={`/runs/${r.id}`} viewTransition>#{r.id}</Link></td>
-              <td className="max-w-96">
+              <td>
                 <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
                   <Link to={`/runs/${r.id}`} viewTransition className="text-ink hover:underline">{name}</Link>
                   {r.off_topic && <Badge tone="warn" title={`Asked ${r.off_topic}'s questions, so it is left out of trends`}>another chatbot's questions</Badge>}
                   {r.source !== 'live' && <Badge>{r.source === 'reevaluated' ? `re-graded #${r.parent_run_id}` : r.source}</Badge>}
                   <RunStatus status={r.status} done={r.progress_done} total={r.progress_total} />
                 </div>
-                {name !== r.experiment && <div className="truncate font-mono text-label text-ink-3">{r.experiment}</div>}
+                {name !== r.experiment && <div className="truncate font-mono text-label text-ink-3" title={r.experiment}>{r.experiment}</div>}
               </td>
-              {!compact && <td className="max-w-56 truncate text-ink-2" title={r.target}>{r.target} <span className="font-mono text-xs text-ink-3">v{r.target_version}</span></td>}
+              {!compact && <td className="truncate text-ink-2" title={`${r.target} v${r.target_version}`}>{r.target} <span className="font-mono text-xs text-ink-3">v{r.target_version}</span></td>}
               {!compact && (
                 <td className="whitespace-nowrap text-xs text-ink-2">
                   <span className="num font-mono">{questionsOf(r) ?? 'n/a'}</span> × <span className="num font-mono">{r.trials_per_case}</span>
-                  <span className={clsx('ml-1.5 rounded px-1', heur ? 'hatched text-ink-2' : 'text-ink-3')}>{r.judge ? (heur ? 'heuristic' : r.judge.model) : 'no judge'}</span>
+                  {' '}{heur ? <Badge tone="heuristic">heuristic</Badge> : <span className="text-ink-3">{r.judge ? r.judge.model : 'no judge'}</span>}
                 </td>
               )}
               <td className="whitespace-nowrap text-right">
@@ -95,6 +111,6 @@ export function RunsTable({ runs, compact = false, selectable = false, selected 
           )
         })}
       </tbody>
-    </Table>
+    </ScrollTable>
   )
 }

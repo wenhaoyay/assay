@@ -2,7 +2,7 @@
 // baseline run.
 import { Link } from 'react-router-dom'
 import { pct } from '../../lib/format'
-import { rateColor, SampleSize } from '../instrument'
+import { RateLegend, rateColor, SampleSize } from '../instrument'
 import { Card } from '../ui'
 import { plain } from './data'
 
@@ -34,6 +34,7 @@ export function ByCategory({ cats, base, baseId }: {
           </Link>
         ))}
       </div>
+      <RateLegend className="mt-4" />
     </Card>
   )
 }

@@ -1,14 +1,21 @@
 // Small helpers shared by the home page and the chatbot page.
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../lib/api'
+import { fmtDay } from '../../lib/format'
 import type { CaseMatrix, Gate, Lineage } from '../../lib/types'
 import type { Cell } from '../instrument'
+import { DUR } from '../ui'
 
-/** "6 Oct" */
+/** "6 Oct 2026", or nothing when there is no date. */
 export function dayLabel(iso: string | null | undefined): string {
-  if (!iso) return ''
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+  return iso ? fmtDay(iso) : ''
 }
+
+/** The one delay between siblings that arrive together (cards, activity lines). */
+export const STAGGER = DUR.fast / 2
+
+/** The one width a sentence of reading text may run to. */
+export const READING_W = 'max-w-3xl'
 
 /** The release gate's minimum pass rate for each chatbot (project id), when a gate sets one. */
 export function useGateThresholds(): Record<number, number> {

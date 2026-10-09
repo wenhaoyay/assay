@@ -9,7 +9,8 @@ import { ParallelHelp } from '../components/helpTexts'
 import { QueueViz } from '../components/QueueViz'
 import { RunReceipt, duration, type Estimate } from '../components/setup/RunReceipt'
 import { SetupField } from '../components/setup/SetupField'
-import { Badge, Button, Card, Dialog, ErrorState, Help, Input, Notice, PageHeader, PageSkeleton, Segmented, Select, Term, useLongWork } from '../components/ui'
+import { Checkbox, SelectCard } from '../components/form'
+import { Badge, Button, Card, Dialog, ErrorState, Input, Notice, PageHeader, PageSkeleton, Panel, Segmented, Select, Term, useLongWork } from '../components/ui'
 import { api } from '../lib/api'
 import { whereLabel } from '../lib/models'
 import { validateSetup } from '../lib/compare'
@@ -193,15 +194,25 @@ export function NewRunPage() {
           <p>Pick what to test and how thoroughly. The receipt on the right updates as you choose; changed lines reprint. Nothing is asked until you press the button under it.</p>
         </>} />
       <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="min-w-0 space-y-9">
-          <Card title="1 · What to test">
+        <div className="min-w-0 space-y-12">
+          <Card title="1 · What to test" help={<>
+            <p>Which chatbot version to ask, which questions to ask it, and what to call the run.</p>
+            <p>The connection decides who answers; the questions are a dataset version, frozen when the run starts. The badges under the connection say how it is reached and whether other people use it.</p>
+          </>}>
             <div className="grid gap-x-4 gap-y-4 md:grid-cols-2">
               <SetupField label="Chatbot">
                 <Select value={project} onChange={(ev) => { setProject(ev.target.value ? Number(ev.target.value) : ''); setTargetVersionId(''); setDatasetVersionId('') }} aria-label="Chatbot">
                   <option value="">All chatbots</option>{projects.visible.map((p) => <option key={p.id} value={p.id}>{projectOption(p)}</option>)}
                 </Select>
               </SetupField>
-              <SetupField label="Connection · version">
+              <SetupField label="Connection · version" readout={tv && (
+                <span className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                  <Badge>{tv.adapter}</Badge>
+                  {tv.latest_version.variant_label && <Badge>{tv.latest_version.variant_label}</Badge>}
+                  {tv.shared && <Badge tone="warn">shared with other people</Badge>}
+                  {tv.local_judges_only && <Badge tone="accent">local grading models only</Badge>}
+                </span>
+              )}>
                 <Select value={targetVersionId} onChange={(ev) => setTargetVersionId(ev.target.value ? Number(ev.target.value) : '')} aria-label="Connection">
                   <option value="">Choose...</option>
                   {projectTargets.map((t) => <option key={t.id} value={t.latest_version.id}>{t.name} - v{t.latest_version.version}{t.latest_version.variant_label ? ` (${t.latest_version.variant_label})` : ''}</option>)}
@@ -228,22 +239,12 @@ export function NewRunPage() {
               </SetupField>
               <SetupField label="Run name"><Input value={name} onChange={(ev) => setName(ev.target.value)} aria-label="Run name" /></SetupField>
             </div>
-            {tv && (
-              <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                {tv && <Badge>{tv.adapter}</Badge>}
-                {tv?.latest_version.variant_label && <Badge>{tv.latest_version.variant_label}</Badge>}
-                {tv?.shared && <Badge tone="warn">shared with other people</Badge>}
-                {tv?.local_judges_only && <Badge tone="accent">local grading models only</Badge>}
-              </div>
-            )}
             {otherPicked && (
               <div className="mt-4" data-testid="other-chatbot-warning">
                 <Notice tone="warn" title={`These questions were written for ${ownerName(otherPicked.project_id)}`}>
                   {tv?.name ?? 'This connection'} belongs to {ownerName(Number(effectiveProject))}: it will answer them off-topic, and each answer may be billed. Their failures say nothing about this bot.
-                  <label className="mt-2 flex items-center gap-2 text-sm font-medium text-ink">
-                    <input type="checkbox" className="accent-[var(--accent)]" checked={allowOther} onChange={(ev) => setAllowOther(ev.target.checked)} />
-                    I mean to use them (say, a successor bot or a shared safety set)
-                  </label>
+                  <Checkbox className="mt-2 font-medium text-ink" checked={allowOther} onChange={setAllowOther}
+                    label="I mean to use them (say, a successor bot or a shared safety set)" />
                 </Notice>
               </div>
             )}
@@ -262,21 +263,13 @@ export function NewRunPage() {
             <p>Meaning checks need a grading model (section 3); without one they are skipped.</p>
             <p>Quick check is the default: 30 questions spread across the categories, the same 30 each time so runs can be compared, 1 try, the objective checks plus correctness{preset === 'quick' && e?.estimated_seconds ? <>. About {duration(e.estimated_seconds).replace('~', '')} with the default grading model</> : ''}. Pick Release gate or Full for every question.</p>
           </>}>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5" role="radiogroup" aria-label="Preset">
-              {PRESETS.map((p) => {
-                const on = preset === p.id
-                const slim = p.id === 'custom'
-                return (
-                  <button key={p.id} type="button" role="radio" aria-checked={on} onClick={() => { choosePreset(p.id); if (p.id === 'custom') { setCustom(checks); setShowChecks(true) } }}
-                    className={clsx('relative flex rounded-xl border bg-surface text-left shadow-card transition-[transform,box-shadow,border-color] duration-200',
-                      slim ? 'items-center gap-2.5 px-4 py-2.5 sm:col-span-2 lg:col-span-5' : 'flex-col items-start p-4',
-                      on ? '-translate-y-0.5 border-accent ring-[3px] ring-accent-wash' : 'border-line hover:-translate-y-px hover:border-line-strong')}>
-                    <p.icon className={clsx('size-4 shrink-0', on ? 'text-accent-ink' : 'text-ink-3')} aria-hidden />
-                    <div className={clsx('text-base font-semibold', !slim && 'mt-2')}>{p.title}</div>
-                    <div className={clsx('text-sm text-ink-2', !slim && 'mt-1')}>{p.body}</div>
-                  </button>
-                )
-              })}
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" role="radiogroup" aria-label="Preset">
+              {PRESETS.map((p) => (
+                <SelectCard key={p.id} selected={preset === p.id} icon={<p.icon className="size-4" aria-hidden />} title={p.title}
+                  onSelect={() => { choosePreset(p.id); if (p.id === 'custom') { setCustom(checks); setShowChecks(true) } }}>
+                  {p.body}
+                </SelectCard>
+              ))}
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1">
               <button type="button" onClick={() => setShowChecks((v) => !v)} className="flex items-center gap-1 text-sm font-medium text-accent-ink" aria-expanded={showChecks}>
@@ -293,14 +286,12 @@ export function NewRunPage() {
                         <legend className="t-label mb-2">{KIND_LABEL[kind]}</legend>
                         <div className="space-y-1.5">
                           {evaluators.filter((ev) => ev.kind === kind).map((ev) => (
-                            <label key={ev.id} className="flex items-start gap-2 text-sm" title={ev.description}>
-                              <input type="checkbox" className="mt-0.5 accent-[var(--accent)]" checked={checks.includes(ev.id)} onChange={() => toggle(ev.id)} />
-                              <span>
+                            <Checkbox key={ev.id} title={ev.description} checked={checks.includes(ev.id)} onChange={() => toggle(ev.id)}
+                              label={<>
                                 {ev.name}
                                 {!ev.gating && <span className="ml-1 text-xs text-ink-3">(diagnostic)</span>}
                                 {ev.calibration && <span className="ml-1 text-xs text-ink-3">- {ev.calibration.status}</span>}
-                              </span>
-                            </label>
+                              </>} />
                           ))}
                         </div>
                       </fieldset>
@@ -324,12 +315,11 @@ export function NewRunPage() {
                 </Select>
                 {!(models.data ?? []).length && <span className="text-xs text-ink-2">No grading model yet: <Link className="text-accent-ink underline" to="/settings?tab=models">connect one</Link> for meaning checks.</span>}
               </SetupField>
-              <div className="flex min-w-0 flex-col gap-1.5">
-                <span className="t-label flex items-center gap-1.5">Tries per question <Term k="flaky">(flakiness)</Term></span>
-                <Segmented value={String(trials)} onChange={(v) => setTrials(Number(v))} label="Tries per question"
-                  options={[1, 2, 3, 5, 10].map((n) => ({ id: String(n), label: <span className="num font-mono">{n}</span> }))} />
-              </div>
-              <SetupField label={<>In parallel<ParallelHelp /></>}
+              <SetupField group label={<>Tries per question <Term k="flaky">(flakiness)</Term></>}>
+                <div><Segmented size="md" value={String(trials)} onChange={(v) => setTrials(Number(v))} label="Tries per question"
+                  options={[1, 2, 3, 5, 10].map((n) => ({ id: String(n), label: <span className="num font-mono">{n}</span> }))} /></div>
+              </SetupField>
+              <SetupField label={<span className="inline-flex items-center gap-1.5">In parallel<ParallelHelp /></span>}
                 readout={pickedConcurrency === null && !purpose && defaultConcurrency === 2 ? (tv?.shared ? 'Default 2: other people use this bot.' : 'Default 2: this run judges speed.') : undefined}>
                 <Select value={concurrency} onChange={(ev) => { setConcurrency(Number(ev.target.value)); setPurpose(null) }} aria-label="In parallel">{[1, 2, 4, 8, 16].map((n) => <option key={n}>{n}</option>)}</Select>
               </SetupField>
@@ -352,22 +342,23 @@ export function NewRunPage() {
                 </Select>
               </SetupField>
             </div>
-            <div className="mt-6 rounded-xl border border-line bg-surface p-4 shadow-card">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="t-label flex items-center gap-1.5">What is this run for?
-                  <Help title="What is this run for?"><p>Sets how many questions go out at once to suit the run: 1 when speed is judged (nothing waits, so timings are the bot's own), 4 for right-or-wrong runs, 8 for a large set on a bot built for load. Picking a number under In parallel overrides it.</p></Help>
-                </span>
-                <Segmented size="sm" value={purpose ?? ('' as Purpose)} onChange={(p) => { setPurpose(p); setConcurrency(null) }} options={PURPOSES.map((p) => ({ id: p.id, label: p.label }))} label="Run purpose" />
-              </div>
-              <p className={clsx('mt-3 text-lead font-medium', reliability.tone === 'good' ? 'text-good-ink' : reliability.tone === 'warn' ? 'text-warn-ink' : 'text-bad-ink')} data-testid="parallel-line">
-                {e ? <><span className="num font-mono">{answers}</span> answers</> : 'Each question'}, <span className="num font-mono">{concurrency}</span> at a time
-                {e?.per_call_ms ? <> → about <span className="num font-mono">{duration(Math.round((answers * e.per_call_ms) / 1000 / concurrency))}</span></> : null}
-                {' '}· speed figures: <b className="font-semibold">{reliability.text}</b>
-                {(budget || e?.spend_cap_usd != null) && concurrency > 1 ? <> · the first <span className="num font-mono">{concurrency}</span> answers start before their cost is known, so they can pass the cap</> : null}
-              </p>
-              <QueueViz atOnce={concurrency} />
+          </Card>
+
+          <Card title="4 · What is this run for?"
+            help={<p>Sets how many questions go out at once to suit the run: 1 when speed is judged (nothing waits, so timings are the bot's own), 4 for right-or-wrong runs, 8 for a large set on a bot built for load. Picking a number under In parallel overrides it.</p>}
+            actions={<Segmented value={purpose ?? ('' as Purpose)} onChange={(p) => { setPurpose(p); setConcurrency(null) }} options={PURPOSES.map((p) => ({ id: p.id, label: p.label }))} label="Run purpose" />}>
+            <div className="space-y-6">
+              <Panel>
+                <p className={clsx('text-lead font-medium', reliability.tone === 'good' ? 'text-good-ink' : reliability.tone === 'warn' ? 'text-warn-ink' : 'text-bad-ink')} data-testid="parallel-line">
+                  {e ? <><span className="num font-mono">{answers}</span> answers</> : 'Each question'}, <span className="num font-mono">{concurrency}</span> at a time
+                  {e?.per_call_ms ? <> → about <span className="num font-mono">{duration(Math.round((answers * e.per_call_ms) / 1000 / concurrency))}</span></> : null}
+                  {' '}· speed figures: <b className="font-semibold">{reliability.text}</b>
+                  {(budget || e?.spend_cap_usd != null) && concurrency > 1 ? <> · the first <span className="num font-mono">{concurrency}</span> answers start before their cost is known, so they can pass the cap</> : null}
+                </p>
+                <QueueViz atOnce={concurrency} />
+              </Panel>
+              {warnings.length > 0 && <div className="space-y-2">{warnings.map((w) => <Notice key={w.title} tone="warn" title={w.title}>{w.body}</Notice>)}</div>}
             </div>
-            {warnings.length > 0 && <div className="mt-4 space-y-2">{warnings.map((w) => <Notice key={w.title} tone="warn" title={w.title}>{w.body}</Notice>)}</div>}
           </Card>
         </div>
 

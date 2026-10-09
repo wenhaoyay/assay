@@ -3,7 +3,7 @@
 import * as d3 from 'd3'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { ms, pct } from '../../lib/format'
+import { ms, pct, pp } from '../../lib/format'
 import { useHotkey } from '../../lib/hotkeys'
 import { useMotionOn } from '../../lib/prefs'
 import type { CaseMatrix, Lineage } from '../../lib/types'
@@ -201,7 +201,7 @@ export function RunTimeline({ lineage, offTopic, gate, matrix, defaultRun, metri
   const cells = matrixCells(matrix, sel)
 
   // Brushed range readout.
-  let readout: ReactNode = <span className="text-ink-3">Drag across the strip under the chart to read a range of runs.</span>
+  let readout: ReactNode = null
   if (range === 'few') readout = <span className="text-ink-3">Pick at least two runs.</span>
   else if (range) {
     const f = line.find((p) => p.run_id === range[0])!
@@ -211,7 +211,7 @@ export function RunTimeline({ lineage, offTopic, gate, matrix, defaultRun, metri
     readout = (
       <span className="text-ink-2" data-testid="timeline-readout">
         Runs <span className="font-mono font-semibold text-ink">#{f.run_id} → #{l.run_id}</span>: pass rate{' '}
-        <Delta value={f.pass_rate != null && l.pass_rate != null ? l.pass_rate - f.pass_rate : null} format={(a) => `${(a * 100).toFixed(0)}pp`} />
+        <Delta value={f.pass_rate != null && l.pass_rate != null ? l.pass_rate - f.pass_rate : null} format={(_, v) => pp(v, 0)} />
         {changed !== null && <> · <span className="font-mono">{changed}</span> question{changed === 1 ? '' : 's'} changed status</>}
         {dp95 !== null && <> · p95 <Delta value={dp95} higherIsBetter={false} noise={40} format={(a) => ms(a)} /></>}
       </span>
@@ -222,7 +222,7 @@ export function RunTimeline({ lineage, offTopic, gate, matrix, defaultRun, metri
     <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,8fr)_minmax(260px,4fr)]">
       <div className="min-w-0">
         <div ref={wrap} className="w-full" data-testid="run-timeline"><svg ref={svgRef} role="img" aria-label="Run timeline" className="block overflow-visible" /></div>
-        {line.length > 1 && <div className="mt-1 min-h-[22px] text-sm">{readout}</div>}
+        {line.length > 1 && readout && <div className="mt-1 text-sm">{readout}</div>}
       </div>
       {selPoint && (
         <div className="min-w-0" data-testid="timeline-side">

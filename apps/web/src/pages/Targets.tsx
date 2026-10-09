@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { Activity, BookmarkPlus, Check, Pencil, Plug, RefreshCw, Send } from 'lucide-react'
+import { Activity, BookmarkPlus, Check, Pencil, Plug, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ReadingCard } from '../components/Causes'
 import { Sparkline } from '../components/viz'
-import { Badge, Button, Card, Code, Empty, ErrorState, Field, Figs, Help, Input, Json, Loading, Notice, PageHeader, PageSkeleton, ProjectMark, Segmented, Stat, Table, Toggle, linkButton } from '../components/ui'
+import { Badge, Button, Card, Code, Empty, ErrorState, Field, Figs, Input, Json, Loading, Notice, PageHeader, PageSkeleton, ProjectMark, Segmented, Stat, Toggle, linkButton } from '../components/ui'
+import { LabelHelp } from '../components/LabelHelp'
+import { ScrollTable } from '../components/Layout'
 import { api } from '../lib/api'
 import { useCrumbs } from '../lib/crumbs'
 import { ms, pct, usd, when } from '../lib/format'
@@ -49,10 +51,10 @@ export function TargetsPage() {
           Paste a curl command, send a test question, click the reply to say where the answer is. Or run <Code>assay seed</Code> for the Acme demo.
         </Empty>
       ) : (
-        <div className="space-y-10">
+        <div className="space-y-12">
           {groups.map(({ p, ts }) => (
             <Card key={p.id} padded={false} meta={`${ts.length} ${ts.length === 1 ? 'connection' : 'connections'}`} title={<Link to={`/p/${p.id}`} className="flex items-center gap-2 hover:underline"><ProjectMark name={p.name} color={p.color} size={20} />{p.name}</Link>}>
-              <Table>
+              <ScrollTable className="[&_table]:min-w-[820px]">
                 <thead><tr className="whitespace-nowrap"><th className="w-6"></th><th className="t-label">Name</th><th className="t-label">Kind</th><th className="t-label">Version</th><th className="t-label">What distinguishes it</th><th className="t-label">Last check</th><th></th></tr></thead>
                 <tbody>
                   {ts.map((t) => (
@@ -62,17 +64,18 @@ export function TargetsPage() {
                         <Link className="font-medium hover:underline" to={`/targets/${t.id}`} viewTransition>{t.name}</Link>
                         {t.local_judges_only && <Badge tone="accent" className="ml-1.5">local judges only</Badge>}
                         {t.shared && <Badge className="ml-1.5">shared</Badge>}
+                        {isStandardShape((t.latest_version.config as { reply_shape?: string }).reply_shape) && <Badge tone="accent" className="ml-1.5">standard shape</Badge>}
                         <div className="line-clamp-1 text-xs text-ink-2">{t.description}</div>
                       </td>
-                      <td><Badge>{t.adapter === 'replay' ? 'imported' : t.adapter}</Badge>{isStandardShape((t.latest_version.config as { reply_shape?: string }).reply_shape) && <Badge tone="accent" className="ml-1">standard shape</Badge>}</td>
+                      <td className="text-ink-2">{t.adapter === 'replay' ? 'imported' : t.adapter}</td>
                       <td className="num font-mono text-xs">v{t.latest_version.version}</td>
                       <td className="text-ink-2">{t.latest_version.variant_label || '-'}</td>
                       <td className="whitespace-nowrap text-xs text-ink-3">{t.last_check ? (t.last_check.ok ? <>ok, <span className="font-mono">{ms(t.last_check.elapsed_ms)}</span></> : <span className="text-bad-ink">{t.last_check.explanation ?? 'failed'}</span>) : 'never'}</td>
-                      <td className="text-right">{t.adapter !== 'replay' && <Button size="sm" variant="ghost" loading={check.isPending && check.variables === t.id} onClick={() => check.mutate(t.id)}><RefreshCw className="size-3.5" />Check</Button>}</td>
+                      <td className="text-right">{t.adapter !== 'replay' && <Button size="sm" loading={check.isPending && check.variables === t.id} onClick={() => check.mutate(t.id)}><RefreshCw className="size-3.5" />Check</Button>}</td>
                     </tr>
                   ))}
                 </tbody>
-              </Table>
+              </ScrollTable>
             </Card>
           ))}
         </div>
@@ -150,9 +153,9 @@ export function TargetPage() {
       />
       {check.isError && <div className="mb-4"><ErrorState error={check.error} /></div>}
       {lc && !lc.ok && <div className="mb-4"><Notice tone="bad" title={lc.explanation ?? 'The last check failed'}><span className="font-mono text-xs">{lc.error}</span> · {when(lc.at)}</Notice></div>}
-      <div className="grid gap-10 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-        <div className="space-y-10">
-          <Card title={<span className="inline-flex items-center gap-1.5"><Send className="size-4 text-ink-3" /> Ask it something</span>}
+      <div className="grid gap-12 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+        <div className="space-y-12">
+          <Card title="Ask it something"
             help={<p>Sends one question with this version's configuration and shows the reply the way Assay reads it, and which checks that makes possible.</p>}>
             <div className="flex gap-2">
               <Input value={message} onChange={(e) => setMessage(e.target.value)} aria-label="Test message" />
@@ -189,18 +192,15 @@ export function TargetPage() {
             {lc?.coverage && <p className="mt-3 text-xs text-ink-2">Reports: {lc.coverage.join(', ') || 'answer only'}.</p>}
             {health.data?.runs[0] && <p className="mt-1 text-xs text-ink-2">Latest run <Link className="font-mono text-accent-ink underline" to={`/runs/${health.data.runs[0].id}`}>#{health.data.runs[0].id}</Link>: <span className="font-mono">{pct(health.data.runs[0].pass_rate)}</span>.</p>}
           </Card>
-        </div>
-        <div className="space-y-10">
-          <ReadingCard targetId={target.id} />
-          <Card title="Grading privacy">
+          <Card title="Grading privacy" help={<p>Keeps this bot's answers on this computer when they are graded. Runs that pick a cloud grading model for this bot are refused.</p>}>
             <Toggle disabled={flags.isPending} checked={!!target.local_judges_only} onChange={(val) => flags.mutate({ local_judges_only: val })}
-              label={<span className="inline-flex items-center gap-1.5">Local grading models only<Help title="Local grading models only"><p>This bot's answers may only be graded by a model running on this machine (Ollama, LM Studio). Runs that pick a cloud model are refused.</p></Help></span>} />
+              label={<LabelHelp label="Local grading models only"><p>This bot's answers may only be graded by a model running on this machine (Ollama, LM Studio). Runs that pick a cloud model are refused.</p></LabelHelp>} />
           </Card>
-          <Card title="Load and cost">
+          <Card title="Load and cost" help={<p>How hard test runs may press on this bot, and what one answer costs when the bot reports no token counts.</p>}>
             <Toggle disabled={flags.isPending} checked={!!target.shared} onChange={(val) => flags.mutate({ shared: val })}
-              label={<span className="inline-flex items-center gap-1.5">Other people use this bot<Help title="A shared bot"><p>New runs then ask 2 questions at a time by default, and warn above that: test questions all at once would slow down real users' answers.</p></Help></span>} />
+              label={<LabelHelp label="Other people use this bot" title="A shared bot"><p>New runs then ask 2 questions at a time by default, and warn above that: test questions all at once would slow down real users' answers.</p></LabelHelp>} />
             <div className="mt-4">
-              <Field label={<span className="inline-flex items-center gap-1.5">Cost per answer (USD, your estimate)<Help title="Cost per answer"><p>For bots that report no token counts (Assay cannot price them). With it, the spend cap and estimates can count this bot's answers.</p></Help></span>}
+              <Field label={<LabelHelp label="Cost per answer (USD, your estimate)" title="Cost per answer"><p>For bots that report no token counts (Assay cannot price them). With it, the spend cap and estimates can count this bot's answers.</p></LabelHelp>}
                 hint={target.cost_per_answer_usd != null ? <>Now <span className="font-mono">{usd(target.cost_per_answer_usd)}</span> per answer.</> : 'Not set: the spend cap cannot limit this bot.'}>
                 <div className="flex gap-2">
                   <Input className="w-32" type="number" min={0} step="0.001" aria-label="Cost per answer" placeholder="e.g. 0.04"
@@ -210,6 +210,9 @@ export function TargetPage() {
               </Field>
             </div>
           </Card>
+        </div>
+        <div className="space-y-12">
+          <ReadingCard targetId={target.id} />
           <Card title="Configuration" meta={`v${v.version}`} help={<p>A configuration is versioned: editing creates v{v.version + 1}, and past runs keep the version they used.</p>} actions={<Segmented size="sm" value={cfgView} onChange={setCfgView} options={[{ id: 'summary', label: 'Readable' }, { id: 'json', label: 'JSON' }]} />}>
             {cfgView === 'json' ? <Json value={v.config} maxHeight={420} /> : (
               <div className="space-y-3 text-sm">
@@ -225,14 +228,15 @@ export function TargetPage() {
             )}
           </Card>
           <Card title="Versions" meta={`${target.versions?.length ?? 1}`} padded={false}>
-            <Table>
+            <ScrollTable className="[&_table]:min-w-[520px] [&_table]:table-fixed">
+              <colgroup><col className="w-20" /><col className="w-40" /><col /><col className="w-36" /></colgroup>
               <thead><tr><th className="t-label">Version</th><th className="t-label">Variant</th><th className="t-label">What changed</th><th className="t-label">Created</th></tr></thead>
               <tbody>
                 {[...(target.versions ?? [])].reverse().map((tv) => (
-                  <tr key={tv.id}><td className="num font-mono text-xs">v{tv.version}</td><td>{tv.variant_label || '-'}</td><td className="text-ink-2">{tv.notes || '-'}</td><td className="whitespace-nowrap text-xs text-ink-3">{when(tv.created_at)}</td></tr>
+                  <tr key={tv.id}><td className="num font-mono text-xs">v{tv.version}</td><td className="break-words">{tv.variant_label || '-'}</td><td className="text-ink-2">{tv.notes || '-'}</td><td className="whitespace-nowrap text-xs text-ink-3">{when(tv.created_at)}</td></tr>
                 ))}
               </tbody>
-            </Table>
+            </ScrollTable>
           </Card>
         </div>
       </div>

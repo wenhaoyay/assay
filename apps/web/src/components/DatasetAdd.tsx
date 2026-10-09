@@ -6,7 +6,8 @@ import { useState } from 'react'
 import { api } from '../lib/api'
 import { projectOption, useProjects } from '../lib/projects'
 import type { Dataset } from '../lib/types'
-import { Button, ErrorState, Field, Help, Input, Segmented, Select, Textarea } from './ui'
+import { Button, ErrorState, Field, Input, Segmented, Select, Textarea } from './ui'
+import { FileInput, TextLink } from './form'
 import { LabelHelp } from './LabelHelp'
 
 type Mode = 'file' | 'type' | 'empty'
@@ -33,12 +34,13 @@ export function DatasetAdd({ projectId: fixedProject, defaultProjectId = '', onD
   const projectId = fixedProject || picked
   const [mode, setMode] = useState<Mode>('file')
   const [file, setFile] = useState<File | null>(null)
+  const [fileKey, setFileKey] = useState(0)
   const [name, setName] = useState('')
   const [typed, setTyped] = useState('')
   const done = (d: Dataset) => {
     qc.invalidateQueries({ queryKey: ['datasets'] })
     qc.invalidateQueries({ queryKey: ['home'] })
-    setFile(null); setName(''); setTyped('')
+    setFile(null); setFileKey((k) => k + 1); setName(''); setTyped('')
     onDone?.(d)
   }
   const add = useMutation({
@@ -73,16 +75,16 @@ export function DatasetAdd({ projectId: fixedProject, defaultProjectId = '', onD
       {mode === 'file' && (
         <>
           <Field label={<LabelHelp label="JSON, YAML or CSV" title="File columns"><p>CSV columns can be plain words: <i>Question</i>, <i>Must mention</i>, <i>Must never say</i>, <i>Should refuse?</i>, <i>Correct answer</i>, <i>Topic</i>.</p></LabelHelp>}>
-            <input type="file" accept=".json,.yaml,.yml,.csv" aria-label="Dataset file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="block w-full text-xs file:mr-3 file:rounded-md file:border file:border-line-strong file:bg-surface file:px-2.5 file:py-1 file:text-xs" />
+            <FileInput key={fileKey} accept=".json,.yaml,.yml,.csv" aria-label="Dataset file" onFiles={(f) => setFile(f[0] ?? null)} />
           </Field>
           <Input placeholder="Name (optional: the file's own name otherwise)" value={name} onChange={(e) => setName(e.target.value)} aria-label="Dataset name" />
-          {!compact && <a href="/api/datasets/template.csv" className="inline-flex items-center gap-1 text-xs text-accent-ink underline"><Download className="size-3" />Spreadsheet template for colleagues (opens in Excel)</a>}
+          {!compact && <TextLink href="/api/datasets/template.csv" size="sm"><Download className="size-3" />Spreadsheet template for colleagues (opens in Excel)</TextLink>}
         </>
       )}
       {mode === 'type' && (
         <>
           <Input placeholder="Name, e.g. First questions" value={name} onChange={(e) => setName(e.target.value)} aria-label="Dataset name" />
-          <div className="flex items-center gap-1.5 text-xs font-medium text-ink-2">Questions, one per line<Help title="Questions without expectations"><p>Each line becomes a question with no expectations yet: rule checks show "not applicable" until you add what a correct answer must say (open the set afterwards).</p></Help></div>
+          <div className="text-xs font-medium text-ink-2"><LabelHelp label="Questions, one per line" title="Questions without expectations"><p>Each line becomes a question with no expectations yet: rule checks show "not applicable" until you add what a correct answer must say (open the set afterwards).</p></LabelHelp></div>
           <Textarea rows={5} value={typed} onChange={(e) => setTyped(e.target.value)} aria-label="Questions, one per line"
             placeholder={'One question per line, the way users ask:\nWhich REM profile does SCRS use?\nWhat does material status Z3 block?'} />
         </>

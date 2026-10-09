@@ -7,6 +7,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type 
 import { Link } from 'react-router-dom'
 import { ms } from '../../lib/format'
 import { useMotionOn } from '../../lib/prefs'
+import { DUR } from '../ui'
 
 export interface WhatIfRun {
   run_id: number
@@ -30,8 +31,6 @@ function useWidth<T extends HTMLElement>() {
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
-const GOOD_FILL = 'color-mix(in srgb, var(--good) 60%, var(--surface))'
-const BAD_FILL = 'color-mix(in srgb, var(--bad) 45%, var(--surface))'
 
 export function GateWhatIf({ runs, passMin, p95Max }: { runs: WhatIfRun[]; passMin: number | null; p95Max: number | null }) {
   const motionOn = useMotionOn()
@@ -49,6 +48,8 @@ export function GateWhatIf({ runs, passMin, p95Max }: { runs: WhatIfRun[]; passM
   const y = d3.scaleLinear().domain([0, 1]).range([H - m.b, m.t])
   const ok = (r: WhatIfRun) => r.pass_rate >= thr && (p95 === null || r.p95_latency_ms === null || r.p95_latency_ms <= p95)
   const n = runs.filter(ok).length
+  const narrow = x.step() < 54
+  const sw = narrow ? Math.max(18, x.step() - 6) : 48
 
   const p95s = runs.map((r) => r.p95_latency_ms).filter((v): v is number => v !== null)
   const sMin = Math.floor((Math.min(...p95s, p95Max ?? Infinity) * 0.8) / 50) * 50
@@ -76,7 +77,7 @@ export function GateWhatIf({ runs, passMin, p95Max }: { runs: WhatIfRun[]; passM
           <svg ref={svg} width={width} height={H} role="img" aria-label={`${n} of ${runs.length} past runs would pass at a pass-rate limit of ${Math.round(thr * 100)}%`} data-testid="whatif-chart">
             {[0, 0.2, 0.4, 0.6, 0.8, 1].map((t) => (
               <g key={t}>
-                <line x1={m.l} x2={width - m.r} y1={y(t)} y2={y(t)} className="gridline" stroke="var(--line)" strokeDasharray={t === 0 ? undefined : '2 4'} />
+                <g className={t === 0 ? 'axis' : 'gridline'}><line x1={m.l} x2={width - m.r} y1={y(t)} y2={y(t)} /></g>
                 <text x={m.l - 8} y={y(t) + 4} textAnchor="end" className="c-num">{Math.round(t * 100)}%</text>
               </g>
             ))}
@@ -87,8 +88,8 @@ export function GateWhatIf({ runs, passMin, p95Max }: { runs: WhatIfRun[]; passM
                 <g key={r.run_id}>
                   <motion.rect x={x(r.run_id)} width={x.bandwidth()} rx={4}
                     initial={motionOn ? { y: y(0), height: 0 } : false} animate={{ y: y(r.pass_rate), height: y(0) - y(r.pass_rate) }}
-                    transition={{ delay: i * 0.06, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-                    fill={good ? GOOD_FILL : BAD_FILL} data-run={r.run_id}>
+                    transition={motionOn ? { delay: i * 0.04, duration: DUR.slow, ease: [0.16, 1, 0.3, 1] } : { duration: 0 }}
+                    fill={good ? 'var(--good)' : 'var(--bad)'} data-run={r.run_id}>
                     <title>{`Run #${r.run_id}${r.variant ? ` (${r.variant})` : ''}: pass rate ${(r.pass_rate * 100).toFixed(1)}%, p95 ${ms(r.p95_latency_ms)}`}</title>
                   </motion.rect>
                   <Link to={`/runs/${r.run_id}`}>
@@ -98,8 +99,8 @@ export function GateWhatIf({ runs, passMin, p95Max }: { runs: WhatIfRun[]; passM
                     <motion.g key={`${r.run_id}-${good}`} initial={armed && motionOn ? { scale: 1.35 } : false} animate={{ scale: 1 }}
                       transition={{ type: 'spring', stiffness: 520, damping: 14 }} style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
                       data-testid={`whatif-stamp-${r.run_id}`} data-state={good ? 'PASS' : 'FAIL'}>
-                      <rect x={-24} y={-11} width={48} height={21} rx={4} fill="var(--surface)" stroke={good ? 'var(--good-ink)' : 'var(--bad-ink)'} strokeWidth={1.8} />
-                      <text y={4} textAnchor="middle" className="c-num c-strong" style={{ fill: good ? 'var(--good-ink)' : 'var(--bad-ink)', letterSpacing: '0.08em' }}>{good ? 'PASS' : 'FAIL'}</text>
+                      <rect x={-sw / 2} y={-11} width={sw} height={21} rx={4} fill="var(--surface)" stroke={good ? 'var(--good-ink)' : 'var(--bad-ink)'} strokeWidth={1.8} />
+                      <text y={4} textAnchor="middle" className="c-num c-strong" style={{ fill: good ? 'var(--good-ink)' : 'var(--bad-ink)', letterSpacing: '0.08em' }}>{narrow ? (good ? '✓' : '✕') : good ? 'PASS' : 'FAIL'}</text>
                     </motion.g>
                   </g>
                 </g>

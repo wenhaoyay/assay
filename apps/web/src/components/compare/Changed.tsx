@@ -10,7 +10,7 @@ import type { PairedCase } from '../../lib/compare'
 import { FAILURE_LABELS } from '../../lib/format'
 import type { CaseChange, Comparison, TrialRow } from '../../lib/types'
 import { Delta } from '../instrument'
-import { Badge, Card, DotStrip, Segmented } from '../ui'
+import { Badge, Card, DotStrip, Panel, Segmented } from '../ui'
 import { AnswerText } from '../trial/AnswerText'
 
 const rate = (s: { passed: number; total: number } | null) => (s && s.total ? s.passed / s.total : null)
@@ -88,7 +88,7 @@ function SideBySide({ caseId, c, sides }: { caseId: string; c: Comparison; sides
   return (
     <div className="mb-2 grid gap-3 md:grid-cols-2">
       {picks.map((ts, i) => (
-        <div key={i} className="min-w-0 rounded-lg border border-line bg-surface p-3">
+        <Panel key={i} className="min-w-0">
           <div className="mb-1.5 flex items-center gap-2 text-xs">
             <span className={clsx('size-2 rounded-full', i === 0 ? 'bg-series-1' : 'bg-series-2')} />
             <span className="font-medium">{i === 0 ? 'Baseline' : 'Candidate'} #{runs[i].id}</span>
@@ -103,7 +103,7 @@ function SideBySide({ caseId, c, sides }: { caseId: string; c: Comparison; sides
               </div>
             </>
           ) : <p className="text-xs text-ink-3">Not in this run.</p>}
-        </div>
+        </Panel>
       ))}
     </div>
   )

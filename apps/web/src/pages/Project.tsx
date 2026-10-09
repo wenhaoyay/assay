@@ -7,10 +7,12 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { FixFirst, NotesCard } from '../components/Causes'
 import { CaseJourney, journeyCounts, SlopeChart, type JourneyFilter } from '../components/home/CaseJourney'
 import { MetricSwitch, RunTimeline, type Metric } from '../components/home/RunTimeline'
-import { dayLabel, spanWords, useGateThresholds, variantChange, type Point } from '../components/home/shared'
+import { dayLabel, READING_W, spanWords, useGateThresholds, variantChange, type Point } from '../components/home/shared'
+import { Menu, TextLink } from '../components/form'
+import { MetricTable } from './Compare'
 import { Needle, SampleSize } from '../components/instrument'
 import { RunsTable } from '../components/RunsTable'
-import { DeltaList, StagePipeline } from '../components/viz'
+import { StagePipeline } from '../components/viz'
 import { Badge, Card, Empty, ErrorState, PageHeader, PageSkeleton, PROJECT_COLORS, ProjectMark, Segmented, Select, Term, linkButton } from '../components/ui'
 import { api } from '../lib/api'
 import { verdictSentence } from '../lib/compare'
@@ -134,26 +136,25 @@ export function ProjectPage() {
 
           <LatestVsPrevious h={h!} />
 
-          <div className="grid gap-10 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-            <Card title={<>Where failures start · run <Link className="font-mono text-accent-ink hover:underline" to={`/runs/${latest.id}`}>#{latest.id}</Link></>}
-              help={<>
-                <p>The <Term k="stage">pipeline stages</Term> of the latest run, and how many failures start in each.</p>
-                <p>Each failed trial is counted once per kind of failure it shows. The stage is where that kind of failure starts. Click a kind to see those answers.</p>
-              </>}>
-              <StagePipeline stages={h!.stages} onPick={undefined} />
-              {h!.top_failures.length > 0 && <TopFailures h={h!} runId={latest.id} />}
-            </Card>
-            <div className="space-y-10">
-              {latest.failed_trials ? <FixFirst runId={latest.id} targetId={latest.target_id} compact onPick={(c) => nav(`/runs/${latest.id}?tab=failures&cause=${c ?? ''}`)} /> : null}
-              <NotesCard projectId={p.id} />
-            </div>
+          <Card title={<>Where failures start · run <Link className="font-mono text-accent-ink hover:underline" to={`/runs/${latest.id}`}>#{latest.id}</Link></>}
+            help={<>
+              <p>The <Term k="stage">pipeline stages</Term> of the latest run, and how many failures start in each.</p>
+              <p>Each failed trial is counted once per kind of failure it shows. The stage is where that kind of failure starts. Click a kind to see those answers.</p>
+            </>}>
+            <StagePipeline stages={h!.stages} onPick={undefined} />
+            {h!.top_failures.length > 0 && <TopFailures h={h!} runId={latest.id} />}
+          </Card>
+
+          <div className="grid gap-x-10 gap-y-12 xl:grid-cols-2">
+            {latest.failed_trials ? <FixFirst runId={latest.id} targetId={latest.target_id} compact onPick={(c) => nav(`/runs/${latest.id}?tab=failures&cause=${c ?? ''}`)} /> : null}
+            <NotesCard projectId={p.id} />
           </div>
 
-          <div className="grid gap-10 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-            <Card title="Recent runs" padded={false} actions={<Link to="/runs" className="text-xs text-accent-ink hover:underline">All runs</Link>}>
+          <div className="grid gap-x-10 gap-y-12 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+            <Card title="Recent runs" padded={false} actions={<TextLink to="/runs">All runs</TextLink>}>
               <div className="pt-2"><RunsTable runs={h!.recent_runs.slice(0, 8)} compact /></div>
             </Card>
-            <div className="space-y-10">
+            <div className="space-y-12">
               <Card title="Connections" padded={false} help={<p>Where this chatbot runs, and the version of each connection. The dot is the last health check: green answered, red failed, grey not checked yet.</p>}>
                 <ul className="divide-y divide-line">
                   {h!.targets.map((t) => (
@@ -194,7 +195,7 @@ function Verdict({ pts, gate }: { pts: Point[]; gate: number | null }) {
   const n = (v: number | null) => <span className="font-mono">{pct(v, 0)}</span>
   const lastGood = gate !== null ? (last.pass_rate ?? 0) >= gate : (last.pass_rate ?? 0) > (first.pass_rate ?? 0)
   if (pts.length === 1) {
-    return <p className="t-verdict mt-2.5 max-w-[780px] text-ink-2" data-testid="project-verdict">First reading: {n(first.pass_rate)} on {dayLabel(first.at)}. <span className="text-ink-3">The next run draws the line.</span></p>
+    return <p className={clsx('t-verdict mt-2.5 text-ink-2', READING_W)} data-testid="project-verdict">First reading: {n(first.pass_rate)} on {dayLabel(first.at)}. <span className="text-ink-3">The next run draws the line.</span></p>
   }
   let dip: { p: Point; prev: Point; d: number } | null = null
   for (let i = 1; i < pts.length; i++) {
@@ -204,9 +205,9 @@ function Verdict({ pts, gate }: { pts: Point[]; gate: number | null }) {
   const up = (last.pass_rate ?? 0) >= (first.pass_rate ?? 0)
   const what = dip ? variantChange(dip.prev.variant, dip.p.variant) : null
   return (
-    <p className="t-verdict mt-2.5 max-w-[820px] text-ink-2" data-testid="project-verdict">
+    <p className={clsx('t-verdict mt-2.5 text-ink-2', READING_W)} data-testid="project-verdict">
       From {n(first.pass_rate)} {up ? 'to' : 'down to'} <span className={clsx('font-mono', lastGood ? 'text-good-ink' : up ? 'text-ink' : 'text-bad-ink')}>{pct(last.pass_rate, 0)}</span> {spanWords(first.at, last.at)}.{' '}
-      {dip && <span className="text-ink-3">The largest dip was on {dayLabel(dip.p.at)}: down <span className="font-mono">{Math.abs(dip.d * 100).toFixed(0)}pp</span> at run <span className="font-mono">#{dip.p.run_id}</span>{what ? <>, after “{what}”</> : null}.</span>}
+      {dip && <span className="text-ink-3">The largest dip was on {dayLabel(dip.p.at)}: down <span className="font-mono">{Math.abs(dip.d * 100).toFixed(0)} pp</span> at run <span className="font-mono">#{dip.p.run_id}</span>{what ? <>, after “{what}”</> : null}.</span>}
     </p>
   )
 }
@@ -222,9 +223,9 @@ function LatestVsPrevious({ h }: { h: ProjectHome }) {
         <p>The latest run against the previous comparable one, metric by metric, on the questions both asked.</p>
         <p>Each change carries its 95% interval. If the interval covers zero, the difference could be chance.</p>
       </>}
-      actions={<Link to={`/compare?baseline=${v.baseline_run_id}&candidate=${v.candidate_run_id}`} viewTransition className="inline-flex items-center gap-1 text-sm font-medium text-accent-ink hover:underline">Every metric, every case <ArrowRight className="size-3.5" /></Link>}>
+      actions={<TextLink to={`/compare?baseline=${v.baseline_run_id}&candidate=${v.candidate_run_id}`}>Every metric, every case <ArrowRight className="size-3.5" /></TextLink>}>
       <p className={clsx('t-readout', s.tone === 'good' && 'text-good-ink', s.tone === 'bad' && 'text-bad-ink')}>{s.text}</p>
-      <div className="mt-4"><DeltaList rows={v.rows} /></div>
+      <div className="mt-4"><MetricTable rows={v.rows} /></div>
     </Card>
   )
 }
@@ -255,23 +256,23 @@ export function HealthDot({ check }: { check: ProjectHome['targets'][number]['la
 
 function ColorPicker({ projectId, current }: { projectId: number; current: string }) {
   const qc = useQueryClient()
-  const [open, setOpen] = useState(false)
   const save = useMutation({
     mutationFn: (color: string) => api.patch(`/api/projects/${projectId}`, { color }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['project-home'] }); qc.invalidateQueries({ queryKey: ['projects'] }); qc.invalidateQueries({ queryKey: ['home'] }); setOpen(false) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['project-home'] }); qc.invalidateQueries({ queryKey: ['projects'] }); qc.invalidateQueries({ queryKey: ['home'] }) },
     meta: { silent: true },
   })
   return (
-    <div className="relative">
-      <button type="button" onClick={() => setOpen((v) => !v)} className={linkButton('ghost', 'sm')} aria-label="Chatbot colour"><Palette className="size-3.5" /></button>
-      {open && (
-        <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="absolute left-0 z-20 mt-1 flex gap-1.5 rounded-lg border border-line bg-surface p-2 shadow-pop">
+    <Menu role="dialog"
+      trigger={({ props }) => <button type="button" {...props} className={linkButton('ghost', 'sm')} aria-label="Chatbot colour"><Palette className="size-3.5" /></button>}>
+      {(close) => (
+        <div className="flex gap-1.5 p-0.5">
           {Object.entries(PROJECT_COLORS).map(([k, c]) => (
-            <button key={k} type="button" title={k} disabled={save.isPending} onClick={() => save.mutate(k)} className={clsx('size-6 rounded-md ring-offset-2 ring-offset-surface', current === k && 'ring-2 ring-accent')} style={{ background: c }} />
+            <button key={k} type="button" title={k} aria-label={k} aria-pressed={current === k} disabled={save.isPending} onClick={() => save.mutate(k, { onSuccess: close })}
+              className={clsx('size-6 rounded-md ring-offset-2 ring-offset-surface', current === k && 'ring-2 ring-accent')} style={{ background: c }} />
           ))}
           {save.isError && <span role="alert" className="ml-1 self-center text-xs text-bad-ink">{save.error.message}</span>}
-        </motion.div>
+        </div>
       )}
-    </div>
+    </Menu>
   )
 }

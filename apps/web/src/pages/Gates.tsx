@@ -6,6 +6,7 @@ import { ReleaseReceipt } from '../components/ReleaseReceipt'
 import { GateSentence, type Rule } from '../components/setup/gateText'
 import { GateWhatIf, type WhatIfRun } from '../components/setup/GateWhatIf'
 import { SetupField } from '../components/setup/SetupField'
+import { TextLink } from '../components/form'
 import { Button, Card, Empty, ErrorState, Input, Loading, PageHeader, Segmented, Select, Textarea } from '../components/ui'
 import { api } from '../lib/api'
 import { useCrumbs } from '../lib/crumbs'
@@ -114,9 +115,10 @@ export function GatesPage() {
         )}
       </PageHeader>
 
+      <div className="space-y-12">
       <AnimatePresence>
         {editing && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mb-10 overflow-hidden">
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
             <Card boxed title={editing === 'new' ? 'New gate' : `Edit ${editing.name}`}
               help={<>
                 <p>Each rule names a metric, how it is judged and a limit. Absolute rules hold for any run; "may drop at most" compares the run with the baseline it is checked against.</p>
@@ -130,7 +132,7 @@ export function GatesPage() {
               </div>
               {mode === 'form' ? (
                 <div className="mt-5 space-y-2">
-                  <div className="t-label">Rules</div>
+                  <div className="text-xs font-medium text-ink-2">Rules</div>
                   {rules.map((r, i) => (
                     <motion.div key={i} layout initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} className="grid grid-cols-[minmax(0,1fr)_170px_120px_auto] items-center gap-2">
                       <Select value={r.metric} onChange={(e) => setRule(i, { metric: e.target.value })} aria-label="Metric">
@@ -160,28 +162,35 @@ export function GatesPage() {
       {gates.isLoading ? <Loading /> : gates.isError ? <ErrorState error={gates.error} /> : list.length === 0 ? (
         <Empty title="No gates yet" icon={<ShieldCheck className="size-6" />} action={<Button variant="primary" onClick={() => start('new')}>Create a gate</Button>}>A gate turns "is it good enough to ship?" into explicit rules. Runs started with a gate show a PASS or FAIL stamp.</Empty>
       ) : (
-        <div className="space-y-12">
-          {gate && <WhatIf key={gate.id} gate={gate} />}
-          {gate && <LatestReceipt gate={gate} />}
-          <Card title="Every gate" meta={list.length} help={<p>One gate per line, said as its rules. Edit changes the rules for every run checked against the gate from now on; past verdicts stay as they were.</p>}>
-            <ul className="divide-y divide-line">
-              {list.map((g) => (
-                <li key={g.id} className="flex items-start gap-3 py-3.5">
-                  <ShieldCheck className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-baseline gap-x-2">
-                      <span className="text-base font-semibold">{g.name}</span>
-                      <span className="text-sm text-ink-2">{projects.all.find((p) => p.id === g.project_id)?.name}</span>
-                    </div>
-                    <p className="mt-0.5 text-sm text-ink-2"><GateSentence rules={gateToRules(g.config)} /></p>
-                  </div>
-                  <Button size="sm" variant="ghost" onClick={() => start(g)}>Edit</Button>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        </div>
+        <>
+          {gate && (
+            <div className="grid items-start gap-x-8 gap-y-12 xl:grid-cols-[minmax(0,1fr)_400px]">
+              <div className="min-w-0 space-y-12">
+                <WhatIf key={gate.id} gate={gate} />
+                <Card title="Every gate" meta={list.length} help={<p>One gate per line, said as its rules. Edit changes the rules for every run checked against the gate from now on; past verdicts stay as they were.</p>}>
+                  <ul className="divide-y divide-line">
+                    {list.map((g) => (
+                      <li key={g.id} className="flex items-start gap-3 py-3.5">
+                        <ShieldCheck className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-baseline gap-x-2">
+                            <TextLink className="text-base font-semibold" aria-label={g.name} onClick={() => start(g)}>{g.name}</TextLink>
+                            <span className="text-sm text-ink-2">{projects.all.find((p) => p.id === g.project_id)?.name}</span>
+                          </div>
+                          <p className="mt-0.5 text-sm text-ink-2"><GateSentence rules={gateToRules(g.config)} /></p>
+                        </div>
+                        <Button size="sm" onClick={() => start(g)}>Edit</Button>
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+              </div>
+              <LatestReceipt gate={gate} />
+            </div>
+          )}
+        </>
       )}
+      </div>
     </>
   )
 }
@@ -219,14 +228,14 @@ function LatestReceipt({ gate }: { gate: Gate }) {
   const run = useQuery({ queryKey: ['run', latest?.id], queryFn: () => api.get<RunDetail>(`/api/runs/${latest!.id}`), enabled: !!latest })
   const checked = !!run.data?.gate_results?.some((g) => g.gate_id === gate.id || g.gate_id === null)
   return (
-    <Card title="The receipt" meta={latest && checked ? `run #${latest.id}` : undefined} help={<>
-      <p>What a gate hands you when it checks a run: the rules, the figures, the run's fingerprint (one dot per question) and the stamp. This is the latest run checked against this gate.</p>
+    <Card title="The receipt" help={<>
+      <p>What a gate hands you when it checks a run: the rules, the figures, the run's fingerprint (one dot per question) and the stamp. This is the latest run checked against this gate{latest && checked ? <>, run #{latest.id}</> : null}.</p>
       <p>Each line is one rule: the run's figure, then ✓ when it met the rule or ✕ when it did not. Lines marked "vs baseline" compare the run with the baseline run named at the top.</p>
       <p>Copy the link or print it for whoever signs off.</p>
     </>}>
       {runs.isLoading || (latest && run.isLoading) ? <Loading rows={6} /> : !latest || !run.data || !checked ? (
         <Empty title="No run has met this gate yet">Start a run with this gate (New run › Release gate) and its receipt appears here.</Empty>
-      ) : <ReleaseReceipt run={run.data} className="w-full max-w-[400px]" />}
+      ) : <ReleaseReceipt run={run.data} className="w-full" />}
     </Card>
   )
 }

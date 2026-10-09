@@ -1,16 +1,16 @@
 // Building golden sets faster without lowering the bar: the machine types, a person vouches.
 // Every case added here records where it came from and who approved it (metadata.provenance).
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import clsx from 'clsx'
 import { Check, ClipboardCopy, FileUp, Keyboard, ListChecks, MessageSquareQuote, Sparkles, ThumbsDown, ThumbsUp, Users, X } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useDeferredValue, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
-import { plural } from '../lib/format'
+import { fmtDay, plural } from '../lib/format'
 import { usePrefs } from '../lib/prefs'
 import type { Dataset, DatasetVersion, EditResult, Project, RunHeader, TestCase, TrialRow } from '../lib/types'
-import { Badge, Button, Card, Dialog, Empty, ErrorState, Field, Help, Input, Kbd, Loading, Notice, ProgressBar, Select, Textarea } from './ui'
+import { Badge, Button, Card, Dialog, Empty, ErrorState, Field, Help, Input, Kbd, Loading, Notice, Panel, ProgressBar, Select, Textarea } from './ui'
+import { Checkbox, Chip, FileInput } from './form'
 import { LabelHelp } from './LabelHelp'
 
 // --------------------------------------------------------------------------------------
@@ -31,7 +31,7 @@ export function ProvenanceBadge({ c, origin }: { c: TestCase; origin?: string })
   const src = p?.source ?? (c.metadata?.generated ? 'generated' : origin)
   if (!src) return null
   const label = SOURCE_LABEL[src] ?? src
-  const who = p?.approved_by ? `approved by ${p.approved_by}${p.approved_at ? `, ${new Date(p.approved_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : ''}` : ''
+  const who = p?.approved_by ? `approved by ${p.approved_by}${p.approved_at ? `, ${fmtDay(p.approved_at)}` : ''}` : ''
   const ai = p?.drafted_by?.startsWith('AI') || src === 'generated' || src === 'prompt-kit'
   return <Badge tone={ai && !p?.approved_by ? 'warn' : 'neutral'} title={[p?.drafted_by && `drafted by ${p.drafted_by}`, who, p?.file].filter(Boolean).join(' · ')}>{label}{who ? ' ✓' : ''}</Badge>
 }
@@ -50,10 +50,9 @@ export function TermChips({ text, picked, onToggle, exclude = [] }: { text: stri
     <div className="flex flex-wrap items-center gap-1.5">
       <span className="t-label">Suggested</span>
       {list.map((t) => (
-        <button key={t} type="button" onClick={() => onToggle(t)} aria-pressed={picked.includes(t)}
-          className={clsx('rounded-full border px-2 py-0.5 text-xs transition-colors', picked.includes(t) ? 'border-accent bg-accent text-on-accent' : 'border-line-strong text-ink-2 hover:border-accent')}>
-          {picked.includes(t) ? <Check className="mr-0.5 inline size-3" /> : '+ '}{t}
-        </button>
+        <Chip key={t} selected={picked.includes(t)} onClick={() => onToggle(t)} icon={picked.includes(t) ? <Check className="size-3" /> : undefined}>
+          {picked.includes(t) ? '' : '+ '}{t}
+        </Chip>
       ))}
     </div>
   )
@@ -102,8 +101,8 @@ function makeCase(question: string, existing: Set<string>, extra: { reference?: 
 export function BuildPanel({ dataset, version, project, onEdited }: { dataset: Dataset; version: DatasetVersion; project?: Project; onEdited: (r: EditResult) => void }) {
   const [tool, setTool] = useState<'kit' | 'real' | 'interview' | null>(null)
   return (
-    <div className="space-y-10">
-      <div className="grid gap-10 xl:grid-cols-2">
+    <div className="space-y-12">
+      <div className="grid gap-12 xl:grid-cols-2">
         <CoverageCard versionId={version.id} />
         <ChecksCard versionId={version.id} />
       </div>
@@ -113,11 +112,13 @@ export function BuildPanel({ dataset, version, project, onEdited }: { dataset: D
           <ToolTile icon={ClipboardCopy} title="Prompt kit" body="A ready prompt for your own ChatGPT or Claude, with your documents; the result lands in the review queue." onClick={() => setTool('kit')} />
           <ToolTile icon={MessageSquareQuote} title="Real questions" body="Upload chat history; near-identical questions are grouped by how often they were asked." onClick={() => setTool('real')} />
           <ToolTile icon={Keyboard} title="Expert interview" body="One question at a time: what must a right answer say, and never say? Keyboard only." onClick={() => setTool('interview')} />
-          <a href="/api/datasets/template.csv" className="flex flex-col items-start rounded-xl border border-line bg-surface p-3 text-left shadow-card transition-colors hover:border-accent/60">
-            <Users className="size-4 text-accent-ink" />
-            <div className="mt-1.5 text-sm font-semibold">Spreadsheet for colleagues</div>
-            <div className="text-xs text-ink-2">A CSV template with examples, filled in Excel; import it on the Datasets page.</div>
-          </a>
+          <Panel padded={false}>
+            <a href="/api/datasets/template.csv" className={TILE}>
+              <Users className="size-4 text-accent-ink" />
+              <div className="mt-1.5 text-sm font-semibold">Spreadsheet for colleagues</div>
+              <div className="text-xs text-ink-2">A CSV template with examples, filled in Excel; import it on the Datasets page.</div>
+            </a>
+          </Panel>
         </div>
       </Card>
       <Dialog open={tool === 'kit'} onClose={() => setTool(null)} title="Prompt kit: draft cases with your own AI assistant" width={760}>
@@ -133,13 +134,17 @@ export function BuildPanel({ dataset, version, project, onEdited }: { dataset: D
   )
 }
 
+const TILE = 'flex h-full w-full flex-col items-start rounded-xl p-3 text-left transition-colors duration-(--dur-ui) hover:bg-surface-2'
+
 function ToolTile({ icon: Icon, title, body, onClick }: { icon: typeof Users; title: string; body: string; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="flex flex-col items-start rounded-xl border border-line bg-surface p-3 text-left shadow-card transition-colors hover:border-accent/60">
-      <Icon className="size-4 text-accent-ink" />
-      <div className="mt-1.5 text-sm font-semibold">{title}</div>
-      <div className="text-xs text-ink-2">{body}</div>
-    </button>
+    <Panel padded={false}>
+      <button type="button" onClick={onClick} className={TILE}>
+        <Icon className="size-4 text-accent-ink" />
+        <div className="mt-1.5 text-sm font-semibold">{title}</div>
+        <div className="text-xs text-ink-2">{body}</div>
+      </button>
+    </Panel>
   )
 }
 
@@ -259,7 +264,7 @@ function AnswerReview({ dataset, version, onEdited }: { dataset: Dataset; versio
   })
 
   return (
-    <Card title={<span className="flex items-center gap-2"><ListChecks className="size-4 text-accent-ink" />Approve good answers</span>}
+    <Card title="Approve good answers"
       help={<>
         <p>Judging an answer takes seconds; writing one takes minutes. Mark the bot's answers right or wrong, and keep what a correct answer must mention.</p>
         <p>A wrong answer with your one-line correction becomes a case the current bot fails: the most valuable kind. Keys: Y right, N wrong, S skip, Enter save.</p>
@@ -282,7 +287,7 @@ function AnswerReview({ dataset, version, onEdited }: { dataset: Dataset; versio
           }} tabIndex={0} className="outline-none">
             <div className="mb-2 flex items-center justify-between text-xs text-ink-3"><span><span className="font-mono">{i + 1}</span> of <span className="font-mono">{cards.length}</span>{saved ? <> · <span className="font-mono">{saved}</span> added</> : ''}</span><span className="flex items-center gap-1"><Kbd>Y</Kbd> right <Kbd>N</Kbd> wrong <Kbd>S</Kbd> skip <Kbd>Enter</Kbd> save</span></div>
             <AnimatePresence mode="wait">
-              <motion.div key={card.id} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.16 }} className="rounded-xl border border-line bg-surface-2/40 p-4">
+              <motion.div key={card.id} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.16 }} className="rounded-xl border border-line bg-surface-2/40 p-[var(--card-p)]">
                 <div className="t-label">Question</div>
                 <div className="mt-1 text-lead font-medium text-ink">{card.question}</div>
                 <div className="t-label mt-3">The bot answered</div>
@@ -291,8 +296,8 @@ function AnswerReview({ dataset, version, onEdited }: { dataset: Dataset; versio
             </AnimatePresence>
             {mode === 'judge' && (
               <div className="mt-3 flex gap-2">
-                <Button variant="good" onClick={() => setMode('right')}><ThumbsUp className="size-3.5" />Right</Button>
-                <Button variant="bad" onClick={() => setMode('wrong')}><ThumbsDown className="size-3.5" />Wrong</Button>
+                <Button onClick={() => setMode('right')}><ThumbsUp className="size-3.5 text-good-ink" />Right</Button>
+                <Button onClick={() => setMode('wrong')}><ThumbsDown className="size-3.5 text-bad-ink" />Wrong</Button>
                 <Button variant="ghost" onClick={next}>Skip</Button>
               </div>
             )}
@@ -300,7 +305,7 @@ function AnswerReview({ dataset, version, onEdited }: { dataset: Dataset; versio
               <div className="mt-3 space-y-2">
                 <div className="text-sm font-medium">Which phrases must a correct answer contain?</div>
                 <TermChips text={card.answer} picked={chips} onToggle={toggle} />
-                <label className="flex items-center gap-2 text-xs"><input type="checkbox" className="accent-[var(--accent)]" checked={keepRef} onChange={(e) => setKeepRef(e.target.checked)} />Keep this answer as the reference answer</label>
+                <Checkbox checked={keepRef} onChange={setKeepRef} label="Keep this answer as the reference answer" />
                 <div className="flex gap-2"><Button variant="primary" loading={add.isPending || update.isPending} onClick={save}><Check className="size-3.5" />{existing ? "Save expectations" : "Add case"}</Button><Button variant="ghost" onClick={() => setMode('judge')}>Back</Button></div>
               </div>
             )}
@@ -380,7 +385,7 @@ function PromptKit({ dataset, project }: { dataset: Dataset; project?: Project }
         <span className="text-xs text-ink-2">{(docs.data ?? []).length ? `Lists the ${plural((docs.data ?? []).length, 'document')} uploaded for this chatbot.` : 'No documents uploaded here: the prompt refers to the ones you attach.'}</span>
       </div>
       <div className="border-t border-line pt-3">
-        <Field label="Upload the result (CSV, YAML or JSON)"><input type="file" accept=".csv,.yaml,.yml,.json" aria-label="Drafted cases file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="block w-full text-xs file:mr-3 file:rounded-md file:border file:border-line-strong file:bg-surface file:px-2.5 file:py-1 file:text-xs" /></Field>
+        <Field label="Upload the result (CSV, YAML or JSON)"><FileInput accept=".csv,.yaml,.yml,.json" aria-label="Drafted cases file" onFiles={(f) => setFile(f[0] ?? null)} /></Field>
         <Button className="mt-2" disabled={!file} loading={upload.isPending} onClick={() => upload.mutate()}><FileUp className="size-3.5" />Send to the review queue</Button>
         {upload.data && <div className="mt-2"><Notice tone="good" title={`${plural(upload.data.created, 'draft case')} in the review queue`}>{upload.data.notice} Open <span className="font-semibold">Generate &amp; review</span> to go through them.</Notice></div>}
         {upload.isError && <div className="mt-2"><ErrorState error={upload.error} /></div>}
@@ -413,7 +418,7 @@ function RealQuestions({ version, onEdited }: { version: DatasetVersion; onEdite
   return (
     <div className="space-y-3">
       <p className="text-sm text-ink-2">The questions users actually ask are the best test cases. Upload chat history (JSONL or JSON with a question field, a CSV with a question column, or one question per line); similar questions are grouped and counted.</p>
-      <input type="file" accept=".jsonl,.ndjson,.json,.csv,.txt" aria-label="Chat history file" onChange={(e) => { const f = e.target.files?.[0]; if (f) group.mutate(f) }} className="block w-full text-xs file:mr-3 file:rounded-md file:border file:border-line-strong file:bg-surface file:px-2.5 file:py-1 file:text-xs" />
+      <FileInput accept=".jsonl,.ndjson,.json,.csv,.txt" aria-label="Chat history file" onFiles={(f) => group.mutate(f[0])} />
       {group.isPending && <Loading rows={3} />}
       {group.isError && <ErrorState error={group.error} />}
       {group.data && (
@@ -423,11 +428,11 @@ function RealQuestions({ version, onEdited }: { version: DatasetVersion; onEdite
           <ul className="scroll-thin max-h-80 space-y-1 overflow-y-auto rounded-lg border border-line p-2">
             {group.data.groups.map((g) => (
               <li key={g.question}>
-                <label className="flex items-start gap-2 rounded px-1 py-0.5 text-sm hover:bg-surface-2">
-                  <input type="checkbox" className="mt-0.5 accent-[var(--accent)]" checked={picked.includes(g.question)} onChange={() => setPicked((p) => (p.includes(g.question) ? p.filter((x) => x !== g.question) : [...p, g.question]))} />
-                  <span className="flex-1">{g.question}{g.examples.length > 1 && <span className="block text-xs text-ink-3">also: {g.examples.slice(1, 3).join(' · ')}</span>}</span>
+                <div className="flex items-start gap-2 rounded px-1 py-0.5 hover:bg-surface-2">
+                  <Checkbox className="flex-1" checked={picked.includes(g.question)} onChange={() => setPicked((p) => (p.includes(g.question) ? p.filter((x) => x !== g.question) : [...p, g.question]))}
+                    label={g.question} hint={g.examples.length > 1 ? `also: ${g.examples.slice(1, 3).join(' · ')}` : undefined} />
                   <Badge tone={g.count > 1 ? 'accent' : 'neutral'}><span className="font-mono">{g.count}×</span></Badge>
-                </label>
+                </div>
               </li>
             ))}
           </ul>
@@ -466,7 +471,7 @@ function Interview({ version, onEdited }: { version: DatasetVersion; onEdited: (
       <Field label="What MUST a correct answer say? (comma-separated)"><Input value={must} onChange={(e) => setMust(e.target.value)} aria-label="Must say" placeholder="e.g. ZP17, backflush" /></Field>
       <TermChips text={`${q} ${must}`} picked={chips} onToggle={(t) => setChips((c) => (c.includes(t) ? c.filter((x) => x !== t) : [...c, t]))} exclude={split(must)} />
       <Field label="What must it NEVER say? (optional)"><Input value={never} onChange={(e) => setNever(e.target.value)} aria-label="Never say" placeholder="e.g. ZPP3" /></Field>
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[var(--accent)]" checked={refuse} onChange={(e) => setRefuse(e.target.checked)} />The assistant should decline this one (out of scope)</label>
+      <Checkbox checked={refuse} onChange={setRefuse} label="The assistant should decline this one (out of scope)" />
       <Button variant="primary" disabled={!q.trim() || (!must.trim() && !chips.length && !refuse)} loading={add.isPending} onClick={save}><Sparkles className="size-3.5" />Save and next</Button>
       {add.isError && <ErrorState error={add.error} />}
     </div>
@@ -549,7 +554,7 @@ export function AddVariations({ versionId, caseId }: { versionId: number; caseId
         <p className="mb-3 text-sm text-ink-2">Does the bot still get it right when the question is asked differently? Each variation keeps this case's expectations and goes to the review queue (a translation can change what must be mentioned).</p>
         <div className="space-y-1.5">
           {KINDS.map(([k, label]) => (
-            <label key={k} className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[var(--accent)]" checked={kinds.includes(k)} onChange={() => setKinds((x) => (x.includes(k) ? x.filter((y) => y !== k) : [...x, k]))} />{label}</label>
+            <Checkbox key={k} checked={kinds.includes(k)} onChange={() => setKinds((x) => (x.includes(k) ? x.filter((y) => y !== k) : [...x, k]))} label={label} />
           ))}
         </div>
         <p className="mt-2 text-xs text-ink-2">Other words and translations use the drafting model from Settings › Defaults.</p>

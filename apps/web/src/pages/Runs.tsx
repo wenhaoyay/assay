@@ -1,12 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
-import clsx from 'clsx'
-import { AlertTriangle, GitCompareArrows, Play, X } from 'lucide-react'
+import { AlertTriangle, GitCompareArrows, X } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { RunsTable } from '../components/RunsTable'
 import { Sparkline } from '../components/viz'
-import { Button, Card, Code, Empty, ErrorState, Input, Kbd, Loading, PageHeader, Segmented, Select, Term, linkButton } from '../components/ui'
+import { Badge, Button, Card, Code, Empty, ErrorState, Input, Kbd, Loading, PageHeader, Segmented, Select, Term, linkButton } from '../components/ui'
 import { api } from '../lib/api'
 import { useCrumbs } from '../lib/crumbs'
 import { plural } from '../lib/format'
@@ -45,7 +44,8 @@ export function RunsPage() {
   const comparable = pair.length === 2 && a.comparability_key === b.comparability_key
 
   return (
-    <>
+    <div className="space-y-12">
+      <div>
       <PageHeader
         title="Runs"
         help={<>
@@ -53,15 +53,15 @@ export function RunsPage() {
           <p>Runs are grouped by <Term k="comparable">comparable setup</Term>: runs in one group asked the same questions with the same checks and grading model, so their numbers can be read side by side. Across groups they cannot. The line beside each group is its pass rate, oldest to newest.</p>
           <p>Tick two runs to compare them. J/K move through the first group, Enter opens the picked run.</p>
         </>}
-        actions={<Link to="/runs/new" viewTransition className={linkButton('primary')}><Play className="size-3.5" /> New run</Link>}
       />
-      <div className="mb-6 flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Input className="w-64" placeholder="Search runs" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search runs" />
         <Select className="w-56" value={project} onChange={(e) => setProject(e.target.value ? Number(e.target.value) : '')} aria-label="Chatbot">
           <option value="">All chatbots</option>{(projects.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </Select>
         <Segmented size="sm" label="Grouping" value={group} onChange={setGroup} options={[{ id: 'comparable', label: 'Grouped by setup' }, { id: 'flat', label: 'All, newest first' }]} />
         <span className="ml-auto flex items-center gap-1 text-xs text-ink-3"><Kbd>J</Kbd><Kbd>K</Kbd> move · <Kbd>Enter</Kbd> open</span>
+      </div>
       </div>
       {runs.isLoading ? <Loading /> : runs.isError ? <ErrorState error={runs.error} /> : rows.length === 0 ? (
         (runs.data ?? []).length === 0
@@ -70,7 +70,7 @@ export function RunsPage() {
       ) : group === 'flat' ? (
         <Card title="All runs" meta={plural(rows.length, 'run')} padded={false}><RunsTable runs={rows} selectable selected={selected} onToggle={toggle} keyboard /></Card>
       ) : (
-        <div className="space-y-10">
+        <div className="space-y-12">
           {groups.map((g, i) => {
             const r0 = g[0]
             const nq = g.map(questionsOf).find((v) => v != null) ?? null
@@ -78,15 +78,15 @@ export function RunsPage() {
             const trend = [...g].reverse().filter((r) => !r.off_topic).map((r) => r.metrics?.overall_pass_rate ?? null)
             return (
               <Card key={r0.comparability_key ?? i} padded={false}
-                title={<>{r0.dataset} <span className="font-mono text-sm font-medium text-ink-3">v{r0.dataset_version}</span></>}
-                meta={<>{plural(g.length, 'run')} · {nq != null ? plural(nq, 'question') : 'questions'}{r0.case_filter ? ' (reduced)' : ''} · setup {r0.comparability_key?.slice(0, 6)}</>}
+                title={r0.dataset}
+                meta={<>v{r0.dataset_version} · {plural(g.length, 'run')} · {nq != null ? plural(nq, 'question') : 'questions'}{r0.case_filter ? ' (reduced)' : ''} · setup {r0.comparability_key?.slice(0, 6)}</>}
                 help={<>
                   <p>These runs asked the same {nq ?? ''} questions{r0.case_filter ? ' (a reduced suite)' : ''} with the same checks and grading model, so their pass rates can be read side by side.</p>
                   <p>Judge: {r0.judge ? (heur ? 'heuristic word overlap (a rough guide, hatched wherever it appears)' : `${r0.judge.provider}/${r0.judge.model}`) : 'none'}. Setup {r0.comparability_key}: runs with different checks count different things in their pass rate.</p>
                   <p>The line is each run's pass rate, oldest to newest; runs that asked another chatbot's questions are left out of it.</p>
                 </>}
                 actions={<span className="flex items-center gap-3">
-                  <span className={clsx('rounded px-1.5 text-xs text-ink-3', heur && 'hatched text-ink-2')}>{r0.judge ? (heur ? 'heuristic judge' : r0.judge.model) : 'no judge'}</span>
+                  <Badge tone={heur ? 'heuristic' : r0.judge ? 'neutral' : 'unmeasured'}>{r0.judge ? (heur ? 'heuristic judge' : r0.judge.model) : 'no judge'}</Badge>
                   {trend.length > 1 && <Sparkline values={trend} width={120} height={26} label="pass rate across these runs" />}
                 </span>}>
                 <RunsTable runs={g} selectable selected={selected} onToggle={toggle} keyboard={i === 0} />
@@ -100,7 +100,7 @@ export function RunsPage() {
         {selected.length > 0 && (
           <motion.div initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 80, opacity: 0 }} transition={{ type: 'spring', stiffness: 400, damping: 32 }}
             style={{ x: '-50%' }}
-            className="fixed bottom-6 left-1/2 z-40 flex items-center gap-3 rounded-xl border border-line bg-surface px-4 py-2.5 shadow-pop">
+            className="fixed bottom-6 left-1/2 z-(--z-menu) flex items-center gap-3 rounded-xl border border-line bg-surface px-4 py-2.5 shadow-pop">
             <span className="text-sm">
               {pair.length === 1 ? <>Run <span className="font-mono font-semibold">#{pair[0].id}</span> picked · tick one more</> : <>Compare <span className="font-mono font-semibold text-series-1">#{a.id}</span> (baseline) with <span className="font-mono font-semibold text-series-2">#{b.id}</span></>}
             </span>
@@ -110,6 +110,6 @@ export function RunsPage() {
           </motion.div>
         )}
       </AnimatePresence>
-    </>
+    </div>
   )
 }

@@ -59,7 +59,7 @@ export function TraceViewer({ spans, showEvaluators = true }: { spans: Span[]; s
             <div key={s.span_id}>
               <button type="button" onClick={() => setOpen(expanded ? null : s.span_id)} aria-expanded={expanded}
                 className="grid w-full grid-cols-[minmax(0,1fr)_minmax(80px,180px)_64px] items-center gap-3 px-3 py-2 text-left hover:bg-surface-2 max-md:grid-cols-[minmax(0,1fr)_64px]">
-                <span className="flex min-w-0 items-start gap-2" style={{ paddingLeft: i === 0 ? 0 : 16 }}>
+                <span className="flex min-w-0 items-start gap-2" style={{ paddingLeft: 0 }}>
                   <ChevronRight className={clsx('mt-0.5 size-3.5 shrink-0 text-ink-3 transition-transform', expanded && 'rotate-90')} />
                   <Icon className={clsx('mt-0.5 size-3.5 shrink-0', s.status === 'error' ? 'text-bad-ink' : 'text-ink-2')} aria-hidden />
                   <span className="min-w-0">
@@ -98,11 +98,9 @@ export function TraceViewer({ spans, showEvaluators = true }: { spans: Span[]; s
               const fail = (c.output_summary ?? '').startsWith('fail')
               const heur = (c.output_summary ?? '').includes('[heuristic]')
               return (
-                <span key={c.span_id} title={c.output_summary ?? ''}
-                  className={clsx('inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs', heur && 'hatched',
-                    pass ? 'border-good/30 text-good-ink' : fail ? 'border-bad/40 bg-bad-wash text-bad-ink' : 'border-line text-ink-3')}>
+                <Badge key={c.span_id} title={c.output_summary ?? ''} tone={heur ? 'heuristic' : pass ? 'pass' : fail ? 'fail' : 'cancelled'}>
                   {pass ? <Check className="size-3" /> : fail ? <X className="size-3" /> : null}{c.name.replace(/^evaluate: /, '')}
-                </span>
+                </Badge>
               )
             })}
           </div>

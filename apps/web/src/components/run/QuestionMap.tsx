@@ -69,8 +69,15 @@ export function QuestionMap({ rows }: { rows: XRow[] }) {
     const pts: QP[] = nodes.map((n) => ({ r: n.r, px: n.x, py: n.y, rate: n.rate }))
     const groups = [...d3.group(pts, (p) => p.r.cat)].map(([cat, ps]) => ({
       cat, hull: ps.length >= 3 ? d3.polygonHull(ps.map((p) => [p.px, p.py] as [number, number])) : null,
-      lx: d3.mean(ps, (p) => p.px) ?? 0, ly: (d3.mean(ps, (p) => p.py) ?? 0) - 14,
+      lx: Math.max(54, Math.min(W - 54, d3.mean(ps, (p) => p.px) ?? 0)), ly: Math.max(14, (d3.min(ps, (p) => p.py) ?? 0) - 14),
     }))
+    // Keep the category names apart: nudge a label up while it would sit on a neighbour.
+    const placed: { lx: number; ly: number }[] = []
+    for (const g of [...groups].sort((a, b) => a.ly - b.ly)) {
+      let guard = 0
+      while (guard++ < 12 && (placed.some((o) => Math.abs(o.lx - g.lx) < 120 && Math.abs(o.ly - g.ly) < 15) || pts.some((p) => Math.abs(p.px - g.lx) < 52 && Math.abs(p.py - g.ly + 4) < 11))) g.ly = Math.max(12, g.ly - 12)
+      placed.push(g)
+    }
     return { pts, groups }
   }, [coords, qs, rates, W])
   const [placed, setPlaced] = useState(!motionOn)
@@ -92,13 +99,16 @@ export function QuestionMap({ rows }: { rows: XRow[] }) {
             {layout.groups.map((g) => g.hull && (
               <path key={`h-${g.cat}`} d={`M${g.hull.join('L')}Z`} fill="var(--ink-3)" opacity={0.06} stroke="var(--line-strong)" strokeDasharray="3 3" strokeLinejoin="round" />
             ))}
-            {layout.groups.map((g) => <text key={`t-${g.cat}`} x={g.lx} y={g.ly} textAnchor="middle" className="c-note">{plain(g.cat)}</text>)}
             {layout.pts.map((p, i) => (
               <circle key={p.r.c} data-case={p.r.c} r={6.5} stroke="var(--surface)" strokeWidth={1.5} className="cursor-pointer"
                 style={{ fill: rateColor(p.rate), transform: placed ? `translate(${p.px}px, ${p.py}px)` : `translate(${W / 2}px, ${H / 2}px)`, transition: motionOn ? `transform 1200ms cubic-bezier(0.33,1,0.68,1) ${i * 12}ms` : undefined }}
                 onMouseMove={(e) => setTip({ x: e.clientX, y: e.clientY, body: <><div className="font-medium text-ink">{p.r.t.title}</div><span className="num font-mono">{pct(p.rate, 0)}</span> of tries passed</> })}
                 onMouseLeave={() => setTip(null)}
                 onClick={() => nav(`/trials/${p.r.id}`, { viewTransition: true })} />
+            ))}
+            {layout.groups.map((g) => (
+              <text key={`t-${g.cat}`} x={g.lx} y={g.ly} textAnchor="middle" className="c-note pointer-events-none"
+                style={{ paintOrder: 'stroke', stroke: 'var(--surface)', strokeWidth: 4, strokeLinejoin: 'round' }}>{plain(g.cat)}</text>
             ))}
           </svg>
         )}

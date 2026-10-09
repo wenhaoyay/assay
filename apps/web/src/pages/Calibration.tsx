@@ -5,15 +5,17 @@ import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useSearchParams } from 'react-router-dom'
+import { Chip } from '../components/form'
 import { Confetti } from '../components/viz'
 import { AgreementGauge, TwoByTwo } from '../components/setup/Agreement'
 import { BakeoffScatter, hasPerItem } from '../components/setup/BakeoffScatter'
 import { SetupField } from '../components/setup/SetupField'
-import { Badge, Button, Card, Empty, ErrorState, Figs, Help, Input, Kbd, Loading, Notice, PageHeader, ProgressBar, Select, Stat, Table, Tabs, Term, useLongWork } from '../components/ui'
+import { Badge, Button, Card, DUR, Dialog, Empty, ErrorState, Figs, Input, Kbd, Loading, Notice, PageHeader, Panel, ProgressBar, SectionHead, Select, Stat, Table, Tabs, Term, useLongWork } from '../components/ui'
+import { LabelHelp } from '../components/LabelHelp'
 import { api, qs } from '../lib/api'
 import { whereLabel } from '../lib/models'
 import { useCrumbs } from '../lib/crumbs'
-import { ms, pct, plural, usd } from '../lib/format'
+import { fmtDate, ms, pct, plural, usd } from '../lib/format'
 import { useHotkey } from '../lib/hotkeys'
 import { useMotionOn, usePrefs } from '../lib/prefs'
 import type { Agreement, Bakeoff, CalibrationItem, CalibrationStats, ProviderConfig, RunHeader } from '../lib/types'
@@ -39,12 +41,12 @@ export function AgreementPanel({ s }: { s: CalibrationStats }) {
   if (a.n === 0) return <Empty title="Uncalibrated">No labels from you yet for {s.dimension.replace(/_/g, ' ')}{s.judge_filter ? ` with ${s.judge_filter}` : ''}. Until there are, treat this judge's verdicts as unvalidated.</Empty>
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-2"><Badge tone="good">{s.status}</Badge>{s.small_sample && <Badge tone="warn">small sample - indicative only</Badge>}</div>
+      <div className="flex flex-wrap items-center gap-2"><Badge tone="pass">{s.status}</Badge>{s.small_sample && <Badge tone="flaky">small sample - indicative only</Badge>}</div>
       <AgreementGauge a={a} small={s.small_sample} sampleNote={false} />
       <Figs>
         <Stat label="Samples" value={a.n} />
         <Stat label="Accuracy" value={pct(a.accuracy)} help={<p>The share of answers where the judge gave the same verdict as you, before correcting for chance.</p>} />
-        <Stat label="F1 (FAIL class)" value={pct(a.f1)} sub={`precision ${pct(a.precision)}, recall ${pct(a.recall)}`}
+        <Stat label="F1 (fail class)" value={pct(a.f1)} sub={`precision ${pct(a.precision)}, recall ${pct(a.recall)}`}
           help={<p>FAIL is the class that matters: did the judge catch the bad answers you caught? Precision: of the answers it failed, how many you failed too. Recall: of the answers you failed, how many it caught.</p>} />
         <Stat label="Disagreements" value={s.disagreements.length} />
       </Figs>
@@ -68,17 +70,18 @@ export function CalibrationPage() {
           <p>A model is shown as validated only once your labels exist - per model, so a new one starts uncalibrated. Above the trust line its grades can run unattended; below it, keep a person in the loop.</p>
           <p>The dimension picks which kind of grade you are checking (correctness, groundedness...); the second list narrows the figures to one grading model.</p>
         </>}
-        actions={
-          <>
-            <Select className="w-52" value={dimension} onChange={(e) => setDimension(e.target.value)} aria-label="Dimension">{DIMENSIONS.map((d) => <option key={d} value={d}>{d.replace(/_/g, ' ')}</option>)}</Select>
-            <Select className="w-64" value={judge} onChange={(e) => setJudge(e.target.value)} aria-label="Judge model">
+        />
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-end">
+          <div className="min-w-0 flex-1 basis-80"><Tabs tabs={[{ id: 'label', label: 'Label answers' }, { id: 'agreement', label: 'Agreement' }, { id: 'bakeoff', label: 'Judge bake-off' }]} value={tab} onChange={(t) => setParams({ tab: t })} /></div>
+          <div className="flex flex-wrap items-center gap-2 border-b border-line pb-1.5 pl-6 max-sm:pl-0 max-sm:pt-3">
+            <Select className="w-44" value={dimension} onChange={(e) => setDimension(e.target.value)} aria-label="Dimension">{DIMENSIONS.map((d) => <option key={d} value={d}>{d.replace(/_/g, ' ')}</option>)}</Select>
+            <Select className="w-60" value={judge} onChange={(e) => setJudge(e.target.value)} aria-label="Judge model">
               <option value="">All grading models</option>
               {Object.entries(stats.data?.by_judge ?? {}).map(([j, n]) => <option key={j} value={j}>{j} ({n} labelled)</option>)}
             </Select>
-          </>
-        } />
-      <Tabs tabs={[{ id: 'label', label: 'Label answers' }, { id: 'agreement', label: 'Agreement' }, { id: 'bakeoff', label: 'Judge bake-off' }]} value={tab} onChange={(t) => setParams({ tab: t })} />
-      <div className="mt-7">
+          </div>
+        </div>
         {tab === 'label' && <LabelTab dimension={dimension} stats={stats.data} />}
         {tab === 'agreement' && (stats.isLoading ? <Loading /> : stats.isError ? <ErrorState error={stats.error} /> : <AgreementTab s={stats.data!} />)}
         {tab === 'bakeoff' && <BakeoffTab dimension={dimension} />}
@@ -160,64 +163,58 @@ function LabelTab({ dimension, stats }: { dimension: string; stats?: Calibration
     </Empty>
   ) : (
     <div className="relative min-h-[360px]" data-testid="label-deck">
-      {queue.length > 2 && <div aria-hidden className="absolute inset-0 rounded-2xl border border-line bg-surface shadow-card" style={{ transform: 'translateY(20px) scale(0.94)', opacity: 0.4 }} />}
-      {queue.length > 1 && <div aria-hidden className="absolute inset-0 rounded-2xl border border-line bg-surface shadow-card" style={{ transform: 'translateY(10px) scale(0.97)', opacity: 0.7 }} />}
+      {queue.length > 2 && <Panel aria-hidden padded={false} className="absolute inset-0" style={{ transform: 'translateY(20px) scale(0.94)', opacity: 0.4 }} />}
+      {queue.length > 1 && <Panel aria-hidden padded={false} className="absolute inset-0" style={{ transform: 'translateY(10px) scale(0.97)', opacity: 0.7 }} />}
       <AnimatePresence mode="popLayout" initial={false}>
         {current ? (
           <motion.div key={current.trial_id}
             initial={motionOn ? { opacity: 0, y: 10, scale: 0.97 } : false} animate={{ opacity: 1, y: 0, scale: 1, x: 0, rotate: 0 }}
             exit={motionOn ? { opacity: 0, x: exitDir === 'PASS' ? '120%' : exitDir === 'FAIL' ? '-120%' : 0, y: exitDir === 'UNKNOWN' ? -80 : 0, rotate: exitDir === 'PASS' ? 10 : exitDir === 'FAIL' ? -10 : 0 } : { opacity: 0 }}
             transition={{ type: 'spring', stiffness: 320, damping: 30 }}
-            className="relative min-h-[360px] rounded-2xl border border-line bg-surface p-5 shadow-pop" data-testid="label-card">
-            {card(current)}
+            className="relative" data-testid="label-card">
+            <Panel className="min-h-[360px]">{card(current)}</Panel>
           </motion.div>
-        ) : <div className="min-h-[360px] rounded-2xl border border-line bg-surface p-5 shadow-pop" />}
+        ) : <Panel className="min-h-[360px]" />}
       </AnimatePresence>
-      {veiled && (
-        <div className="absolute inset-0 z-10 grid place-items-center rounded-2xl bg-page/55 backdrop-blur-[5px]" data-testid="name-veil">
-          <div className="w-[360px] max-w-[calc(100%-24px)] rounded-xl border border-line bg-surface p-4 shadow-pop">
-            <div className="flex items-center gap-2 text-base font-semibold">Who is labelling?
-              <Help title="Who is labelling?"><p>Labels are stored per person, so two people's judgements can be compared later. You only enter this once.</p></Help>
-            </div>
-            <div className="mt-3 flex gap-2">
-              <Input value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} placeholder="Your name" aria-label="Your name" autoFocus className="min-w-0 flex-1"
-                onKeyDown={(e) => { if (e.key === 'Enter') saveName() }} />
-              <Button variant="primary" className="shrink-0 whitespace-nowrap" disabled={!nameDraft.trim()} onClick={saveName}>Start</Button>
-            </div>
-          </div>
+      <Dialog open={veiled} onClose={() => { if (annotator) setEditingName(false) }} width={400}
+        title={<LabelHelp label="Who is labelling?"><p>Labels are stored per person, so two people's judgements can be compared later. You only enter this once.</p></LabelHelp>}>
+        <div className="flex gap-2" data-testid="name-veil">
+          <Input value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} placeholder="Your name" aria-label="Your name" data-autofocus className="min-w-0 flex-1"
+            onKeyDown={(e) => { if (e.key === 'Enter') saveName() }} />
+          <Button variant="primary" className="shrink-0 whitespace-nowrap" disabled={!nameDraft.trim()} onClick={saveName}>Start</Button>
         </div>
-      )}
+      </Dialog>
     </div>
   )
 
   const judged = revealed?.judge
   return (
-    <div className="grid items-start gap-10 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+    <div className="grid items-start gap-x-10 gap-y-12 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
       <Confetti fire={celebrate} />
-      <div className="min-w-0" data-tour="flashcard">
-        <div className="mb-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
-          <span className="t-label flex items-center gap-1.5">Label answers
-            <Help title="Label answers">
-              <p>Real answers from your runs, graded by a judge. Judge each one yourself: <Kbd>P</Kbd> pass, <Kbd>F</Kbd> fail, <Kbd>U</Kbd> unsure. After each label you see what the judge said.</p>
-              <p>The judge's verdict stays hidden until you label, so it cannot anchor your judgement.</p>
-              <p>Label what a careful expert would say, not what you think the judge will say. Disagreements are the useful part: they show where the judge cannot be trusted.</p>
-              <p>{SAMPLE} labels per dimension make a sample worth reading; fewer are a hint.</p>
-            </Help>
-          </span>
-          {annotator && !editingName && (
-            <span className="flex items-center gap-1 text-xs text-ink-2">as <b className="font-medium text-ink">{annotator}</b>
-              <button type="button" onClick={() => setEditingName(true)} className="text-accent-ink hover:underline" aria-label="Change name"><Pencil className="inline size-3" /></button>
-            </span>
-          )}
-          <Select className="ml-auto w-60" value={runId} onChange={(e) => setRunId(e.target.value ? Number(e.target.value) : '')} aria-label="Run">
-            <option value="">Answers from all runs</option>{(runs.data ?? []).map((r) => <option key={r.id} value={r.id}>#{r.id} {r.experiment}</option>)}
-          </Select>
-          <span className="text-sm text-ink-2" data-testid="label-progress"><span className="num font-mono font-medium text-ink">{Math.min(total, SAMPLE)}</span> of <span className="num font-mono">{SAMPLE}</span></span>
+      <div className="min-w-0 space-y-6" data-tour="flashcard">
+        <div className="space-y-3">
+        <SectionHead rule className="min-h-11!" title="Label answers" help={<>
+          <p>Real answers from your runs, graded by a judge. Judge each one yourself: <Kbd>P</Kbd> pass, <Kbd>F</Kbd> fail, <Kbd>U</Kbd> unsure. After each label you see what the judge said.</p>
+          <p>The judge's verdict stays hidden until you label, so it cannot anchor your judgement.</p>
+          <p>Label what a careful expert would say, not what you think the judge will say. Disagreements are the useful part: they show where the judge cannot be trusted.</p>
+          <p>{SAMPLE} labels per dimension make a sample worth reading; fewer are a hint.</p>
+        </>}
+          actions={<>
+            {annotator && !editingName && (
+              <span className="flex items-center gap-1 text-xs text-ink-2">as <b className="font-medium text-ink">{annotator}</b>
+                <button type="button" onClick={() => setEditingName(true)} className="text-accent-ink hover:underline" aria-label="Change name"><Pencil className="inline size-3" /></button>
+              </span>
+            )}
+            <Select className="w-56" value={runId} onChange={(e) => setRunId(e.target.value ? Number(e.target.value) : '')} aria-label="Run">
+              <option value="">Answers from all runs</option>{(runs.data ?? []).map((r) => <option key={r.id} value={r.id}>#{r.id} {r.experiment}</option>)}
+            </Select>
+            <span className="text-sm text-ink-2" data-testid="label-progress"><span className="num font-mono font-medium text-ink">{Math.min(total, SAMPLE)}</span> of <span className="num font-mono">{SAMPLE}</span></span>
+          </>} />
+        <ProgressBar value={Math.min(1, total / SAMPLE)} tone={total >= SAMPLE ? 'good' : 'accent'} />
         </div>
-        <ProgressBar value={Math.min(1, total / SAMPLE)} tone={total >= SAMPLE ? 'good' : 'accent'} className="mb-5" />
         {deck}
         {(current || veiled) && (
-          <div className="mt-8 space-y-3">
+          <div className="space-y-3">
             <SetupField label="Note (optional)" help={<p>Why you labelled it so. It shows beside the judge's reason wherever you two disagree.</p>}>
               <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Why - helps when you look at disagreements" disabled={!can} />
             </SetupField>
@@ -231,17 +228,15 @@ function LabelTab({ dimension, stats }: { dimension: string; stats?: Calibration
         )}
       </div>
       <div className="min-w-0 space-y-6" data-testid="live-agreement">
-        <div className="t-label flex items-center gap-1.5">Agreement <Help title="Agreement">{KAPPA_HELP}</Help>
-          {stats?.judge_filter && <span className="normal-case tracking-normal text-ink-2">· {stats.judge_filter}</span>}
-        </div>
+        <SectionHead rule className="min-h-11!" title="Agreement" help={KAPPA_HELP} meta={stats?.judge_filter || undefined} />
         {stats ? <AgreementGauge a={stats.agreement} small={stats.small_sample} /> : <Loading rows={3} />}
         {stats && <TwoByTwo a={stats.agreement} testPrefix="live" />}
       </div>
       {createPortal(
         <AnimatePresence>
           {reveal && judged && (
-            <motion.div initial={{ opacity: 0, y: 24, x: '-50%' }} animate={{ opacity: 1, y: 0, x: '-50%' }} exit={{ opacity: 0, y: 24, x: '-50%' }} transition={{ duration: 0.22 }}
-              className="fixed bottom-6 left-1/2 z-[90] max-w-[min(560px,calc(100vw-32px))] rounded-xl bg-ink px-4 py-2.5 text-sm text-page shadow-pop" role="status" data-testid="judge-toast">
+            <motion.div initial={{ opacity: 0, y: 24, x: '-50%' }} animate={{ opacity: 1, y: 0, x: '-50%' }} exit={{ opacity: 0, y: 24, x: '-50%' }} transition={{ duration: DUR.slow }}
+              className="fixed bottom-6 left-1/2 z-(--z-toast) max-w-[min(560px,calc(100vw-32px))] rounded-xl bg-ink px-4 py-2.5 text-sm text-page shadow-pop" role="status" data-testid="judge-toast">
               {judged.label === reveal.human
                 ? <>Judge agreed: <b className="font-semibold">{judged.label.toLowerCase()}</b></>
                 : <>Judge said <b className={clsx('font-semibold')}>{judged.label.toLowerCase()}</b>{judged.reason ? <>: “{judged.reason.length > 110 ? `${judged.reason.slice(0, 110)}…` : judged.reason}”</> : null}</>}
@@ -256,7 +251,7 @@ function LabelTab({ dimension, stats }: { dimension: string; stats?: Calibration
 
 function AgreementTab({ s }: { s: CalibrationStats }) {
   return (
-    <div className="grid items-start gap-10 xl:grid-cols-[minmax(0,1fr)_480px]">
+    <div className="grid items-start gap-x-10 gap-y-12 xl:grid-cols-[minmax(0,1fr)_480px]">
       <Card title={`You vs the judge · ${s.dimension.replace(/_/g, ' ')}${s.judge_filter ? ` · ${s.judge_filter}` : ''}`} help={KAPPA_HELP}><AgreementPanel s={s} /></Card>
       <Card title="Where you and the judge disagree" meta={s.disagreements.length || undefined} padded={false}
         help={<>
@@ -267,7 +262,7 @@ function AgreementTab({ s }: { s: CalibrationStats }) {
           <ul className="divide-y divide-line">
             {s.disagreements.map((d) => (
               <li key={d.trial_id} className="py-3 text-sm" data-case={d.case_id}>
-                <div className="flex flex-wrap items-center gap-2"><Link className="font-mono text-xs text-accent-ink hover:underline" to={`/trials/${d.trial_id}`}>{d.case_id}</Link><Badge tone={d.human === 'PASS' ? 'good' : 'bad'}>you: {d.human}</Badge><Badge tone={d.judge === 'PASS' ? 'good' : 'bad'}>judge: {d.judge}</Badge></div>
+                <div className="flex flex-wrap items-center gap-2"><Link className="font-mono text-xs text-accent-ink hover:underline" to={`/trials/${d.trial_id}`}>{d.case_id}</Link><Badge tone={d.human === 'PASS' ? 'pass' : 'fail'}>you: {d.human.toLowerCase()}</Badge><Badge tone={d.judge === 'PASS' ? 'pass' : 'fail'}>judge: {d.judge.toLowerCase()}</Badge></div>
                 <div className="mt-1 text-ink-2">Judge: {d.judge_reason}</div>
                 {d.note && <div className="text-ink-2">You: {d.note}</div>}
               </li>
@@ -314,14 +309,13 @@ function BakeoffTab({ dimension }: { dimension: string }) {
         <p>A local model on a CPU takes ~30 s per answer; cloud models cost money (see Settings for the per-100 price). Pick up to four.</p>
         <p>Pick the cheapest judge whose agreement with you is close to the best. A judge that agrees with you no better than chance (kappa near 0) should not gate a release.</p>
       </>}>
-        {n === 0 ? <Notice tone="warn" title="Label some answers first">The bake-off needs your PASS/FAIL labels. Label a few on the first tab.</Notice> : (
+        {n === 0 ? <Notice tone="warn" title="Label some answers first">The bake-off needs your pass and fail labels. Label a few on the first tab.</Notice> : (
           <>
             <div className="flex flex-wrap gap-2">
               {[{ id: 'heuristic', name: 'Heuristic (word overlap)', local: true }, ...(models.data ?? []).map((m) => ({ id: String(m.id), name: m.name, local: !!m.local, where: whereLabel(m) }))].map((m) => (
-                <button key={m.id} type="button" onClick={() => toggle(m.id)} aria-pressed={picked.includes(m.id)}
-                  className={clsx('flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors', picked.includes(m.id) ? 'border-accent bg-accent-wash text-accent-ink' : 'border-line bg-surface hover:bg-surface-2')}>
-                  {picked.includes(m.id) ? <Check className="size-3.5" /> : <span className="size-3.5" />}{m.name}<Badge>{'where' in m ? m.where : 'local'}</Badge>
-                </button>
+                <Chip key={m.id} selected={picked.includes(m.id)} onClick={() => toggle(m.id)} icon={picked.includes(m.id) ? <Check className="size-3.5" /> : <span className="size-3.5" />}>
+                  {m.name}<Badge>{'where' in m ? m.where : 'local'}</Badge>
+                </Chip>
               ))}
             </div>
             <div className="mt-4">
@@ -347,7 +341,7 @@ function BakeoffTab({ dimension }: { dimension: string }) {
         )
       ) : (
         <>
-          <Card title={`Results · ${shown.dimension.replace(/_/g, ' ')}`} meta={new Date(shown.created_at).toLocaleString()} help={<>
+          <Card title={`Results · ${shown.dimension.replace(/_/g, ' ')}`} meta={fmtDate(shown.created_at)} help={<>
             <p>One row per judge, best agreement with you first. The crown marks the winner: highest kappa, cheapest on a tie. Heuristic (word-overlap) rows are hatched: it is not an LLM.</p>
             <p>No verdict: answers the judge could not grade. Speed is the median time per answer; cost is the whole bake-off.</p>
           </>}>
@@ -356,7 +350,7 @@ function BakeoffTab({ dimension }: { dimension: string }) {
             {shown.results && (
               <>
                 <Table>
-                  <thead><tr><th>Judge</th><th><Term k="kappa">Agreement (kappa)</Term></th><th className="text-right">Accuracy</th><th className="text-right">F1 (FAIL)</th><th className="text-right">No verdict</th><th className="text-right">Speed</th><th className="text-right">Cost</th></tr></thead>
+                  <thead><tr><th>Judge</th><th><Term k="kappa">Agreement (kappa)</Term></th><th className="text-right">Accuracy</th><th className="text-right">F1 (fail)</th><th className="text-right">No verdict</th><th className="text-right">Speed</th><th className="text-right">Cost</th></tr></thead>
                   <tbody>
                     {[...shown.results.judges].sort((a, b) => (b.agreement.kappa ?? -2) - (a.agreement.kappa ?? -2)).map((j, i) => (
                       <motion.tr key={j.name} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.08 }} className={clsx(j.name.startsWith('heuristic') && 'hatched')}>

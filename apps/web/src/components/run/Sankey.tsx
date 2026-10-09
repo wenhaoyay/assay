@@ -5,6 +5,7 @@ import { sankey as d3Sankey, sankeyLinkHorizontal, type SankeyLink, type SankeyN
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMotionOn } from '../../lib/prefs'
 import type { ExploreTrial } from '../../lib/types'
+import { TextLink } from '../form'
 import { SampleSize } from '../instrument'
 import { Card } from '../ui'
 import { CaseChip, ChartTip, NothingPasses, useWidth, type TipState } from './bits'
@@ -59,6 +60,7 @@ export function FlowSankey({ trials }: { trials: ExploreTrial[] }) {
   const rows = useMemo(() => trials.filter(decided), [trials])
   const [box, W] = useWidth<HTMLDivElement>(1000)
   const H = 400
+  const SW = Math.max(W, 640) // narrower than this the diagram scrolls inside its section
   const motionOn = useMotionOn()
   const [tip, setTip] = useState<TipState | null>(null)
   const [hover, setHover] = useState<string | null>(null)
@@ -68,9 +70,9 @@ export function FlowSankey({ trials }: { trials: ExploreTrial[] }) {
   const data = useMemo(() => flow(rows), [rows])
   const G = useMemo(() => {
     if (!data.links.length) return null
-    const sk = d3Sankey<N, L>().nodeWidth(12).nodePadding(18).nodeSort(null).extent([[1, 10], [Math.max(320, W - 150), H - 10]])
+    const sk = d3Sankey<N, L>().nodeWidth(12).nodePadding(18).nodeSort(null).extent([[1, 10], [SW - 150, H - 10]])
     return sk({ nodes: data.nodes.map((d) => ({ ...d })), links: data.links.map((d) => ({ ...d })) })
-  }, [data, W])
+  }, [data, SW])
   const path = sankeyLinkHorizontal<N, L>()
   const total = rows.length
 
@@ -144,7 +146,7 @@ export function FlowSankey({ trials }: { trials: ExploreTrial[] }) {
       </>}>
       <div ref={box} data-testid="run-sankey">
         {!G ? <NothingPasses>No scored tries yet.</NothingPasses> : (
-          <svg width={W} height={H} className="block overflow-visible">
+          <div className="scroll-thin overflow-x-auto"><svg width={SW} height={H} className="block">
             <g ref={linksRef} fill="none">
               {(G.links as SL[]).map((l) => {
                 const k = `${(l.source as SN).name}→${(l.target as SN).name}`
@@ -169,7 +171,7 @@ export function FlowSankey({ trials }: { trials: ExploreTrial[] }) {
                 </g>
               )
             })}
-          </svg>
+          </svg></div>
         )}
         <ChartTip tip={tip} />
         {picked && (
@@ -177,7 +179,7 @@ export function FlowSankey({ trials }: { trials: ExploreTrial[] }) {
             <div className="mb-2 flex items-baseline gap-2">
               <span className="text-sm font-semibold">{pa} → {pb}</span>
               <span className="num font-mono text-xs text-ink-3">{list.length} tries · {uniq.length} questions</span>
-              <button type="button" className="ml-auto text-xs font-medium text-accent-ink hover:underline" onClick={() => setPicked(null)}>Close</button>
+              <TextLink size="sm" className="ml-auto" onClick={() => setPicked(null)}>Close</TextLink>
             </div>
             <div className="flex flex-wrap gap-1.5">
               {uniq.map((t) => <CaseChip key={t.case_id} caseId={t.case_id} trialId={t.id} tone={t.status === 'passed' ? 'good' : 'bad'} title={t.question}>{t.title}</CaseChip>)}

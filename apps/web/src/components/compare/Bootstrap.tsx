@@ -4,14 +4,16 @@ import * as d3 from 'd3'
 import { Play, RotateCcw } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { mulberry32, redraw } from '../../lib/compare'
+import { pp } from '../../lib/format'
 import { useMotionOn } from '../../lib/prefs'
 import { Button, Card } from '../ui'
 import { useWidth } from './useWidth'
 
 const N = 600
-const H = 280
+const H_RUN = 280 // while resampling and after
+const H_IDLE = 120 // before the first press: the axis and the measured change, nothing to draw yet
 const M = { l: 16, r: 16, b: 30, t: 12 }
-const ppf = (v: number, digits = 0) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v * 100).toFixed(digits)}pp`
+const ppf = (v: number, digits = 0) => pp(v, digits)
 
 interface Readout { n: number; lo: number; hi: number; zero: number; done: boolean }
 
@@ -28,6 +30,7 @@ export function Bootstrap({ diffs, nQuestions }: { diffs: number[]; nQuestions: 
     return Array.from({ length: N }, () => redraw(diffs, rand))
   }, [diffs])
   const chartW = Math.max(240, w)
+  const H = run ? H_RUN : H_IDLE
 
   useEffect(() => {
     const svg = d3.select(svgRef.current!)
@@ -84,7 +87,7 @@ export function Bootstrap({ diffs, nQuestions }: { diffs: number[]; nQuestions: 
       window.clearTimeout(timer)
       svg.selectAll('*').interrupt()
     }
-  }, [chartW, run, draws, diffs, obs, motionOn])
+  }, [chartW, H, run, draws, diffs, obs, motionOn])
 
   const beyond = !!say && (say.lo > 0 || say.hi < 0)
   return (

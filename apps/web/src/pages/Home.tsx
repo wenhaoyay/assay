@@ -6,10 +6,11 @@ import { useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
 import { ActivityStream, regressionItem, WorthALook, type LookItem } from '../components/home/Activity'
 import { ConnectCard, ReadingCard } from '../components/home/ReadingCard'
-import { useGateThresholds } from '../components/home/shared'
-import { Badge, Button, Card, Code, ErrorState, Notice, PageHeader, PageSkeleton, ProgressBar, StatusBadge, linkButton } from '../components/ui'
+import { STAGGER, useGateThresholds } from '../components/home/shared'
+import { Badge, Button, Card, Code, ErrorState, Notice, PageHeader, PageSkeleton, Panel, ProgressBar, StatusBadge, linkButton } from '../components/ui'
 import { api } from '../lib/api'
 import { useCrumbs } from '../lib/crumbs'
+import { fmtDay } from '../lib/format'
 import { useMotionOn } from '../lib/prefs'
 import type { CalibrationStats, Comparison, HomeData, RunHeader, TrialRow } from '../lib/types'
 
@@ -29,7 +30,7 @@ export function HomePage() {
   })
   const calib = useQuery({ queryKey: ['calibration', 'correctness', 'stats'], queryFn: () => api.get<CalibrationStats>('/api/calibration/correctness/stats') })
   const gates = useGateThresholds()
-  const [today] = useState(() => new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }))
+  const [today] = useState(() => fmtDay(new Date().toISOString()))
   const shown = (q.data?.projects ?? []).filter((p) => !(q.data?.settings.hide_demo && p.is_demo))
   const pair = shown.find((p) => p.latest_run_id && p.previous_run_id)
   const cmp = useQuery({
@@ -65,7 +66,7 @@ export function HomePage() {
         key: 'flaky', dot: 'bg-flaky', to: `/p/${pair.id}`,
         title: <><span className="font-mono">{flaky.length}</span> question{flaky.length === 1 ? ' is' : 's are'} flaky</>,
         body: <>they pass some tries and fail others in run <span className="font-mono">#{pair.latest_run_id}</span>: the answer depends on luck</>,
-        chip: <Badge tone="warn">flaky</Badge>,
+        chip: <Badge tone="flaky">flaky</Badge>,
       })
     }
   }
@@ -75,7 +76,7 @@ export function HomePage() {
       key: 'calib', dot: 'bg-series-1', to: '/calibration',
       title: 'The grading model is unchecked',
       body: <>label <span className="font-mono">20</span> answers to see how often the judge agrees with you</>,
-      chip: <Badge>calibrate</Badge>,
+      chip: <Badge tone="neutral">calibrate</Badge>,
     })
   }
   for (const r of runs.filter((x) => x.off_topic).slice(0, 2)) {
@@ -83,7 +84,7 @@ export function HomePage() {
       key: `off-${r.id}`, dot: 'bg-warn', to: `/runs/${r.id}`,
       title: <>Run <span className="font-mono">#{r.id}</span> asked another chatbot’s questions</>,
       body: <>they were written for {r.off_topic}, so the run is left out of {projectName(r.project_id) || 'its chatbot'}’s trend</>,
-      chip: <Badge tone="warn">left out</Badge>,
+      chip: <Badge tone="unmeasured">left out</Badge>,
     })
   }
 
@@ -100,39 +101,40 @@ export function HomePage() {
         actions={<Button onClick={() => ctx?.startTour?.()}><Lightbulb className="size-3.5" /> Take the tour</Button>}
       />
 
-      {h.projects.length > 0 && <StatusRow noJudge={noJudge} hasProviders={h.has_providers} passing={shown.filter((p) => p.gate_status === 'PASS').length} gated={shown.filter((p) => p.gate_status).length} />}
-
-      {h.active_runs.length > 0 && (
-        <div className="mt-4 space-y-2">
-          {h.active_runs.map((r) => (
-            <Link key={r.id} to={`/runs/${r.id}`} viewTransition className="block rounded-xl border border-accent/30 bg-accent-wash/50 px-4 py-3 hover:border-accent/60">
-              <div className="mb-1.5 flex items-center gap-2 text-sm"><StatusBadge status={r.status} /><span className="font-medium"><span className="font-mono">#{r.id}</span> {r.experiment}</span><span className="ml-auto font-mono text-xs text-ink-3">{r.progress_done}/{r.progress_total}</span></div>
-              <ProgressBar value={r.progress_total ? r.progress_done / r.progress_total : 0} />
-            </Link>
-          ))}
-        </div>
-      )}
-
-      {h.projects.length === 0 ? <FirstSteps /> : (
-        <>
-          <div className="mt-5 grid gap-6 md:grid-cols-2 xl:grid-cols-3" data-tour="projects">
-            {shown.map((p, i) => <ReadingCard key={p.id} p={p} i={i} gate={gates[p.id] ?? null} runs={byId} />)}
-            <ConnectCard i={shown.length} />
+      <div className="space-y-12">
+        {(h.projects.length > 0 || h.active_runs.length > 0) && (
+          <div className="space-y-3">
+            {h.projects.length > 0 && <StatusRow noJudge={noJudge} hasProviders={h.has_providers} passing={shown.filter((p) => p.gate_status === 'PASS').length} gated={shown.filter((p) => p.gate_status).length} />}
+            {h.active_runs.map((r) => (
+              <Link key={r.id} to={`/runs/${r.id}`} viewTransition className="block rounded-xl border border-accent/30 bg-accent-wash/50 px-4 py-3 transition-colors duration-(--dur-fast) hover:border-accent/60">
+                <div className="mb-1.5 flex items-center gap-2 text-sm"><StatusBadge status={r.status} /><span className="font-medium"><span className="font-mono">#{r.id}</span> {r.experiment}</span><span className="ml-auto font-mono text-xs text-ink-3">{r.progress_done}/{r.progress_total}</span></div>
+                <ProgressBar value={r.progress_total ? r.progress_done / r.progress_total : 0} />
+              </Link>
+            ))}
           </div>
+        )}
 
-          <div className="mt-10 grid gap-10 lg:grid-cols-[7fr_5fr]">
-            <Card title="Recent activity" help={<p>Runs, release-gate checks and anything left out of trends, newest first. Click a line to open that run.</p>}>
-              <ActivityStream runs={runs} projectName={projectName} gates={gates} multi={h.projects.length > 1} />
-            </Card>
-            <Card title="Worth a look" help={<>
-              <p>From the latest comparable pair{pair ? <> (<span className="font-mono">#{pair.previous_run_id}</span> → <span className="font-mono">#{pair.latest_run_id}</span>, {pair.name})</> : null}: questions that regressed, and questions that are flaky.</p>
-              <p>Also anything not yet checked: a grading model nobody has compared with their own labels, and runs that asked another chatbot’s questions.</p>
-            </>}>
-              <WorthALook items={look} />
-            </Card>
-          </div>
-        </>
-      )}
+        {h.projects.length === 0 ? <FirstSteps /> : (
+          <>
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,22rem),1fr))] gap-6" data-tour="projects">
+              {shown.map((p, i) => <ReadingCard key={p.id} p={p} i={i} gate={gates[p.id] ?? null} runs={byId} />)}
+              <ConnectCard i={shown.length} />
+            </div>
+
+            <div className="grid gap-x-10 gap-y-12 lg:grid-cols-[7fr_5fr]">
+              <Card title="Recent activity" help={<p>Runs, release-gate checks and anything left out of trends, newest first. Click a line to open that run.</p>}>
+                <ActivityStream runs={runs} projectName={projectName} gates={gates} multi={h.projects.length > 1} />
+              </Card>
+              <Card title="Worth a look" help={<>
+                <p>From the latest comparable pair{pair ? <> (<span className="font-mono">#{pair.previous_run_id}</span> → <span className="font-mono">#{pair.latest_run_id}</span>, {pair.name})</> : null}: questions that regressed, and questions that are flaky.</p>
+                <p>Also anything not yet checked: a grading model nobody has compared with their own labels, and runs that asked another chatbot’s questions.</p>
+              </>}>
+                <WorthALook items={look} />
+              </Card>
+            </div>
+          </>
+        )}
+      </div>
     </>
   )
 }
@@ -161,15 +163,16 @@ function FirstSteps() {
     { n: 3, title: 'Run and compare', body: 'Run two versions on the same questions and see what changed, with the uncertainty stated.', to: '/runs/new', cta: 'New run' },
   ]
   return (
-    <div className="mt-6 space-y-5">
-      <div className="grid gap-4 md:grid-cols-3">
+    <div className="space-y-6">
+      <div className="grid gap-6 md:grid-cols-3">
         {steps.map((s, i) => (
-          <motion.div key={s.n} initial={motionOn ? { opacity: 0, y: 10 } : false} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
-            className="rounded-xl border border-line bg-surface p-5 shadow-card">
+          <motion.div key={s.n} initial={motionOn ? { opacity: 0, y: 10 } : false} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * STAGGER }}>
+            <Panel className="h-full">
             <span className="flex size-8 items-center justify-center rounded-full bg-accent font-mono text-base font-semibold text-on-accent">{s.n}</span>
             <h2 className="mt-3 text-h font-semibold">{s.title}</h2>
             <p className="mt-1 text-sm text-ink-2">{s.body}</p>
             <Link to={s.to} className={clsx(linkButton(i === 0 ? 'primary' : 'secondary'), 'mt-4')}>{s.cta} <ArrowRight className="size-3.5" /></Link>
+            </Panel>
           </motion.div>
         ))}
       </div>

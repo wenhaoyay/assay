@@ -9,6 +9,7 @@ import { ms, num, pct, usd } from '../../lib/format'
 import { useMotionOn } from '../../lib/prefs'
 import { isLive } from '../../lib/runstate'
 import type { RunHeader, TrialRow } from '../../lib/types'
+import { pctTick } from '../charts'
 import { Odometer, SampleSize } from '../instrument'
 import { Card, Help } from '../ui'
 import { LegendItem, useWidth } from './bits'
@@ -93,7 +94,7 @@ function Funnel({ fin, total, gate }: { fin: TrialRow[]; total: number; gate: nu
   const ax = useRef<SVGGElement>(null), ay = useRef<SVGGElement>(null)
   useEffect(() => {
     if (ax.current) d3.select(ax.current).call(d3.axisBottom(x).ticks(6))
-    if (ay.current) d3.select(ay.current).call(d3.axisLeft(y).ticks(4).tickFormat(d3.format('.0%')))
+    if (ay.current) d3.select(ay.current).call(d3.axisLeft(y).ticks(4).tickFormat((v) => pctTick(+v)))
   }, [x, y])
   const band = d3.area<(typeof hist)[number]>().x((d) => x(d.n)).y0((d) => y(d.lo)).y1((d) => y(d.hi))(hist) ?? ''
   const line = d3.line<(typeof hist)[number]>().x((d) => x(d.n)).y((d) => y(d.r))(hist) ?? ''

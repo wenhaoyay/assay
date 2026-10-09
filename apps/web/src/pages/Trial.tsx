@@ -10,7 +10,8 @@ import { TraceViewer } from '../components/TraceViewer'
 import { AnswerDiff, AnswerText } from '../components/trial/AnswerText'
 import { resolverFor, Sources } from '../components/trial/Sources'
 import { TracePlayback } from '../components/trial/TracePlayback'
-import { Badge, Button, Card, ErrorState, Field, Figs, Help, Input, Json, Kbd, PageSkeleton, Segmented, Select, Stat, StatusBadge, Term } from '../components/ui'
+import { Checkbox, Chip, TextLink } from '../components/form'
+import { Badge, Button, Card, Empty, ErrorState, Field, Figs, Input, Json, Kbd, PageSkeleton, SectionHead, Segmented, Select, Skeleton, StateDot, stateOf, Stat, StatusBadge, Term } from '../components/ui'
 import { api } from '../lib/api'
 import { useCrumbs } from '../lib/crumbs'
 import { FAILURE_LABELS, ms, num, usd } from '../lib/format'
@@ -90,7 +91,8 @@ function TrialView({ t: tr, heuristic, projectId, failIdx, failN, onNext }: { t:
   const hasTrace = !!tr.trace?.spans.length
 
   return (
-    <>
+    <div className="space-y-12">
+      <div>
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="t-label">{[c?.category?.replace(/_/g, ' '), c?.difficulty].filter(Boolean).join(' · ')}{c?.category ? ' · ' : ''}run <span className="font-mono">#{tr.run_id}</span></div>
@@ -106,7 +108,7 @@ function TrialView({ t: tr, heuristic, projectId, failIdx, failN, onNext }: { t:
             <Link key={s.id} to={`/trials/${s.id}`} title={`try ${s.trial_index + 1}: ${s.status} ([ and ] step between tries)`} aria-current={s.id === tr.id ? 'page' : undefined}
               className={clsx('inline-flex h-7 items-center gap-1.5 rounded-lg border px-2.5 text-xs transition-colors',
                 s.id === tr.id ? 'border-accent/50 bg-accent-wash text-accent-ink' : 'border-line bg-surface text-ink-2 hover:border-line-strong')}>
-              <span className={clsx('size-2 rounded-full', s.status === 'passed' ? 'bg-good' : s.status === 'error' ? 'bg-error' : 'bg-bad')} />try {s.trial_index + 1}
+              <StateDot state={stateOf(s.status)} />try {s.trial_index + 1}
             </Link>
           ))}
           {failN > 0 && (
@@ -118,23 +120,24 @@ function TrialView({ t: tr, heuristic, projectId, failIdx, failN, onNext }: { t:
       </header>
 
       <Verdict t={tr} failing={failing} diag={scores.some((s) => (s.status === 'fail' || s.status === 'error') && !s.gating)} />
+      </div>
 
-      <div className="mt-8 grid items-start gap-x-10 gap-y-10 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
-        <div className="min-w-0 space-y-10">
+      <div className="grid items-start gap-x-10 gap-y-12 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+        <div className="min-w-0 space-y-12">
           <AnswerBlock tr={tr} mustMention={mustMention} mustNot={mustNot} missing={missing} answerFailed={answerFailed} resolve={resolve} lit={lit} onLight={setLit} />
-          <Card title="Expected" help={<p>Written or approved by a person, never inferred. The checks compare the answer with these.</p>}>
-            {c ? <Expectations c={c} /> : <p className="text-sm text-ink-3">No expected outcomes stored.</p>}
-          </Card>
-        </div>
-        <div className="min-w-0 space-y-10">
           <Sources docs={docs} relevant={c?.expected.relevant_documents ?? []} cited={cited} lit={lit} onLight={setLit} shown={hasTrace ? retFrac : 1} />
+        </div>
+        <div className="min-w-0 space-y-12">
+          <Card title="Expected" help={<p>Written or approved by a person, never inferred. The checks compare the answer with these.</p>}>
+            {c ? <Expectations c={c} /> : <Empty title="No expected outcomes stored" />}
+          </Card>
           <Checks scores={scores} heuristic={heuristic} />
         </div>
       </div>
 
-      <div className="mt-12 space-y-12">
+      <div className="space-y-12">
         {hasTrace ? <TracePlayback spans={tr.trace!.spans} answer={answer} onRetrieval={onRetrieval} />
-          : <Card title="Replay the answer"><p className="text-sm text-ink-3">No trace stored for this answer. Bots that report their steps (search, model calls, tools) can be replayed here.</p></Card>}
+          : <Card title="Replay the answer"><Empty title="No trace stored for this answer">Bots that report their steps (search, model calls, tools) can be replayed here.</Empty></Card>}
 
         <div className="grid items-start gap-x-10 gap-y-12 xl:grid-cols-2">
           <div className="min-w-0 space-y-12">
@@ -159,13 +162,13 @@ function TrialView({ t: tr, heuristic, projectId, failIdx, failN, onNext }: { t:
           <div className="min-w-0 space-y-12">
             <Telemetry tr={tr} />
             <Card title="Execution trace" help={<p>Every step the bot reported, with its timing. Click a step for its input, output, tokens and the passages or tool arguments it carried. The slowest step is marked.</p>}>
-              {tr.trace ? <TraceViewer spans={tr.trace.spans} /> : <p className="text-sm text-ink-3">No trace stored.</p>}
+              {tr.trace ? <TraceViewer spans={tr.trace.spans} /> : <Empty title="No trace stored" />}
             </Card>
             <RawResponse tr={tr} />
           </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }
 
@@ -178,7 +181,7 @@ function Verdict({ t, failing, diag }: { t: TrialDetail; failing: Score[]; diag:
         : `${failing.length} check${failing.length === 1 ? '' : 's'}`
   const evidence = passed ? null : (t.cause?.evidence[0] ?? failing[0]?.explanation ?? t.result?.error ?? null)
   return (
-    <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="mt-4 max-w-[980px]" data-testid="trial-verdict">
+    <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="mt-6 max-w-[980px]" data-testid="trial-verdict">
       <p className={clsx('t-verdict', passed ? 'text-good-ink' : 'text-bad-ink')}>
         {passed ? (diag ? 'Passed every gating check.' : 'Passed every check.') : `Failed: ${what}.`}
       </p>
@@ -213,20 +216,20 @@ function AnswerBlock({ tr, mustMention, mustNot, missing, answerFailed, resolve,
   const otherTrial = other.data && (other.data.find((x) => x.case_id === tr.case_id && x.trial_index === tr.trial_index) ?? other.data.find((x) => x.case_id === tr.case_id))
 
   return (
-    <section>
-      <div className="t-label">Question</div>
-      <p className="mt-1.5 text-lead text-ink">{c?.input.message ?? tr.question}</p>
-      <div className="mt-6 flex flex-wrap items-center gap-2">
-        <span className="t-label flex items-center gap-2">
-          Answer{r?.provider?.model && <span className="font-mono normal-case tracking-normal">· {r.provider.model}</span>}
-          <Help title="The answer">
-            <p>Hover a citation chip to light the passage it came from, in "What the bot read"; hover a passage to light its citations. A dashed chip cites something the bot did not report reading.</p>
-            <p>Phrases the question must mention are underlined green; phrases it must not claim are struck through in red.</p>
-            <p>Diff shows what changed from another run's answer to the same question (the same try where it exists): removed words struck in red, added words in green.</p>
-          </Help>
-        </span>
-        {otherId && (
-          <span className="ml-auto flex items-center gap-2">
+    <section className="space-y-12">
+      <div className="space-y-4">
+        <SectionHead title="Question" rule />
+        <p className="text-lead text-ink">{c?.input.message ?? tr.question}</p>
+      </div>
+      <div>
+      <SectionHead title="Answer" rule meta={r?.provider?.model}
+        help={<>
+          <p>Hover a citation chip to light the passage it came from, in "What the bot read"; hover a passage to light its citations. A dashed chip cites something the bot did not report reading.</p>
+          <p>Phrases the question must mention are underlined green; phrases it must not claim are struck through in red.</p>
+          <p>Diff shows what changed from another run's answer to the same question (the same try where it exists): removed words struck in red, added words in green.</p>
+        </>}
+        actions={otherId && (
+          <>
             <Segmented size="sm" value={mode} onChange={setMode} label="Answer view"
               options={[{ id: 'answer', label: 'This answer' }, { id: 'diff', label: <>Diff vs run <span className="font-mono">#{otherId}</span></> }]} />
             {mode === 'diff' && options.length > 1 && (
@@ -234,12 +237,11 @@ function AnswerBlock({ tr, mustMention, mustNot, missing, answerFailed, resolve,
                 {options.map((o) => <option key={o.id} value={o.id}>#{o.id} {o.variant_label}{o.comparability_key === me?.comparability_key ? '' : ' (different setup)'}</option>)}
               </Select>
             )}
-          </span>
-        )}
-      </div>
-      <div className="mt-2 whitespace-pre-wrap text-lead leading-relaxed text-ink" data-testid="answer">
+          </>
+        )} />
+      <div className="mt-4 whitespace-pre-wrap text-lead leading-relaxed text-ink" data-testid="answer">
         {mode === 'diff' && otherId ? (
-          other.isLoading ? <div className="skeleton h-20" /> : !otherTrial ? <p className="text-sm text-ink-3">Run #{otherId} did not ask this question.</p> : (
+          other.isLoading ? <Skeleton size="chart" /> : !otherTrial ? <Empty title={`Run #${otherId} did not ask this question`} /> : (
             <>
               <div className="mb-2 flex flex-wrap items-center gap-x-3 text-xs text-ink-3" data-testid="diff-legend">
                 <span><span className="rounded-[3px] bg-bad-wash px-1 text-bad-ink line-through">removed</span> from run <Link className="font-mono text-accent-ink hover:underline" to={`/trials/${otherTrial.id}`}>#{otherId}</Link> (try {otherTrial.trial_index + 1}, {otherTrial.status})</span>
@@ -250,7 +252,7 @@ function AnswerBlock({ tr, mustMention, mustNot, missing, answerFailed, resolve,
           )
         ) : answer ? <AnswerText text={answer} good={mustMention} bad={mustNot} resolve={resolve} lit={lit} onLight={onLight} /> : <span className="text-ink-3">(empty)</span>}
       </div>
-      <div className="mt-3 space-y-1 text-sm">
+      <div className="mt-4 space-y-1 text-sm">
         {mustMention.length > 0 && (missing.length
           ? <p className="text-bad-ink">Missing: {missing.map((m, i) => <span key={m}>{i > 0 && ', '}<b className="font-semibold">{m.split('|').join(' or ')}</b></span>)}</p>
           : <p><span className="text-good-ink">Every must-mention phrase is there</span> <span className="text-ink-3">(underlined)</span></p>)}
@@ -259,6 +261,7 @@ function AnswerBlock({ tr, mustMention, mustNot, missing, answerFailed, resolve,
         )}
         {r?.error && <p className="text-bad-ink">Bot error: {r.error}</p>}
       </div>
+      </div>
     </section>
   )
 }
@@ -266,8 +269,7 @@ function AnswerBlock({ tr, mustMention, mustNot, missing, answerFailed, resolve,
 function Expectations({ c }: { c: NonNullable<TrialDetail['case']> }) {
   const e = c.expected
   const chip = (m: string, tone: 'good' | 'bad' | 'plain') => (
-    <span key={m} className={clsx('mb-1 mr-1 inline-block rounded-full border px-2 font-mono text-xs leading-5',
-      tone === 'good' ? 'border-good/40 bg-good-wash text-good-ink' : tone === 'bad' ? 'border-bad/40 bg-bad-wash text-bad-ink' : 'border-line-strong text-ink-2')}>{m}</span>
+    <Badge key={m} tone={tone === 'good' ? 'pass' : tone === 'bad' ? 'fail' : 'cancelled'} className="mb-1 mr-1 font-mono">{m}</Badge>
   )
   const rows: [string, ReactNode][] = []
   if (e.answer.reference) rows.push(['Reference answer', <span key="r" className="text-sm text-ink">{e.answer.reference}</span>])
@@ -283,9 +285,9 @@ function Expectations({ c }: { c: NonNullable<TrialDetail['case']> }) {
   if (Object.keys(e.expected_outcome).length) rows.push(['Expected outcome', <span key="eo" className="break-all font-mono text-xs">{JSON.stringify(e.expected_outcome)}</span>])
   if (e.refusal_expected != null) rows.push(['Should decline', e.refusal_expected ? 'yes' : 'no'])
   if (c.description) rows.push(['Note', c.description])
-  if (!rows.length) return <p className="text-sm text-ink-3">No expected outcomes: only black-box checks apply.</p>
+  if (!rows.length) return <Empty title="No expected outcomes">Only black-box checks apply.</Empty>
   return (
-    <dl className="grid gap-x-8 gap-y-4 sm:grid-cols-2" data-testid="expected">
+    <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2" data-testid="expected">
       {rows.map(([k, v]) => <div key={k} className={clsx(k === 'Reference answer' && 'sm:row-span-2')}><dt className="t-label">{k}</dt><dd className="mt-1 text-sm text-ink-2">{v}</dd></div>)}
     </dl>
   )
@@ -328,21 +330,20 @@ function Checks({ scores, heuristic }: { scores: Score[]; heuristic: boolean }) 
         {passed.length > 0 && (
           <div className="flex flex-wrap gap-1 pt-1">
             {passed.map((s) => (
-              <span key={s.evaluator_id} title={`${s.explanation}${heur(s) ? ' (heuristic judge)' : ''}`}
-                className={clsx('inline-flex h-6 items-center gap-1 rounded-full border border-good/40 bg-good-wash px-2 font-mono text-xs text-good-ink', heur(s) && 'hatched')}>
+              <Badge key={s.evaluator_id} tone={heur(s) ? 'heuristic' : 'pass'} className="font-mono" title={`${s.explanation}${heur(s) ? ' (heuristic judge)' : ''}`}>
                 <Check className="size-3" />{s.evaluator_id}
-              </span>
+              </Badge>
             ))}
           </div>
         )}
         <div className="flex flex-wrap items-center gap-4 pt-1 text-xs text-ink-2">
           {passed.length > 0 && (
-            <button type="button" onClick={() => setOpen((v) => !v)} className="flex items-center gap-1 text-accent-ink hover:underline" aria-expanded={open}>
-              <ChevronRight className={clsx('size-3.5 transition-transform', open && 'rotate-90')} />details of the passed checks
-            </button>
+            <TextLink size="sm" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+              <ChevronRight className={clsx('size-3.5 transition-transform duration-(--dur-fast)', open && 'rotate-90')} />details of the passed checks
+            </TextLink>
           )}
           {na.length > 0 && (
-            <label className="flex items-center gap-1.5"><input type="checkbox" className="accent-[var(--accent)]" checked={showNA} onChange={(e) => setShowNA(e.target.checked)} />show <span className="font-mono">{na.length}</span> not applicable</label>
+            <Checkbox checked={showNA} onChange={setShowNA} className="text-xs" label={<>show <span className="font-mono">{na.length}</span> not applicable</>} />
           )}
         </div>
         <AnimatePresence initial={false}>
@@ -364,13 +365,13 @@ function ScoreRow({ s, heuristic }: { s: Score; heuristic: boolean }) {
   return (
     <div className={clsx('rounded-r-lg border-l-[3px] px-3 py-2',
       bad ? (s.gating ? 'border-bad bg-bad-wash' : 'border-warn bg-warn-wash') : s.status === 'pass' ? 'border-good bg-surface-2' : 'border-line-strong bg-surface-2',
-      heuristic && judge && 'hatched')}>
+      )}>
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-mono text-sm font-medium text-ink">{s.evaluator_id}</span>
         {s.score != null && <span className="font-mono text-xs text-ink-3">{s.score.toFixed(2)}{s.threshold != null && ` / needs ${s.threshold}`}</span>}
         {!bad && s.status !== 'pass' && <StatusBadge status={s.status} />}
         {!s.gating && <span className="text-xs text-ink-3"><Term k="gating">diagnostic</Term></span>}
-        {judge && <span className="text-xs text-ink-3">{heuristic ? 'heuristic judge' : 'grading model'}</span>}
+        {judge && (heuristic ? <Badge tone="heuristic">heuristic judge</Badge> : <span className="text-xs text-ink-3">grading model</span>)}
         {s.failure_type && bad && <Badge tone="bad" className="ml-auto">{FAILURE_LABELS[s.failure_type] ?? s.failure_type}</Badge>}
       </div>
       <p className="mt-0.5 text-sm text-ink-2">{s.explanation}</p>
@@ -403,8 +404,9 @@ function Telemetry({ tr }: { tr: TrialDetail }) {
 
 function ToolCalls({ r }: { r: TrialDetail['result'] }) {
   return (
-    <Card title="Tool calls" meta={r?.tool_calls ? r.tool_calls.length : undefined}>
-      {r?.tool_calls == null ? <p className="text-sm text-ink-3">The bot did not report tool calls.</p> : r.tool_calls.length === 0 ? <p className="text-sm text-ink-3">No tools called.</p> : (
+    <Card title="Tool calls" meta={r?.tool_calls ? r.tool_calls.length : undefined}
+      help={<p>The tools the bot called while answering this question, with the arguments it sent and what came back. Compare them with the expected calls above.</p>}>
+      {r?.tool_calls == null ? <Empty title="The bot did not report tool calls" /> : r.tool_calls.length === 0 ? <Empty title="No tools called" /> : (
         <ol className="space-y-2">
           {r.tool_calls.map((tc, i) => (
             <li key={i} className="rounded-lg border border-line p-2.5 text-xs">
@@ -452,7 +454,7 @@ function FailureAnnotation({ t }: { t: TrialDetail }) {
       actions={<>{t.failure_override ? <Badge tone="info">set by you</Badge> : <Badge>automatic</Badge>}{!editing && <Button size="sm" variant="ghost" onClick={() => setEditing(true)}><Pencil className="size-3.5" />Change</Button>}</>}>
       {!editing ? (
         <div className="space-y-1.5">
-          {t.failure_types.length ? <div className="flex flex-wrap gap-1">{t.failure_types.map((f) => <Badge key={f} tone="bad">{FAILURE_LABELS[f] ?? f}</Badge>)}</div> : <p className="text-sm text-ink-3">None.</p>}
+          {t.failure_types.length ? <div className="flex flex-wrap gap-1">{t.failure_types.map((f) => <Badge key={f} tone="bad">{FAILURE_LABELS[f] ?? f}</Badge>)}</div> : <Empty title="None" />}
           {t.failure_note && <p className="text-sm text-ink-2">Your note: {t.failure_note}</p>}
         </div>
       ) : (
@@ -462,10 +464,9 @@ function FailureAnnotation({ t }: { t: TrialDetail }) {
               <legend className="t-label mb-1">{g.label}</legend>
               <div className="flex flex-wrap gap-1">
                 {g.types.map((ft) => (
-                  <button key={ft} type="button" aria-pressed={sel.includes(ft)} onClick={() => setSel((s) => (s.includes(ft) ? s.filter((x) => x !== ft) : [...s, ft]))}
-                    className={clsx('rounded-md border px-2 py-0.5 text-xs transition-colors', sel.includes(ft) ? 'border-bad/50 bg-bad-wash text-bad-ink' : 'border-line text-ink-2 hover:bg-surface-2')}>
-                    {sel.includes(ft) && <Check className="mr-0.5 inline size-3" />}{FAILURE_LABELS[ft] ?? ft}
-                  </button>
+                  <Chip key={ft} selected={sel.includes(ft)} tone="bad" icon={sel.includes(ft) ? <Check className="size-3" /> : undefined} onClick={() => setSel((s) => (s.includes(ft) ? s.filter((x) => x !== ft) : [...s, ft]))}>
+                    {FAILURE_LABELS[ft] ?? ft}
+                  </Chip>
                 ))}
               </div>
             </fieldset>

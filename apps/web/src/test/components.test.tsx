@@ -70,13 +70,13 @@ describe('comparison metrics', () => {
     wrap(<MetricTable rows={[rate({}), rate({ metric: 'p95_latency_ms', label: 'p95 latency', unit: 'latency', baseline: 2000, candidate: 2400, delta: 400, relative: 0.2, ci: null })]} />)
     const row = screen.getByTestId('metric-overall_pass_rate')
     expect(within(row).getByText('50.0%')).toBeInTheDocument()
-    expect(within(row).getByText('+20.0pp')).toBeInTheDocument()
-    expect(within(row).getByText('10.0 to 30.0pp (n=58)')).toBeInTheDocument()
+    expect(within(row).getByText(/\+20\.0 pp/)).toBeInTheDocument()
+    expect(within(row).getByText('10.0 to 30.0 pp (n=58)')).toBeInTheDocument()
     const lat = screen.getByTestId('metric-p95_latency_ms')
-    expect(within(lat).getByText('+20.0%')).toBeInTheDocument()
+    expect(within(lat).getByText(/\+20\.0%/)).toBeInTheDocument()
     // the arrow says which way the number moved (up); the colour says it is worse
-    expect(within(lat).getByLabelText('up')).toBeInTheDocument()
-    expect(within(lat).getByText('+20.0%').closest('td')).toHaveClass('text-bad-ink')
+    expect(within(lat).getByText(/↑/)).toBeInTheDocument()
+    expect(within(lat).getByText(/\+20\.0%/)).toHaveClass('text-bad-ink')
   })
 })
 

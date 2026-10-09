@@ -118,8 +118,8 @@ function BarList({ rows, k, label, filter, setFilter }: { rows: XRow[]; k: CatKe
           const m = sub.get(v) ?? 0
           return (
             <button key={v} type="button" onClick={() => toggle(v)} aria-pressed={on}
-              className={clsx('flex w-full items-center gap-2 rounded px-1 py-0.5 text-left text-xs hover:bg-surface-2', on ? 'font-semibold text-ink' : 'text-ink-2')}>
-              <span className="w-36 truncate">{plain(v)}</span>
+              className={clsx('flex w-full items-center gap-2 rounded px-1 py-0.5 text-left text-xs transition-colors duration-(--dur-fast) hover:bg-surface-2', on ? 'font-semibold text-ink' : 'text-ink-2')}>
+              <span className="w-36 shrink-0 leading-snug" title={plain(v)}>{plain(v)}</span>
               <span className="relative h-3.5 flex-1">
                 <i className="absolute inset-y-0 left-0 rounded-[3px] bg-surface-3" style={{ width: `${(n / max) * 100}%` }} />
                 <i className="absolute inset-y-0 left-0 rounded-[3px] transition-[width] duration-300" style={{ width: `${(m / max) * 100}%`, background: color(v) }} />
@@ -151,10 +151,10 @@ function Scatter({ rows, filter, setFilter, kx, ky, onTip }: {
   const [shown, setShown] = useState(!motionOn)
   useEffect(() => { if (!motionOn) return; const t = setTimeout(() => setShown(true), 30); return () => clearTimeout(t) }, [motionOn, kx, ky])
   useEffect(() => {
-    if (axX.current) d3.select(axX.current).call(d3.axisBottom(x).ticks(7))
-    if (axY.current) d3.select(axY.current).call(d3.axisLeft(y).ticks(5))
+    if (axX.current) d3.select(axX.current).call(d3.axisBottom(x).ticks(7).tickFormat((v) => ax.fmt(+v)))
+    if (axY.current) d3.select(axY.current).call(d3.axisLeft(y).ticks(5).tickFormat((v) => ay.fmt(+v)))
     if (grid.current) d3.select(grid.current).call(d3.axisLeft(y).ticks(5).tickSize(-(W - m.l - m.r)).tickFormat(() => '')).call((g) => g.select('.domain').remove())
-  }, [x, y, W, m.l, m.r])
+  }, [x, y, W, m.l, m.r, ax, ay])
   useEffect(() => {
     const g = brushG.current
     if (!g) return
@@ -250,7 +250,7 @@ export function AnyAgainstAny({ rows, filter, setFilter, resetKey }: { rows: XRo
       <div className="grid gap-6 lg:grid-cols-[minmax(0,8fr)_minmax(0,4fr)]">
         <Scatter key={`${kx}-${ky}-${resetKey}`} rows={rows} filter={filter} setFilter={setFilter} kx={kx} ky={ky} onTip={setTip} />
         <div className="min-w-0">
-          <div className="t-label mb-2 flex items-center gap-2">Questions in the filter <SampleSize n={qs.length} min={10} /></div>
+          <div className="mb-2 flex items-center gap-2"><span className="t-label">Questions in the filter</span><SampleSize n={qs.length} min={10} /></div>
           <div className="scroll-thin max-h-[380px] overflow-y-auto" data-testid="xf-list">
             {qs.length === 0 ? <NothingPasses /> : qs.slice(0, 80).map((r) => (
               <Link key={r.c} to={`/trials/${r.id}`} data-case={r.c} viewTransition

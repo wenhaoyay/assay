@@ -6,8 +6,8 @@ import { Link } from 'react-router-dom'
 import { FAILURE_LABELS, pct } from '../../lib/format'
 import { useMotionOn } from '../../lib/prefs'
 import type { CaseChange, RunHeader } from '../../lib/types'
-import { Badge } from '../ui'
-import { dayLabel } from './shared'
+import { Badge, DUR, Empty } from '../ui'
+import { dayLabel, STAGGER } from './shared'
 
 const DOT: Record<string, string> = { pass: 'bg-good', fail: 'bg-bad', warn: 'bg-warn', info: 'bg-series-1', idle: 'bg-untested', live: 'bg-accent' }
 
@@ -58,11 +58,11 @@ export function ActivityStream({ runs, projectName, gates, multi }: {
     const dot = r.gate_status === 'PASS' ? 'pass' : r.gate_status === 'FAIL' ? 'fail' : gate !== undefined && rate != null ? (rate >= gate ? 'pass' : 'fail') : 'info'
     events.push({ key: `r${r.id}`, dot, at, to: `/runs/${r.id}`, body: <>Run {id} finished: <span className="font-mono">{pct(rate)}</span> · {r.variant_label || r.target}{of}</> })
   }
-  if (!events.length) return <p className="text-sm text-ink-3">No runs yet. The first one will show up here.</p>
+  if (!events.length) return <Empty title="No runs yet">The first one will show up here.</Empty>
   return (
     <ul data-testid="activity">
       {events.slice(0, 10).map((e, i) => (
-        <motion.li key={e.key} initial={motionOn ? { opacity: 0, y: -6 } : false} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+        <motion.li key={e.key} initial={motionOn ? { opacity: 0, y: -6 } : false} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * STAGGER, duration: DUR.slow, ease: [0.16, 1, 0.3, 1] }}
           className="border-b border-dashed border-line">
           <Link to={e.to} viewTransition className="grid grid-cols-[18px_minmax(0,1fr)_auto] gap-2.5 py-2.5 text-sm text-ink-2 hover:text-ink">
             <span className={clsx('mt-1.5 size-2 rounded-full', DOT[e.dot])} />
@@ -86,7 +86,7 @@ export function regressionItem(r: CaseChange, baselineId: number, trialFor: (cas
     key: `reg-${r.case_id}`, dot: 'bg-bad', caseId: r.case_id,
     title: <>{r.title} <span className="font-mono text-sm font-normal text-ink-3">{r.case_id}</span></>,
     body: <>{before}, {now}{why ? `: ${why}` : ''}</>,
-    chip: <Badge tone="bad">regressed</Badge>,
+    chip: <Badge tone="fail">regressed</Badge>,
     to: t ? `/trials/${t}` : `/runs/${latestId}`,
   }
 }

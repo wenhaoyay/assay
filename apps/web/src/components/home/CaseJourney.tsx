@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { pct } from '../../lib/format'
 import type { CaseMatrix } from '../../lib/types'
 import { cellState, type CellState } from '../instrument'
-import { GaugeArt, Help } from '../ui'
+import { Empty, Help } from '../ui'
 
 export type JourneyFilter = 'all' | 'flip' | 'fail' | 'flaky'
 
@@ -45,10 +45,7 @@ export function CaseJourney({ matrix, runIds, filter, trialFor, latestRun }: {
 
   if (!rows.length) {
     return (
-      <div className="grid place-items-center rounded-xl border-[1.5px] border-dashed border-line-strong p-10 text-center text-ink-3">
-        <GaugeArt size={56} />
-        <div className="mt-2 text-sm">Nothing here. Either the bot is perfect or the filter is.</div>
-      </div>
+      <Empty title="Nothing here">Either the bot is perfect or the filter is.</Empty>
     )
   }
   const cw = 34

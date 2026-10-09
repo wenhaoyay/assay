@@ -14,7 +14,7 @@ export function CaseChip({ caseId, trialId, tone = 'neutral', children, color, t
 }) {
   return (
     <Link to={`/trials/${trialId}`} data-case={caseId} title={title ?? caseId} viewTransition
-      className={clsx('inline-flex h-6 max-w-72 items-center gap-1.5 truncate rounded-full border px-2.5 text-xs font-medium transition-colors hover:bg-surface-2',
+      className={clsx('inline-flex h-7 max-w-72 items-center gap-1.5 truncate rounded-full border px-2.5 text-xs font-medium transition-colors duration-(--dur-fast) hover:bg-surface-2',
         tone === 'good' && 'border-good/40 text-good-ink',
         tone === 'bad' && 'border-bad/40 text-bad-ink',
         tone === 'warn' && 'border-warn/50 text-warn-ink',
@@ -47,7 +47,7 @@ export interface TipState { x: number; y: number; body: ReactNode }
 export function ChartTip({ tip }: { tip: TipState | null }) {
   if (!tip) return null
   return createPortal(
-    <div className="pointer-events-none fixed z-[85] max-w-72 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs text-ink-2 shadow-pop"
+    <div className="pointer-events-none fixed z-(--z-pop) max-w-72 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs text-ink-2 shadow-pop"
       style={{ left: Math.min(tip.x + 14, window.innerWidth - 300), top: tip.y + 14 }}>
       {tip.body}
     </div>,

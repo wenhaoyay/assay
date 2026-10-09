@@ -5,7 +5,9 @@ import type { ReactNode } from 'react'
 import { chancePhrase, reading } from '../../lib/compare'
 import type { Comparison, ComparisonRow } from '../../lib/types'
 import { Delta, Needle, SampleSize } from '../instrument'
+import { READING_W } from '../home/shared'
 import { Help, Term } from '../ui'
+import { fmtRel } from './delta'
 
 export function headline(overall: ComparisonRow | null): { word: string; tone: 'good' | 'bad' | 'neutral'; rest: ReactNode } {
   if (!overall || overall.delta === null) return { word: 'Not enough to compare.', tone: 'neutral', rest: ' The two runs share too few questions.' }
@@ -28,16 +30,14 @@ export function Hero({ c, actions }: { c: Comparison; actions?: ReactNode }) {
   const priced = [tok, cost].filter((m): m is ComparisonRow => !!m && m.relative !== null)
   const rises = priced.some((m) => (m.relative ?? 0) > 0.05)
   const falls = priced.length > 0 && priced.every((m) => (m.relative ?? 0) < -0.05)
-  const pctFmt = (a: number) => `${(a * 100).toFixed(0)}%`
   return (
-    <section className="mt-8 grid items-center gap-x-10 gap-y-4 md:grid-cols-[auto_minmax(0,1fr)]" data-tour="verdict">
+    <section className="grid items-center gap-x-10 gap-y-4 md:grid-cols-[auto_minmax(0,1fr)]" data-tour="verdict">
       <div className="justify-self-center">
         <Needle mode="delta" value={overall?.delta ?? null} low={overall?.ci?.ci_low} high={overall?.ci?.ci_high} size={250}
           label={`Pass rate change ${overall?.delta != null ? (overall.delta * 100).toFixed(1) : 'n/a'} points`} />
       </div>
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="t-label"><span className="font-mono">{c.n_shared_cases}</span> questions in both runs · paired by question</span>
           <SampleSize n={c.n_shared_cases} unit="questions" />
           {actions && <span className="ml-auto">{actions}</span>}
         </div>
@@ -51,7 +51,7 @@ export function Hero({ c, actions }: { c: Comparison; actions?: ReactNode }) {
             </Help>
           </span>
         </h1>
-        <p className="mt-3 max-w-[760px] text-lead text-ink-2">
+        <p className={clsx('mt-3 text-lead text-ink-2', READING_W)}>
           <b className="font-semibold text-good-ink">{c.improvements.length} question{c.improvements.length === 1 ? '' : 's'} improved</b>,{' '}
           <b className="font-semibold text-bad-ink">{c.regressions.length} regressed</b>, <span className="font-mono">{mc.both_fail}</span> fail in both.
           {mc.p_value !== null && (
@@ -64,7 +64,7 @@ export function Hero({ c, actions }: { c: Comparison; actions?: ReactNode }) {
             {rises ? '⚠ The price: ' : falls ? 'Cheaper too: ' : 'The price: '}
             {priced.map((m, i) => (
               <span key={m.metric}>{i > 0 && ', '}{m.unit === 'cost' ? 'cost per answer' : 'tokens per answer'}{' '}
-                <Delta value={m.relative} format={pctFmt} higherIsBetter={false} noise={0.05} />
+                <Delta value={m.relative} format={(_, v) => fmtRel(v, 0)} higherIsBetter={false} noise={0.05} />
               </span>
             ))}.
           </p>

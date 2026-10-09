@@ -2,7 +2,7 @@
 // choice above changes it (ReceiptLine), so you can see what a click did.
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { usd } from '../../lib/format'
+import { fmtDate, usd } from '../../lib/format'
 import { Receipt, ReceiptLine } from '../instrument'
 import { Help } from '../ui'
 
@@ -34,7 +34,7 @@ export function duration(s: number | null): string {
 }
 
 // Printed at load, like the time on a till slip; a render never reads the clock.
-const PRINTED = new Date().toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
+const PRINTED = fmtDate(new Date().toISOString())
 
 export function RunReceipt({ e, trials, concurrency, gateName, judgeLabel, targetId, loading, children }: {
   e: Estimate | undefined
@@ -47,7 +47,7 @@ export function RunReceipt({ e, trials, concurrency, gateName, judgeLabel, targe
   children?: ReactNode
 }) {
   const title = (
-    <span className="inline-flex items-center gap-2">
+    <span className="inline-flex items-center gap-1.5">
       Before you start
       <Help title="Before you start">
         <p>What this run will ask, how long it should take and what it should cost. Change anything on the left and the lines it changes reprint.</p>

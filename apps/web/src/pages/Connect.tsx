@@ -11,7 +11,8 @@ import { useState, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { CleanupMethodHelp, ConnectionHelp, MethodHelp } from '../components/helpTexts'
 import { JsonTree } from '../components/JsonTree'
-import { Badge, Button, Card, ErrorState, Field, Input, Json, Notice, PageHeader, PageSkeleton, Segmented, Select, Table, Textarea, Toggle, toast } from '../components/ui'
+import { Badge, Button, Card, ErrorState, Field, Input, Json, Notice, PageHeader, PageSkeleton, Panel, Segmented, Select, Table, Textarea, Toggle, toast } from '../components/ui'
+import { Checkbox, Chip, FileInput, SelectCard, TextLink } from '../components/form'
 import { LabelHelp } from '../components/LabelHelp'
 import { api } from '../lib/api'
 import { useCrumbs } from '../lib/crumbs'
@@ -160,9 +161,9 @@ function ConnectWizard({ editing }: { editing: Target | null }) {
           <p>Each step shows what it found before you go on. Nothing is saved until a test question has come back right.</p>
           <p>Advanced (JSON) shows the whole configuration beside the steps; edits on either side update the other.</p>
         </>}
-        actions={<Button variant={advanced ? 'primary' : 'secondary'} onClick={() => setAdvanced((v) => !v)}><Code2 className="size-3.5" />Advanced (JSON)</Button>} />
+        actions={<Chip selected={advanced} onClick={() => setAdvanced((v) => !v)} icon={<Code2 className="size-3.5" />}>Advanced (JSON)</Chip>} />
       <Stepper step={step} onStep={(i) => i <= step && setStep(i)} />
-      <div className={clsx('mt-5 grid gap-5', advanced && 'xl:grid-cols-[minmax(0,1fr)_420px]')}>
+      <div className={clsx('mt-8 grid gap-8', advanced && 'xl:grid-cols-[minmax(0,1fr)_420px]')}>
         <div className="min-w-0" data-tour="connect">
           <AnimatePresence mode="wait">
             <motion.div key={step} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.18 }}>
@@ -178,9 +179,9 @@ function ConnectWizard({ editing }: { editing: Target | null }) {
                 onSaved={(id) => { qc.invalidateQueries({ queryKey: ['targets'] }); qc.invalidateQueries({ queryKey: ['projects'] }); nav(`/targets/${id}`, { viewTransition: true }) }} />}
             </motion.div>
           </AnimatePresence>
-          {route === 'logs' && step === 0 && <div className="mt-5"><LogsImport projects={projects.visible} onDone={(id) => nav(`/targets/${id}`)} /></div>}
+          {route === 'logs' && step === 0 && <div className="mt-8"><LogsImport projects={projects.visible} onDone={(id) => nav(`/targets/${id}`)} /></div>}
           {!(route === 'logs' && step === 0) && (
-            <div className="mt-5 flex items-center gap-2">
+            <div className="mt-8 flex flex-wrap items-center gap-2">
               {step > 0 && <Button onClick={() => setStep(step - 1)}><ArrowLeft className="size-3.5" />Back</Button>}
               {step < 3 && <Button variant="primary" disabled={!canNext} onClick={() => setStep(step + 1)}>Next: {STEPS[step + 1]} <ArrowRight className="size-3.5" /></Button>}
               {step === 2 && !test?.ok && <span className="text-xs text-ink-2">Send a test question that comes back right to continue.</span>}
@@ -218,16 +219,14 @@ function StepRoute({ route, onRoute, templates, onTemplate, standard, setStandar
   standard: boolean; setStandard: (v: boolean) => void; projects: Project[]
 }) {
   return (
-    <div className="space-y-5">
+    <div className="space-y-12">
       <Card title="How do you reach your chatbot?">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" role="radiogroup">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" role="radiogroup" aria-label="How you reach your chatbot">
           {ROUTES.map((r) => (
-            <button key={r.id} type="button" role="radio" aria-checked={route === r.id} onClick={() => onRoute(r.id)}
-              className={clsx('relative flex flex-col items-start rounded-xl border p-4 text-left transition-colors', route === r.id ? 'border-accent bg-accent-wash/50' : 'border-line hover:border-line-strong')}>
-              {route === r.id && <motion.span layoutId="route-ring" className="absolute inset-0 rounded-xl ring-2 ring-accent" />}
-              <div className="flex items-center gap-2"><r.icon className={clsx('size-4', route === r.id ? 'text-accent-ink' : 'text-ink-3')} /><span className="text-sm font-semibold">{r.title}</span>{r.badge && <Badge tone="accent">{r.badge}</Badge>}</div>
-              <p className="mt-1 text-xs text-ink-2">{r.body}</p>
-            </button>
+            <SelectCard key={r.id} selected={route === r.id} onSelect={() => onRoute(r.id)} icon={<r.icon className="size-4" />}
+              title={<span className="flex flex-wrap items-center gap-2">{r.title}{r.badge && <Badge tone="accent">{r.badge}</Badge>}</span>}>
+              <span className="text-xs">{r.body}</span>
+            </SelectCard>
           ))}
         </div>
       </Card>
@@ -244,10 +243,12 @@ function StepRoute({ route, onRoute, templates, onTemplate, standard, setStandar
         <Card title="Or start from a template" meta={`${templates.length}`} help={<p>Fills the steps from a known setup. Your saved connections appear here too.</p>}>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {templates.map((t) => (
-              <button key={t.id} type="button" onClick={() => onTemplate(t)} className="flex flex-col items-start rounded-lg border border-line p-3 text-left hover:border-accent/50 hover:bg-surface-2">
-                <div className="flex items-center gap-2 text-sm font-medium">{t.name}{!t.builtin && <Badge tone="accent">yours</Badge>}</div>
-                <div className="mt-0.5 line-clamp-2 text-xs text-ink-2">{t.description}</div>
-              </button>
+              <Panel key={t.id} padded={false}>
+                <button type="button" onClick={() => onTemplate(t)} className="flex h-full w-full flex-col items-start rounded-xl p-3 text-left transition-colors duration-(--dur-ui) hover:bg-surface-2">
+                  <div className="flex items-center gap-2 text-sm font-medium">{t.name}{!t.builtin && <Badge tone="accent">yours</Badge>}</div>
+                  <div className="mt-0.5 line-clamp-2 text-xs text-ink-2">{t.description}</div>
+                </button>
+              </Panel>
             ))}
           </div>
         </Card>
@@ -317,7 +318,7 @@ function StepRequest({ route, adapter, cfg, setCfg }: { route: Route; adapter: '
     )
   }
   return (
-    <div className="space-y-5">
+    <div className="space-y-12">
       {route === 'curl' && (
         <Card title="Paste the curl command" help={<>
           <p>Copy a real request to your bot as curl and Assay reads the address, headers and body from it, finds where the question goes, and offers to store any key securely.</p>
@@ -325,7 +326,7 @@ function StepRequest({ route, adapter, cfg, setCfg }: { route: Route; adapter: '
         </>}>
           <Textarea mono rows={6} value={curl} onChange={(e) => setCurl(e.target.value)} placeholder={"curl 'https://my-bot.example.com/api/chat' \\\n  -H 'Authorization: Bearer sk-...' \\\n  -H 'Content-Type: application/json' \\\n  --data-raw '{\"question\":\"How do I reset it?\"}'"} aria-label="curl command" />
           <div className="mt-2 flex items-center gap-2">
-            <Button variant="primary" loading={parse.isPending} disabled={curl.trim().length < 6} onClick={() => parse.mutate()}><Wand2 className="size-3.5" />Read it</Button>
+            <Button loading={parse.isPending} disabled={curl.trim().length < 6} onClick={() => parse.mutate()}><Wand2 className="size-3.5" />Read it</Button>
             <span className="text-xs text-ink-2">DevTools → Network → Copy as cURL (bash)</span>
           </div>
           {parse.isError && <div className="mt-2"><ErrorState error={parse.error} /></div>}
@@ -358,7 +359,7 @@ function StepRequest({ route, adapter, cfg, setCfg }: { route: Route; adapter: '
         {quotedLiterals(cfg.body).map((w) => (
           <p key={w.path} className="mt-2 text-xs text-warn-ink">
             <code>{w.path}</code> is the <i>text</i> "{w.value}" because of its quotes. If you meant the empty value, write <code>{w.value}</code> without quotes (a bot that expects an id refuses the text "null").
-            <button type="button" className="ml-1 text-accent-ink underline" onClick={() => { const fixed = unquote(cfg.body, w.path); set('body', fixed); setBodyText(JSON.stringify(fixed, null, 2)) }}>Remove the quotes</button>
+            <TextLink size="sm" className="ml-1" onClick={() => { const fixed = unquote(cfg.body, w.path); set('body', fixed); setBodyText(JSON.stringify(fixed, null, 2)) }}>Remove the quotes</TextLink>
           </p>
         ))}
         {!!cfg.auth && <p className="mt-2 flex items-center gap-1.5 text-xs text-good-ink"><Lock className="size-3.5" />Sends {(cfg.auth as { header: string }).header} from {(cfg.auth as { secret_ref: string }).secret_ref} - the key itself is not in this configuration.</p>}
@@ -378,7 +379,7 @@ function SecretRow({ secret, onStored, stored }: { secret: { header: string; pre
         <>
           <span className="ml-auto text-xs text-ink-2">Save as</span>
           <Input className="w-40" value={name} onChange={(e) => setName(e.target.value)} aria-label="Secret name" />
-          <Button size="sm" variant="primary" loading={save.isPending} onClick={() => save.mutate()}><Lock className="size-3.5" />Store securely</Button>
+          <Button size="sm" loading={save.isPending} onClick={() => save.mutate()}><Lock className="size-3.5" />Store securely</Button>
         </>
       )}
       {save.isError && <div className="w-full"><ErrorState error={save.error} /></div>}
@@ -490,11 +491,11 @@ function StepMap(props: {
   }
   const reasons = probe?.suggestion?.reasons ?? {}
   return (
-    <div className="space-y-5">
+    <div className="space-y-12">
       <Card title="Send a test question" help={<p>Sends one question with the request so far and shows the raw reply. With the Assay shape off, map the reply below by clicking it.</p>}>
         <div className="flex gap-2">
           <Input value={message} onChange={(e) => setMessage(e.target.value)} aria-label="Test question" />
-          <Button variant="primary" loading={probing} onClick={runProbe}><Send className="size-3.5" />Send</Button>
+          <Button loading={probing} onClick={runProbe}><Send className="size-3.5" />Send</Button>
         </div>
         {!!probeError && <div className="mt-3"><ErrorState error={probeError} /></div>}
         {probe && !probe.ok && <div className="mt-3"><Notice tone="bad" title={probe.explanation ?? 'The request failed'}><span className="font-mono text-xs">{probe.error}</span></Notice></div>}
@@ -530,7 +531,7 @@ function StepMap(props: {
                         <span className="text-sm">{r.label}</span>
                         <span className={clsx('block truncate text-xs text-ink-3', p && 'font-mono')} title={reasons[r.id === 'sources' ? 'retrieved_documents' : r.id === 'tools' ? 'tool_calls' : r.id] ?? ''}>{p ?? (r.hint || 'not mapped')}</span>
                       </span>
-                      <Button size="sm" variant={picking === r.id ? 'primary' : 'ghost'} onClick={() => setPicking(picking === r.id ? null : r.id)}>{p ? 'Change' : 'Pick'}</Button>
+                      <Button size="sm" variant={picking === r.id ? 'secondary' : 'ghost'} onClick={() => setPicking(picking === r.id ? null : r.id)}>{p ? 'Change' : 'Pick'}</Button>
                       {p && r.id !== 'answer' && <button type="button" aria-label={`Clear ${r.label}`} className="text-ink-3 hover:text-bad-ink" onClick={() => setCfg((c) => ({ ...c, response: setRole((c.response ?? {}) as Mapping, r.id, null) }))}><X className="size-3.5" /></button>}
                     </div>
                   </li>
@@ -562,7 +563,7 @@ function StepMap(props: {
       )}
 
       {probe?.ok && (
-        <Card title="What Assay will see" help={<p>Runs the whole connection (request and mapping) and shows the result as Assay reads it, and which checks that makes possible.</p>} actions={<Button variant="primary" loading={testing} onClick={runTest}><Check className="size-3.5" />Check the mapping</Button>}>
+        <Card title="What Assay will see" help={<p>Runs the whole connection (request and mapping) and shows the result as Assay reads it, and which checks that makes possible.</p>} actions={<Button loading={testing} onClick={runTest}><Check className="size-3.5" />Check the mapping</Button>}>
           {!!testError && <div className="mb-3"><ErrorState error={testError} /></div>}
           {!test ? <p className="text-sm text-ink-2">Not checked yet: press Check the mapping.</p> : !test.ok ? (
             <Notice tone="bad" title={test.explanation ?? test.error ?? 'No answer'}>{test.error}</Notice>
@@ -705,7 +706,7 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved, reply, tes
   const initials = projectName ? projectName.split(/\s+/).map((w) => w[0]).join('').toUpperCase().slice(0, 4) : 'Bot'
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-12">
       {!editing && (
         <Card title="Which chatbot is this?" help={<p>Decides which question sets are offered below and where its runs appear.</p>}>
           <div className="flex flex-wrap items-center gap-2">
@@ -782,9 +783,7 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved, reply, tes
           {canAsk && <Button loading={dry.isPending} onClick={() => dry.mutate()}><Send className="size-3.5" />Ask {asked} question{asked === 1 ? '' : 's'}{loadCheck ? `, then ${asked} at once` : ''}</Button>}
         </div>
         {others.length > 0 && (
-          <label className="mt-2 flex items-center gap-2 text-xs text-ink-2">
-            <input type="checkbox" className="accent-[var(--accent)]" checked={showOthers} onChange={(e) => setShowOthers(e.target.checked)} />Also list question sets written for other chatbots ({others.length})
-          </label>
+          <Checkbox className="mt-3" checked={showOthers} onChange={setShowOthers} label={`Also list question sets written for other chatbots (${others.length})`} />
         )}
         {src === 'typed' && (
           <div className="mt-3 grid gap-2 md:grid-cols-3">
@@ -799,10 +798,7 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved, reply, tes
           </div>
         )}
         {src !== 'test' && asked > 0 && (
-          <label className="mt-2 flex items-center gap-2 text-xs text-ink-2">
-            <input type="checkbox" className="accent-[var(--accent)]" checked={loadCheck} onChange={(e) => setLoadCheck(e.target.checked)} />
-            Also check how it copes when busy: ask the same questions again, all at once ({asked} more answer{asked === 1 ? '' : 's'})
-          </label>
+          <Checkbox className="mt-3" checked={loadCheck} onChange={setLoadCheck} label={`Also check how it copes when busy: ask the same questions again, all at once (${asked} more answer${asked === 1 ? '' : 's'})`} />
         )}
         {src === 'test' && <p className="mt-2 text-xs text-ink-2">No new questions: the estimate below uses the <span className="font-mono">{ms(testMs)}</span> the test question took. One answer is a rough guide; three are steadier.</p>}
         {dry.isError && <div className="mt-2"><ErrorState error={dry.error} /></div>}
@@ -856,7 +852,7 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved, reply, tes
           </Field>
           {editing && <Field label="What changed"><Input value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>}
         </div>
-        <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[var(--accent)]" checked={asTemplate} onChange={(e) => setAsTemplate(e.target.checked)} />Also save as a template for connecting similar bots</label>
+        <Checkbox className="mt-3" checked={asTemplate} onChange={setAsTemplate} label="Also save as a template for connecting similar bots" />
         {save.isError && <div className="mt-3"><ErrorState error={save.error} /></div>}
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <Button variant="primary" size="lg" loading={save.isPending} disabled={!!saveWhy} onClick={() => save.mutate()}>
@@ -924,12 +920,12 @@ function LogsImport({ projects, onDone }: { projects: Project[]; onDone: (target
       <p>Drop a log of past questions and answers (.jsonl, .json or .csv), then say which column is which.</p>
       <p>Creates a dataset of the logged questions and a "replay" connection that answers with what was logged: graded without calling the bot.</p>
     </>}>
-      <label className={clsx('flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-8 text-sm transition-colors', file ? 'border-good/50 bg-good-wash/30' : 'border-line-strong hover:border-accent')}
+      <div className={clsx('flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-8 text-sm transition-colors', file ? 'border-good/50 bg-good-wash/30' : 'border-line-strong')}
         onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) { setFile(f); preview.mutate(f) } }}>
         <FileUp className="size-6 text-ink-3" />
-        {file ? <span><span className="font-mono font-medium">{file.name}</span> · <span className="font-mono">{Math.round(file.size / 1024)}</span> KB</span> : <span>Drop a <span className="font-mono">.jsonl</span>, <span className="font-mono">.json</span> or <span className="font-mono">.csv</span> file, or click to choose</span>}
-        <input type="file" accept=".jsonl,.json,.csv,.ndjson" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) { setFile(f); preview.mutate(f) } }} />
-      </label>
+        {file ? <span><span className="font-mono font-medium">{file.name}</span> · <span className="font-mono">{Math.round(file.size / 1024)}</span> KB</span> : <span>Drop a <span className="font-mono">.jsonl</span>, <span className="font-mono">.json</span> or <span className="font-mono">.csv</span> file, or choose one</span>}
+        <FileInput accept=".jsonl,.json,.csv,.ndjson" aria-label="Log file" onFiles={(f) => { setFile(f[0]); preview.mutate(f[0]) }} />
+      </div>
       {preview.isError && <div className="mt-3"><ErrorState error={preview.error} /></div>}
       {preview.data && (
         <div className="mt-4 space-y-4">
@@ -942,12 +938,10 @@ function LogsImport({ projects, onDone }: { projects: Project[]; onDone: (target
               </Field>
             ))}
           </div>
-          <div className="scroll-thin max-h-72 overflow-auto rounded-lg border border-line">
-            <table className="w-full text-xs">
-              <thead className="sticky top-0 bg-surface-2"><tr>{cols.slice(0, 8).map((c) => <th key={c.name} className={clsx('px-2 py-1 text-left font-medium', Object.values(roles).includes(c.name) && 'text-accent-ink')}>{c.name}</th>)}</tr></thead>
-              <tbody>{preview.data.rows.slice(0, 10).map((r, i) => <tr key={i} className="border-t border-line">{cols.slice(0, 8).map((c) => <td key={c.name} className="max-w-48 truncate px-2 py-1">{typeof r[c.name] === 'object' ? JSON.stringify(r[c.name]) : String(r[c.name] ?? '')}</td>)}</tr>)}</tbody>
-            </table>
-          </div>
+          <Table className="max-h-72 overflow-y-auto rounded-lg border border-line [&_table]:min-w-[640px]">
+            <thead className="sticky top-0 bg-surface-2"><tr>{cols.slice(0, 8).map((c) => <th key={c.name} className={clsx('t-label', Object.values(roles).includes(c.name) && 'text-accent-ink')}>{c.name}</th>)}</tr></thead>
+            <tbody>{preview.data.rows.slice(0, 10).map((r, i) => <tr key={i}>{cols.slice(0, 8).map((c) => <td key={c.name} className="max-w-48 truncate text-xs">{typeof r[c.name] === 'object' ? JSON.stringify(r[c.name]) : String(r[c.name] ?? '')}</td>)}</tr>)}</tbody>
+          </Table>
           {preview.data.bad_lines > 0 && <p className="text-xs text-warn-ink">{plural(preview.data.bad_lines, 'unreadable line')} will be skipped.</p>}
           <div className="grid gap-3 md:grid-cols-2">
             <Field label="Chatbot"><Select value={projectId} onChange={(e) => setProjectId(Number(e.target.value))}>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>

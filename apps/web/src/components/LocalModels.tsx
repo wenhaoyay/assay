@@ -2,15 +2,19 @@
 // model fits this machine, download after the third-party notice, connect, then calibrate.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { BookOpen, Check, Cloud, Cpu, Download, ExternalLink, RefreshCw } from 'lucide-react'
+import { BookOpen, Check, Cloud, Download, ExternalLink, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
+import { fmtDay } from '../lib/format'
 import { useSettings } from '../lib/projects'
 import type { ProviderConfig } from '../lib/types'
-import { Badge, Button, Card, Dialog, ErrorState, Help, Notice, ProgressBar, Table } from './ui'
+import { Checkbox, TextLink } from './form'
+import { ScrollTable } from './Layout'
+import { Badge, Button, Card, Dialog, ErrorState, Help, Notice, Panel, ProgressBar } from './ui'
 
 const OLLAMA_URL = 'https://ollama.com/download'
+// TextLink's props do not list target/rel (they reach the anchor through the rest spread).
+const EXTERNAL = { target: '_blank', rel: 'noreferrer noopener' } as object
 
 interface Status { running: boolean; version?: string; models: { name: string; size_gb: number; cloud: boolean }[]; base_url: string; error?: string }
 interface Advice {
@@ -85,13 +89,14 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
   const rec = a?.suggestions.find((s) => s.model === a.recommended)
 
   return (
-    <Card title={<span className="flex items-center gap-2"><Cpu className="size-4 text-good-ink" />Run a grading model on this PC (Ollama)</span>}
+    <Card title="Run a grading model on this PC (Ollama)"
       help={<>
         <p>Free per call, and the answers being graded never leave this PC. Slower than a cloud model.</p>
         <p>The four steps light up as they are done: install, running, a model downloaded, connected as a grading model. The full guide covers choosing a model, LM Studio and what to do when something goes wrong.</p>
       </>}
       actions={<Button size="sm" variant="ghost" onClick={() => setGuide(true)}><BookOpen className="size-3.5" />Full guide</Button>}>
-      <ol className="mb-4 flex flex-wrap gap-2">
+      <div className="space-y-6">
+      <ol className="flex flex-wrap gap-2">
         {steps.map((s, i) => (
           <li key={s.label} className={clsx('flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs', s.done ? 'border-good/40 text-good-ink' : 'border-line text-ink-3')}>
             <span className={clsx('flex size-4 items-center justify-center rounded-full font-mono text-label font-semibold', s.done ? 'bg-good text-on-solid' : 'bg-surface-3')}>{s.done ? <Check className="size-2.5" /> : i + 1}</span>{s.label}
@@ -105,21 +110,21 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
             action={<Button size="sm" onClick={() => status.refetch()} loading={status.isFetching}><RefreshCw className="size-3.5" />Check again</Button>}>
             1. Install it from the Ollama website (an external, third-party site). 2. Open the Ollama app; it then runs in the background. This page notices within a few seconds.
           </Notice>
-          <a href={OLLAMA_URL} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1.5 text-sm font-medium text-accent-ink underline">
+          <TextLink href={OLLAMA_URL} {...EXTERNAL} className="gap-1.5">
             ollama.com/download <ExternalLink className="size-3.5" /><span className="text-xs font-normal text-ink-3">(opens an external site)</span>
-          </a>
+          </TextLink>
         </div>
       ) : (
-        <p className="mb-3 text-xs text-good-ink">Ollama <span className="font-mono">{st.version}</span> is running at <span className="font-mono">{st.base_url}</span>.</p>
+        <p className="text-xs text-good-ink">Ollama <span className="font-mono">{st.version}</span> is running at <span className="font-mono">{st.base_url}</span>.</p>
       )}
 
       {a && (
-        <div className="mt-4">
-          <div className="mb-1.5 flex items-center gap-1.5 text-sm text-ink-2">
+        <div className="space-y-2">
+          <div className="flex items-center gap-1.5 text-sm text-ink-2">
             <span><span className="font-medium text-ink">Which model fits this PC:</span> <span className="font-mono">{a.memory.free_gb ?? '?'}</span> GB of <span className="font-mono">{a.memory.total_gb ?? '?'}</span> GB memory free, {a.gpu ? `graphics: ${a.gpu}` : 'no graphics card found (models run on the processor, slowly)'}.</span>
             {rec && <Help title="Time against cost"><p>Grading 100 answers on 2 meaning checks is 200 calls. With {rec.model} here: about {Math.round((200 * rec.seconds_per_check) / 60)} min, free. With a cloud model: about {Math.max(1, Math.round((200 * 2.5) / 4 / 60))} min at 4 in parallel, paid per call (see a cloud model's Check for its cost per 100 calls).</p><p>Greyed rows need more free memory than this PC has now.</p></Help>}
           </div>
-          <Table>
+          <ScrollTable className="[&_table]:min-w-[640px]">
             <thead><tr className="whitespace-nowrap"><th className="t-label">Model</th><th className="t-label text-right">Download</th><th className="t-label text-right">Needs memory</th><th className="t-label text-right">Per call here</th><th /></tr></thead>
             <tbody>
               {a.suggestions.map((s) => (
@@ -133,18 +138,18 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
                   <td className="num whitespace-nowrap text-right font-mono">~{s.seconds_per_check} s</td>
                   <td className="text-right">
                     {installed.has(s.model) ? (connected.has(s.model) ? <Badge tone="good"><Check className="size-3" />connected</Badge>
-                      : <Button size="sm" variant="primary" loading={connect.isPending && connect.variables === s.model} onClick={() => connect.mutate(s.model)}>Use for grading</Button>)
+                      : <Button size="sm" loading={connect.isPending && connect.variables === s.model} onClick={() => connect.mutate(s.model)}>Use for grading</Button>)
                       : <Button size="sm" disabled={!st?.running || !acked || downloading} title={!acked ? 'Accept the third-party notice below first' : undefined} loading={startPull.isPending && startPull.variables === s.model} onClick={() => startPull.mutate(s.model)}><Download className="size-3.5" />Download</Button>}
                   </td>
                 </tr>
               ))}
             </tbody>
-          </Table>
+          </ScrollTable>
         </div>
       )}
 
       {a && (st?.models ?? []).some((m) => !a.suggestions.some((s) => s.model === m.name)) && (
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
           <span className="text-ink-3">Also installed:</span>
           {(st?.models ?? []).filter((m) => !a.suggestions.some((s) => s.model === m.name)).map((m) => (
             <span key={m.name} className="inline-flex items-center gap-1">
@@ -157,34 +162,35 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
       )}
 
       {downloading && progress.data && (
-        <div className="mt-3">
+        <div>
           <div className="mb-1 flex justify-between text-xs text-ink-2"><span>Downloading <code>{pulling}</code>: {progress.data.status}</span>
             <span className="num font-mono">{progress.data.total ? `${(progress.data.completed / 1e9).toFixed(1)} / ${(progress.data.total / 1e9).toFixed(1)} GB` : ''}</span></div>
           <ProgressBar value={progress.data.total ? progress.data.completed / progress.data.total : 0} />
         </div>
       )}
-      {progress.data?.error && <div className="mt-3"><Notice tone="bad" title={progress.data.status === 'lost' ? 'The download stopped' : 'The download failed'}>{progress.data.error}</Notice></div>}
-      {progress.isError && <div className="mt-3"><ErrorState error={progress.error} /></div>}
-      {connect.data?.checkError && <div className="mt-3"><Notice tone="warn" title="Connected, but the check failed">{connect.data.checkError}</Notice></div>}
-      {ack.isError && <div className="mt-3"><ErrorState error={ack.error} /></div>}
-      {startPull.isError && <div className="mt-3"><ErrorState error={startPull.error} /></div>}
-      {connect.isError && <div className="mt-3"><ErrorState error={connect.error} /></div>}
+      {progress.data?.error && <div><Notice tone="bad" title={progress.data.status === 'lost' ? 'The download stopped' : 'The download failed'}>{progress.data.error}</Notice></div>}
+      {progress.isError && <div><ErrorState error={progress.error} /></div>}
+      {connect.data?.checkError && <div><Notice tone="warn" title="Connected, but the check failed">{connect.data.checkError}</Notice></div>}
+      {ack.isError && <div><ErrorState error={ack.error} /></div>}
+      {startPull.isError && <div><ErrorState error={startPull.error} /></div>}
+      {connect.isError && <div><ErrorState error={connect.error} /></div>}
 
       {st?.running && !acked && (
-        <div className="mt-4 rounded-xl border border-warn/40 bg-warn-wash/40 p-3">
+        <Panel className="bg-surface-2">
           <div className="mb-2 text-sm font-semibold">Before the first download</div>
           <ThirdPartyNotice />
-          <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[var(--accent)]" checked={ticked} onChange={(e) => setTicked(e.target.checked)} />I have read this notice and accept it</label>
-          <Button className="mt-2" size="sm" variant="primary" disabled={!ticked} loading={ack.isPending} onClick={() => ack.mutate()}>Continue to downloads</Button>
-        </div>
+          <Checkbox className="mt-3" checked={ticked} onChange={setTicked} label="I have read this notice and accept it" />
+          <Button className="mt-3" size="sm" variant="primary" disabled={!ticked} loading={ack.isPending} onClick={() => ack.mutate()}>Continue to downloads</Button>
+        </Panel>
       )}
-      {acked && <p className="mt-3 text-xs text-ink-2">Third-party notice accepted {new Date(settings.data!.values.ollama_notice_ack!).toLocaleDateString()}. <button type="button" className="underline" onClick={() => setGuide(true)}>Read it again</button></p>}
+      {acked && <p className="text-xs text-ink-2">Third-party notice accepted {fmtDay(settings.data!.values.ollama_notice_ack)}. <TextLink size="sm" onClick={() => setGuide(true)}>Read it again</TextLink></p>}
 
       {connected.size > 0 && (
-        <div className="mt-4"><Notice title="Calibrate before you trust it" action={<Link to="/calibration" className="text-sm font-medium text-accent-ink underline">Calibration</Link>}>
+        <Notice title="Calibrate before you trust it" action={<TextLink to="/calibration">Calibration</TextLink>}>
           A new grading model is unvalidated. Label about 30 answers yourself and Assay measures how often it agrees with you; small local models disagree more often than large cloud ones.
-        </Notice></div>
+        </Notice>
       )}
+      </div>
 
       <Dialog open={guide} onClose={() => setGuide(false)} title="Local grading models: the full guide" width={680}>
         <LocalGuide />
@@ -228,7 +234,7 @@ function LocalGuide() {
           <li><b className="font-semibold">Answers marked "not evaluated"</b>: the model replied without valid JSON or timed out. Run its Check; small models fail the JSON test more often.</li>
         </ul>
       </section>
-      <section className="rounded-xl border border-warn/40 bg-warn-wash/40 p-3">
+      <section className="rounded-xl border border-line bg-surface-2 p-3">
         <h3 className="mb-1 font-semibold text-ink">Third-party notice</h3>
         <ThirdPartyNotice />
       </section>

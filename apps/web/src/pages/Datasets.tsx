@@ -1,12 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { Archive, ArchiveRestore, Download, Hammer, Lock, Plus, Sparkles, Trash2 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { DatasetAdd } from '../components/DatasetAdd'
 import { AddVariations, BuildPanel, ProvenanceBadge, TermChips } from '../components/Golden'
 import { CaseMatrixView, MatrixLegend } from '../components/viz'
-import { Badge, Button, Card, Code, Empty, ErrorState, Field, Input, Json, Loading, Notice, PageHeader, Segmented, Select, StatusBadge, Table, Tabs, Textarea, Help, linkButton, useLongWork } from '../components/ui'
+import { Badge, Button, Card, Code, Empty, ErrorState, Field, Input, Json, Loading, Notice, PageHeader, Segmented, Select, StatusBadge, Textarea, linkButton, useLongWork } from '../components/ui'
+import { Checkbox, FileInput, TextLink } from '../components/form'
+import { ScrollTable, ScrollTabs } from '../components/Layout'
 import { LabelHelp } from '../components/LabelHelp'
 import { api } from '../lib/api'
 import { useCrumbs } from '../lib/crumbs'
@@ -48,7 +50,8 @@ export function DatasetsPage() {
         <p>Versioned golden datasets: test cases with the outcomes a person expects. A version used by a run is frozen for good; editing it makes a new version.</p>
         <p><span className="font-semibold">Who decides what is correct? You do.</span> Assay cannot infer ground truth: every expected outcome in a dataset was written, imported or approved by a person. AI-generated cases stay in a review queue until someone approves them.</p>
       </>} />
-      <div className="mb-10 grid gap-10 lg:grid-cols-[minmax(0,1fr)_400px]">
+      <div className="space-y-12">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-10">
         <WaysToBuild />
         <Card title="Add questions" boxed help={<p>Type or paste questions, or upload a file, into a new or existing dataset. You add the expected answers afterwards, or approve good answers on the Build tab.</p>}>
           <DatasetAdd key={fromProject} defaultProjectId={fromProject} />
@@ -59,28 +62,37 @@ export function DatasetsPage() {
       ) : (
         <Card padded={false} title="Your datasets" meta={`${shown.length}`} help={<p>Each dataset belongs to one chatbot; change it here. A set that runs have used can only be archived (its questions stay with those runs); an unused one can be deleted.</p>}
           actions={archivedCount > 0 && <Button size="sm" variant="ghost" onClick={() => setShowArchived((v) => !v)}>{showArchived ? 'Hide' : 'Show'} {archivedCount} archived</Button>}>
-          <Table>
+          <ScrollTable className="[&_table]:min-w-[760px]">
             <thead><tr className="whitespace-nowrap"><th className="t-label">Dataset</th><th className="t-label">Chatbot</th><th className="t-label">Latest version</th><th className="t-label text-right">Cases</th><th className="t-label">Review queue</th><th className="w-40" /></tr></thead>
             <tbody>
               {shown.map((d) => <DatasetRow key={d.id} d={d} projects={projects.all} />)}
             </tbody>
-          </Table>
+          </ScrollTable>
         </Card>
       )}
+      </div>
     </>
   )
 }
 
 /** Where golden questions can come from, each one click away. */
 function WaysToBuild() {
+  const ways: [string, ReactNode][] = [
+    ['Approve good answers', <>Open a dataset → <i>Build</i>: mark a bot's answers right or wrong; Assay suggests what a correct answer must mention.</>],
+    ['Prompt kit', <>Copy a ready prompt into your own ChatGPT or Claude with your documents; the result lands in the review queue.</>],
+    ['Real questions', <>Upload chat history; similar questions are grouped by how often they were asked.</>],
+    ['Colleagues', <>Send the <TextLink href="/api/datasets/template.csv" className="underline">spreadsheet template</TextLink> or use expert interview mode.</>],
+  ]
   return (
-    <Card title="Ways to build a set" help={<p>The machine does the typing; you vouch for every case. Each way ends in the same place: cases a person has approved.</p>}>
-      <ul className="grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
-        <li><span className="font-semibold text-ink">Approve good answers</span><span className="mt-0.5 block text-sm text-ink-2">Open a dataset → <i>Build</i>: mark a bot's answers right or wrong; Assay suggests what a correct answer must mention.</span></li>
-        <li><span className="font-semibold text-ink">Prompt kit</span><span className="mt-0.5 block text-sm text-ink-2">Copy a ready prompt into your own ChatGPT or Claude with your documents; the result lands in the review queue.</span></li>
-        <li><span className="font-semibold text-ink">Real questions</span><span className="mt-0.5 block text-sm text-ink-2">Upload chat history; similar questions are grouped by how often they were asked.</span></li>
-        <li><span className="font-semibold text-ink">Colleagues</span><span className="mt-0.5 block text-sm text-ink-2">Send the <a className="text-accent-ink underline" href="/api/datasets/template.csv">spreadsheet template</a> or use expert interview mode.</span></li>
-      </ul>
+    <Card title="Ways to build a set" boxed className="flex flex-col" help={<p>The machine does the typing; you vouch for every case. Each way ends in the same place: cases a person has approved.</p>}>
+      <dl className="divide-y divide-line text-sm">
+        {ways.map(([k, v]) => (
+          <div key={k} className="grid gap-x-4 gap-y-0.5 py-2.5 first:pt-0 last:pb-0 sm:grid-cols-[9.5rem_minmax(0,1fr)]">
+            <dt className="font-medium text-ink">{k}</dt>
+            <dd className="text-ink-2">{v}</dd>
+          </div>
+        ))}
+      </dl>
     </Card>
   )
 }
@@ -101,7 +113,7 @@ function DatasetRow({ d, projects }: { d: Dataset; projects: Project[] }) {
           <div className="max-w-md truncate text-xs text-ink-2">{d.description || d.latest?.change_summary}</div>
         </td>
         <td>
-          <Select className="w-64" value={d.project_id} aria-label={`Chatbot of ${d.name}`} onChange={(e) => patch.mutate({ project_id: Number(e.target.value) })}>
+          <Select className="w-52" value={d.project_id} aria-label={`Chatbot of ${d.name}`} onChange={(e) => patch.mutate({ project_id: Number(e.target.value) })}>
             {projects.map((p) => <option key={p.id} value={p.id}>{projectOption(p)}</option>)}
           </Select>
         </td>
@@ -119,7 +131,7 @@ function DatasetRow({ d, projects }: { d: Dataset; projects: Project[] }) {
           {confirm && (
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <span>Delete <span className="font-semibold">{d.name}</span> and its <span className="font-mono">{d.latest?.case_count ?? 0}</span> {(d.latest?.case_count ?? 0) === 1 ? 'question' : 'questions'}? No run used it. This cannot be undone.</span>
-              <Button size="sm" variant="bad" loading={del.isPending} onClick={() => del.mutate()}>Delete</Button>
+              <Button size="sm" variant="danger" loading={del.isPending} onClick={() => del.mutate()}>Delete</Button>
               <Button size="sm" variant="ghost" onClick={() => setConfirm(false)}>Cancel</Button>
             </div>
           )}
@@ -175,8 +187,8 @@ export function DatasetPage() {
           </>
         }
       />
-      {notice && <div className="mb-4"><Notice tone="warn" title="New version created">{notice}</Notice></div>}
-      <Tabs
+      {notice && <div className="mb-6"><Notice tone="warn" title="New version created">{notice}</Notice></div>}
+      <ScrollTabs
         tabs={[
           { id: 'cases', label: `Cases${version.data ? ` (${version.data.case_count})` : ''}` },
           { id: 'build', label: <span className="inline-flex items-center gap-1.5"><Hammer className="size-3.5" /> Build</span> },
@@ -203,7 +215,7 @@ export function DatasetPage() {
         {tab === 'generate' && versionId && <GeneratePanel datasetId={d.id} versionId={versionId} onPromoted={(r) => { if (r.branched) setNotice(r.notice ?? null); switchTo(r.id); setTab('cases') }} />}
         {tab === 'versions' && (
           <Card padded={false} title="Versions" meta={`${d.versions.length}`} help={<p>Every saved version of this dataset, newest first. Click one to open its cases. The hash identifies the exact content a run used.</p>}>
-            <Table>
+            <ScrollTable className="[&_table]:min-w-[760px]">
               <thead><tr className="whitespace-nowrap"><th className="t-label">Version</th><th className="t-label">Status</th><th className="t-label text-right">Cases</th><th className="t-label">Parent</th><th className="t-label">Change summary</th><th className="t-label">Hash</th><th className="t-label">Created</th></tr></thead>
               <tbody>
                 {[...d.versions].reverse().map((v) => (
@@ -218,7 +230,7 @@ export function DatasetPage() {
                   </tr>
                 ))}
               </tbody>
-            </Table>
+            </ScrollTable>
           </Card>
         )}
       </div>
@@ -286,7 +298,7 @@ function CasesPanel({ version, onEdited, matrix, focus }: { version: DatasetVers
   )
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {version.status === 'frozen' && (
         <Notice tone="info" title="This version is frozen">A run used it, so it stays exactly as it was. Editing a case saves your change to a new draft version.</Notice>
       )}
@@ -301,13 +313,13 @@ function CasesPanel({ version, onEdited, matrix, focus }: { version: DatasetVers
           {categories.map((c) => <option key={c}>{c}</option>)}
         </Select>
         <span className="text-xs text-ink-2"><span className="font-mono">{shown.length}</span> of <span className="font-mono">{cases.length}</span></span>
-        <Button className="ml-auto" variant="primary" onClick={() => setEditing('new')}><Plus className="size-3.5" /> Add case</Button>
+        <Button className="ml-auto" variant={editing ? 'secondary' : 'primary'} onClick={() => setEditing('new')}><Plus className="size-3.5" /> Add case</Button>
       </div>
       {cases.length === 0 ? (
         <Empty title="No cases in this version. An empty exam is easy to pass.">Add one manually, import a file, or generate candidates from your documents (they will need your review).</Empty>
       ) : (
         <Card padded={false}>
-          <Table>
+          <ScrollTable className="[&_table]:min-w-[760px]">
             <thead><tr className="whitespace-nowrap"><th className="t-label">Id</th><th className="t-label">Question</th><th className="t-label">Category</th><th className="t-label">What a right answer needs</th><th className="t-label">Recent runs</th><th></th></tr></thead>
             <tbody>
               {shown.map((c) => (
@@ -321,7 +333,7 @@ function CasesPanel({ version, onEdited, matrix, focus }: { version: DatasetVers
                 </tr>
               ))}
             </tbody>
-          </Table>
+          </ScrollTable>
         </Card>
       )}
     </div>
@@ -405,12 +417,12 @@ export function CaseEditor({ versionId, initial, onClose, onSaved }: {
               <option value="">Not specified</option><option value="false">No - it should answer</option><option value="true">Yes - it should decline</option>
             </Select>
           </Field>
-          <button className="text-xs font-medium text-accent-ink hover:underline" onClick={() => setAdvanced((v) => !v)}>
+          <TextLink size="sm" onClick={() => setAdvanced((v) => !v)}>
             {advanced ? 'Hide advanced' : 'Advanced: relevant documents, tools and arguments, outcome, schema, evaluator config'}
-          </button>
+          </TextLink>
           {advanced && (
             <Field label={<LabelHelp label="Advanced (JSON)" title="Fields of expected"><p>relevant_documents, required_tools, tool_calls [{'{'}name, arguments, symmetric{'}'}], forbidden_tools, tool_policy, expected_outcome, max_extra_tool_calls, required_citations, min_citations, answer.regex, answer.json_schema...</p></LabelHelp>} error={jsonError ?? undefined}>
-              <Textarea rows={14} value={advancedText} onChange={(e) => { setAdvancedText(e.target.value); setJsonError(null) }} spellCheck={false} />
+              <Textarea mono rows={14} value={advancedText} onChange={(e) => { setAdvancedText(e.target.value); setJsonError(null) }} spellCheck={false} />
             </Field>
           )}
         </div>
@@ -463,22 +475,20 @@ function GeneratePanel({ datasetId, versionId, onPromoted }: { datasetId: number
   const promote = useMutation({ mutationFn: () => api.post<EditResult>(`/api/dataset-versions/${versionId}/approve-candidates`, {}), onSuccess: (r) => { refresh(); onPromoted(r) } })
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <Notice tone="warn" title="Generated cases are candidates, not ground truth">
         A model drafts questions and answers from your documents. Each one stays <span className="font-semibold">unreviewed</span> until a person approves,
         edits or rejects it; only approved cases can be added to a dataset version. Check the evidence quote: Assay flags quotes it cannot find in the document.
       </Notice>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <Card boxed title="1. Reference documents" help={<p>Upload Markdown, TXT, JSON or PDF, then tick the documents to draft questions from.</p>}>
-          <input type="file" accept=".md,.txt,.json,.pdf" onChange={(e) => e.target.files?.[0] && upload.mutate(e.target.files[0])} className="block text-xs file:mr-3 file:rounded-md file:border file:border-line-strong file:bg-surface file:px-2.5 file:py-1 file:text-xs" aria-label="Upload document" />
+          <FileInput accept=".md,.txt,.json,.pdf" label="Upload document" aria-label="Upload document" onFiles={(f) => upload.mutate(f[0])} />
           {upload.isError && <div className="mt-2"><ErrorState error={upload.error} /></div>}
           <ul className="mt-3 max-h-48 space-y-1 overflow-y-auto text-sm">
             {(docs.data ?? []).map((d) => (
               <li key={d.id}>
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" checked={selected.includes(d.id)} onChange={(e) => setSelected((s) => (e.target.checked ? [...s, d.id] : s.filter((x) => x !== d.id)))} />
-                  <span className="font-mono text-xs">{d.filename}</span><span className="text-xs text-ink-3"><span className="font-mono">{d.chars}</span> chars</span>
-                </label>
+                <Checkbox checked={selected.includes(d.id)} onChange={(on) => setSelected((s) => (on ? [...s, d.id] : s.filter((x) => x !== d.id)))}
+                  label={<><span className="font-mono text-xs">{d.filename}</span> <span className="text-xs text-ink-3"><span className="font-mono">{d.chars}</span> chars</span></>} />
               </li>
             ))}
             {docs.data?.length === 0 && <li className="text-ink-2">No documents uploaded yet (Markdown, TXT, JSON or PDF).</li>}
@@ -510,7 +520,7 @@ function GeneratePanel({ datasetId, versionId, onPromoted }: { datasetId: number
             <Select className="h-7 w-36 text-xs" value={status} onChange={(e) => setStatus(e.target.value as typeof status)} aria-label="Filter by status">
               <option value="unreviewed">Unreviewed</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="">All</option>
             </Select>
-            <Button size="sm" variant="primary" loading={promote.isPending} onClick={() => promote.mutate()}>Add approved to dataset</Button>
+            <Button size="sm" loading={promote.isPending} onClick={() => promote.mutate()}>Add approved to dataset</Button>
           </>
         }
       >
@@ -541,14 +551,14 @@ function GeneratePanel({ datasetId, versionId, onPromoted }: { datasetId: number
                 ))}
                 {editingId === c.id ? (
                   <div className="mt-2 space-y-2">
-                    <Textarea rows={12} value={editText} onChange={(e) => setEditText(e.target.value)} spellCheck={false} />
+                    <Textarea mono rows={12} value={editText} onChange={(e) => setEditText(e.target.value)} spellCheck={false} />
                     {edit.isError && <ErrorState error={edit.error} />}
-                    <div className="flex gap-2"><Button size="sm" variant="primary" loading={edit.isPending} onClick={() => edit.mutate(c.id)}>Save edit</Button><Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>Cancel</Button></div>
+                    <div className="flex gap-2"><Button size="sm" loading={edit.isPending} onClick={() => edit.mutate(c.id)}>Save edit</Button><Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>Cancel</Button></div>
                   </div>
                 ) : !c.approved_in_version_id && (
                   <div className="mt-3 flex gap-2">
-                    <Button size="sm" variant="primary" disabled={!reviewer || review.isPending} loading={review.isPending && review.variables?.id === c.id && review.variables.action === 'approve'} onClick={() => review.mutate({ id: c.id, action: 'approve' })}>Approve</Button>
-                    <Button size="sm" disabled={!reviewer} onClick={() => { setEditingId(c.id); setEditText(JSON.stringify(c.case, null, 2)) }}>Edit</Button>
+                    <Button size="sm" disabled={!reviewer || review.isPending} loading={review.isPending && review.variables?.id === c.id && review.variables.action === 'approve'} onClick={() => review.mutate({ id: c.id, action: 'approve' })}>Approve</Button>
+                    <Button size="sm" variant="ghost" disabled={!reviewer} onClick={() => { setEditingId(c.id); setEditText(JSON.stringify(c.case, null, 2)) }}>Edit</Button>
                     <Button size="sm" variant="danger" disabled={!reviewer || review.isPending} loading={review.isPending && review.variables?.id === c.id && review.variables.action === 'reject'} onClick={() => review.mutate({ id: c.id, action: 'reject' })}>Reject</Button>
                     {c.status !== 'unreviewed' && <Button size="sm" variant="ghost" onClick={() => review.mutate({ id: c.id, action: 'reset' })}>Undo</Button>}
                   </div>
@@ -576,7 +586,7 @@ function PlainMatchers({ onAdd }: { onAdd: (pattern: string) => void }) {
   }
   return (
     <div className="rounded-lg border border-line p-2">
-      <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-ink-2">Or a rule in plain words<Help title="Rules in plain words"><p>Assay writes the pattern (shown below the rule) so "91" does not match "910", and capitals do not matter.</p></Help></div>
+      <div className="mb-1 text-xs font-medium text-ink-2"><LabelHelp label="Or a rule in plain words" title="Rules in plain words"><p>Assay writes the pattern (shown below the rule) so "91" does not match "910", and capitals do not matter.</p></LabelHelp></div>
       <div className="flex flex-wrap gap-2">
         <Select className="w-48" value={kind} onChange={(e) => setKind(e.target.value as typeof kind)} aria-label="Rule kind">
           <option value="any">contains any of</option><option value="word">contains the whole word</option><option value="number">contains the exact number</option>

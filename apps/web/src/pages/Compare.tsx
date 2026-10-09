@@ -1,24 +1,25 @@
 import { useQuery } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { ArrowDownRight, ArrowLeftRight, ArrowUpRight, Minus } from 'lucide-react'
+import { ArrowLeftRight } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { CompareCauses } from '../components/Causes'
 import { Bootstrap } from '../components/compare/Bootstrap'
 import { Changed, Dumbbell } from '../components/compare/Changed'
+import { PpDelta, RowDelta } from '../components/compare/delta'
 import { Hero } from '../components/compare/Hero'
 import { Power } from '../components/compare/Power'
 import { Replay } from '../components/compare/Replay'
 import { RunPicker } from '../components/compare/RunPicker'
 import { SampleSize } from '../components/instrument'
 import { ShareMenu } from '../components/Share'
-import { Badge, Card, Empty, ErrorState, Loading, Notice, PageSkeleton, Segmented, Table, Term } from '../components/ui'
+import { Badge, Card, Empty, ErrorState, Loading, Notice, PageSkeleton, Segmented, Skeleton, Table, Term } from '../components/ui'
 import { Confetti, DeltaList, ForestPlot } from '../components/viz'
 import { api } from '../lib/api'
-import { direction, fmtDelta, fmtValue, pairCases, reading } from '../lib/compare'
+import { fmtValue, pairCases, reading } from '../lib/compare'
 import { useCrumbs } from '../lib/crumbs'
 import { isCompleted } from '../lib/runstate'
-import { pct } from '../lib/format'
+import { NA, pct } from '../lib/format'
 import type { Comparison, ComparisonRow, EvaluatorInfo, RunHeader, TrialRow } from '../lib/types'
 
 export function MetricTable({ rows }: { rows: ComparisonRow[] }) {
@@ -29,20 +30,15 @@ export function MetricTable({ rows }: { rows: ComparisonRow[] }) {
       </thead>
       <tbody>
         {rows.map((r) => {
-          const d = direction(r)
           const read = reading(r)
-          const Icon = r.delta === null || r.delta === 0 ? Minus : r.delta > 0 ? ArrowUpRight : ArrowDownRight
           return (
             <tr key={r.metric} data-testid={`metric-${r.metric}`}>
               <td>{r.label}</td>
               <td className="num text-right font-mono">{fmtValue(r, r.baseline)}</td>
               <td className="num text-right font-mono">{fmtValue(r, r.candidate)}</td>
-              <td className={clsx('num text-right font-mono', d === 'better' && 'text-good-ink', d === 'worse' && 'text-bad-ink')}>
-                {/* Arrow = which way the number moved; colour = better or worse. */}
-                <span className="inline-flex items-center gap-1"><Icon className="size-3.5" aria-label={r.delta === null ? 'n/a' : r.delta > 0 ? 'up' : r.delta < 0 ? 'down' : 'same'} />{fmtDelta(r)}</span>
-              </td>
+              <td className="num whitespace-nowrap text-right"><RowDelta row={r} /></td>
               <td className="num whitespace-nowrap text-right font-mono text-xs text-ink-2">
-                {r.ci && r.ci.ci_low !== null ? `${(r.ci.ci_low * 100).toFixed(1)} to ${(r.ci.ci_high! * 100).toFixed(1)}pp (n=${r.ci.n})` : '-'}
+                {r.ci && r.ci.ci_low !== null ? `${(r.ci.ci_low * 100).toFixed(1)} to ${(r.ci.ci_high! * 100).toFixed(1)} pp (n=${r.ci.n})` : NA}
               </td>
               <td><Badge tone={read.tone}>{read.text}</Badge></td>
             </tr>
@@ -80,22 +76,22 @@ export function ComparePage() {
   if (runs.isLoading) return <PageSkeleton />
   if (runs.isError) return <ErrorState error={runs.error} retry={() => runs.refetch()} />
   return (
-    <>
-      <div className="flex flex-wrap items-center gap-3 max-md:flex-col max-md:items-stretch" data-testid="run-pickers">
+    <div className="space-y-12">
+      <div className="grid items-center gap-x-3 gap-y-1 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]" data-testid="run-pickers">
         <RunPicker runs={done} value={baseline} onChange={(v) => set('baseline', v)} side="baseline" />
         <button type="button" title="Swap baseline and candidate" aria-label="Swap baseline and candidate" onClick={() => baseline && candidate && setParams({ baseline: String(candidate), candidate: String(baseline) })}
-          className="flex size-8 shrink-0 items-center justify-center self-center rounded-lg text-ink-3 hover:bg-surface-2 hover:text-ink"><ArrowLeftRight className="size-4" /></button>
+          className="flex size-8 shrink-0 items-center justify-center justify-self-center rounded-lg text-ink-3 transition-colors duration-(--dur-fast) hover:bg-surface-2 hover:text-ink max-md:h-6"><ArrowLeftRight className="size-4 max-md:rotate-90" /></button>
         <RunPicker runs={done} value={candidate} onChange={(v) => set('candidate', v)} side="candidate" />
       </div>
       {done.length < 2 ? (
-        <div className="mt-8"><Empty title="Two finished runs are needed to compare">Run a baseline and a candidate on the same questions (<code className="font-mono">assay seed --run</code> does this for the Acme demo), then pick them above.</Empty></div>
+        <Empty title="Two finished runs are needed to compare">Run a baseline and a candidate on the same questions (<code className="font-mono">assay seed --run</code> does this for the Acme demo), then pick them above.</Empty>
       ) : !baseline || !candidate ? (
-        <div className="mt-8"><Empty title="Pick a baseline and a candidate">Choose two runs above; the same questions are paired between them.</Empty></div>
-      ) : baseline === candidate ? <div className="mt-6"><Notice tone="warn" title="Pick two different runs" /></div>
-        : cmp.isLoading ? <div className="mt-8"><Loading label="Comparing" rows={8} /></div>
-          : cmp.isError ? <div className="mt-6"><ErrorState error={cmp.error} /></div>
+        <Empty title="Pick a baseline and a candidate">Choose two runs above; the same questions are paired between them.</Empty>
+      ) : baseline === candidate ? <Notice tone="warn" title="Pick two different runs" />
+        : cmp.isLoading ? <Loading label="Comparing" rows={8} />
+          : cmp.isError ? <ErrorState error={cmp.error} />
             : cmp.data && <CompareView key={`${baseline}-${candidate}`} c={cmp.data} />}
-    </>
+    </div>
   )
 }
 
@@ -141,7 +137,7 @@ function CompareView({ c }: { c: Comparison }) {
       <Hero c={c} actions={<ShareMenu runId={c.candidate_run.id} baselineId={c.baseline_run.id} />} />
 
       {((issues.data?.issues.length ?? 0) > 0 || loadDiffers || offTopic.length > 0 || onlyOne > 0) && (
-        <div className="-mt-4 space-y-2">
+        <div className="space-y-2">
           {offTopic.map((r) => (
             <Notice key={r.id} tone="warn" title={<>Run <span className="font-mono">#{r.id}</span> asked {r.off_topic}'s questions</>}>
               Its questions were written for another chatbot, so its pass rate says little about this one. Compare runs that asked this chatbot's own questions.
@@ -166,12 +162,12 @@ function CompareView({ c }: { c: Comparison }) {
         </div>
       )}
 
-      {sides.isError ? <ErrorState error={sides.error} /> : !sides.data ? <div className="skeleton h-28" /> : (
+      {sides.isError ? <ErrorState error={sides.error} /> : !sides.data ? <Skeleton size="chart" /> : (
         <Replay cases={cases} baseId={c.baseline_run.id} candId={c.candidate_run.id} />
       )}
 
       <div className="grid gap-x-10 gap-y-12 xl:grid-cols-2">
-        {sides.data ? <Changed cases={cases} c={c} baseTrials={sides.data[0]} candTrials={sides.data[1]} /> : <div className="skeleton h-60" />}
+        {sides.data ? <Changed cases={cases} c={c} baseTrials={sides.data[0]} candTrials={sides.data[1]} /> : <Skeleton size="block" />}
         <Card title="Every metric" meta={<SampleSize n={c.n_shared_cases} unit="paired" />}
           help={<>
             <p>The change in each check, with its 95% interval from resampling questions. A line clear of the zero mark is a real change; one crossing zero could be noise.</p>
@@ -200,14 +196,12 @@ function CompareView({ c }: { c: Comparison }) {
         <Card title="Pass rate by category" help={<><p>Each category's pass rate in both runs: the blue dot is #{c.baseline_run.id}, the orange dot #{c.candidate_run.id}.</p><p>Small categories move a lot from one question: read the question count before the change.</p></>}>
           <ul className="divide-y divide-line">
             {c.by_category.map((r) => (
-              <li key={r.category} className="flex items-center gap-3 py-2">
-                <span className="min-w-0 flex-1 truncate text-sm">{r.category.replace(/_/g, ' ')}</span>
+              <li key={r.category} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
+                <span className="min-w-0 flex-1 truncate text-sm max-sm:basis-full">{r.category.replace(/_/g, ' ')}</span>
                 <SampleSize n={r.n} min={10} />
                 <span className="num w-24 text-right font-mono text-xs text-ink-3">{pct(r.baseline, 0)} → {pct(r.candidate, 0)}</span>
                 <span className="max-sm:hidden"><Dumbbell a={r.baseline} b={r.candidate} /></span>
-                <span className={clsx('num w-16 text-right font-mono text-sm', (r.delta ?? 0) > 0 && 'text-good-ink', (r.delta ?? 0) < 0 && 'text-bad-ink', !r.delta && 'text-ink-3')}>
-                  {r.delta === null ? 'n/a' : `${r.delta > 0 ? '+' : r.delta < 0 ? '−' : ''}${Math.abs(r.delta * 100).toFixed(1)}pp`}
-                </span>
+                <span className="num w-24 text-right text-sm"><PpDelta value={r.delta} /></span>
               </li>
             ))}
           </ul>

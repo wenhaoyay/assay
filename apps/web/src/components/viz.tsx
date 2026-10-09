@@ -5,13 +5,16 @@ import { ArrowDown, ArrowUp, Minus } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { direction, fmtDelta, fmtValue, reading } from '../lib/compare'
-import { FAILURE_LABELS, pct } from '../lib/format'
+import { direction, fmtDelta as rawDelta, fmtValue, reading } from '../lib/compare'
+import { FAILURE_LABELS, pct, pp } from '../lib/format'
+
+/** A comparison row's change: rates as spaced percentage points (+23.6 pp, −2.0 pp), the rest as compare.ts words it. */
+const fmtDelta = (r: ComparisonRow) => (r.unit === 'rate' && r.delta !== null ? pp(r.delta) : rawDelta(r))
 import { useMotionOn } from '../lib/prefs'
 import type { CaseMatrix, ComparisonRow, Stage } from '../lib/types'
 import { useWidth } from './compare/useWidth'
 import { Needle } from './instrument'
-import { Term } from './ui'
+import { Badge, STATE_DOT, Term } from './ui'
 
 const spring = { type: 'spring' as const, stiffness: 140, damping: 22 }
 
@@ -92,9 +95,9 @@ export function ForestPlot({ rows, isHeuristic, onPick }: { rows: ComparisonRow[
           const tr = motionOn ? { duration: 0.7, delay: 0.2 + 0.07 * i, ease: [0.16, 1, 0.3, 1] as const } : { duration: 0 }
           return (
             <button key={r.metric} type="button" onClick={() => onPick?.(r)} title={`${r.label}: ${fmtDelta(r)}, ${read.text}`}
-              className={clsx('grid w-full grid-cols-[minmax(0,170px)_minmax(0,1fr)_96px] items-center gap-3 rounded-md text-left hover:bg-surface-2 max-md:grid-cols-[minmax(0,1fr)_96px]', heur && 'hatched')}
+              className={clsx('grid w-full grid-cols-[minmax(0,170px)_minmax(0,1fr)_96px] items-center gap-3 rounded-md text-left hover:bg-surface-2 max-md:grid-cols-[minmax(0,1fr)_96px]')}
               style={{ height: RH }} data-testid={`forest-${r.metric}`}>
-              <span className="truncate pl-1 text-sm text-ink">{r.label.replace(/ \(judge\)$/, '')}</span>
+              <span className="flex min-w-0 items-center gap-1.5 pl-1 text-sm text-ink"><span className="truncate">{r.label.replace(/ \(judge\)$/, '')}</span>{heur && <Badge tone="heuristic">heuristic</Badge>}</span>
               <svg width={W} height={RH} className="max-md:hidden" role="img"
                 aria-label={`${r.label}: ${fmtDelta(r)}${lo !== null ? `, interval ${(lo * 100).toFixed(1)} to ${((hi ?? 0) * 100).toFixed(1)}` : ''}`}>
                 {ticks.map((t) => <line key={t} x1={x(t)} x2={x(t)} y1={0} y2={RH} stroke={t === 0 ? 'var(--ink-3)' : 'var(--line)'} strokeDasharray={t === 0 ? undefined : '2 3'} />)}
@@ -152,7 +155,7 @@ export function DeltaList({ rows, caution }: { rows: ComparisonRow[]; caution?: 
             <span className="num flex items-center justify-end gap-2 whitespace-nowrap text-right font-mono">
               <span className="text-xs text-ink-3">{fmtValue(r, r.baseline)} → {fmtValue(r, r.candidate)}</span>
               <span className={clsx('inline-flex items-center text-sm', d === 'better' && 'text-good-ink', d === 'worse' && 'text-bad-ink', d === 'same' && 'text-ink-3')}>
-                <Arrow className="size-3.5" aria-label={r.delta! > 0 ? 'up' : r.delta! < 0 ? 'down' : 'same'} />{fmtDelta(r).replace(/^[+-]/, '')}
+                <Arrow className="size-3.5" aria-label={r.delta! > 0 ? 'up' : r.delta! < 0 ? 'down' : 'same'} />{fmtDelta(r).replace(/^[+\-−]/, '')}
               </span>
             </span>
           </div>
@@ -225,7 +228,7 @@ export function Confetti({ fire }: { fire: boolean }) {
   return (
     <AnimatePresence>
       {on && (
-        <div className="pointer-events-none fixed inset-x-0 top-1/3 z-[95] flex justify-center" aria-hidden>
+        <div className="pointer-events-none fixed inset-x-0 top-1/3 z-(--z-stamp) flex justify-center" aria-hidden>
           {pieces.map((p) => (
             <motion.span key={p.id} className="absolute rounded-[2px]" style={{ background: p.c, width: p.w, height: p.w * 0.45 }}
               initial={{ x: 0, y: 0, rotate: 0, opacity: 1 }}
@@ -305,10 +308,10 @@ export function CaseMatrixView({ data, filter = 'all', focusCase }: { data: Case
         <tbody>
           {rows.map((c) => (
             <tr key={c.id} data-case={c.id} className={clsx(focusCase === c.id && 'bg-accent-wash')}>
-              <td className="sticky left-0 z-[5] max-w-[280px] border-b border-line bg-surface px-3 py-1">
+              <td className="sticky left-0 z-(--z-sticky) max-w-[280px] border-b border-line bg-surface px-3 py-1">
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-xs text-ink">{c.id}</span>
-                  {always.has(c.id) && <span className="rounded bg-bad-wash px-1 text-label text-bad-ink" title="Failed in every run: check the golden answer">always fails</span>}
+                  {always.has(c.id) && <Badge tone="fail" title="Failed in every run: check the golden answer">always fails</Badge>}
                 </div>
                 <div className="truncate text-xs text-ink-3">{c.title}</div>
               </td>
@@ -321,8 +324,7 @@ export function CaseMatrixView({ data, filter = 'all', focusCase }: { data: Case
                       className="inline-block">
                       <motion.span initial={motionOn ? { scale: 0.3, opacity: 0 } : false} animate={{ scale: 1, opacity: 1 }} transition={{ delay: Math.min(ri * 0.03, 0.4), duration: 0.18 }}
                         className={clsx('block size-4 rounded-full',
-                          state === 'pass' && 'bg-good', state === 'fail' && 'bg-bad', state === 'flaky' && 'bg-flaky',
-                          state === 'error' && 'bg-error', state === 'none' && 'border border-dashed border-untested',
+                          state === 'none' ? 'border border-dashed border-untested' : STATE_DOT[state],
                           r.judge === 'heuristic' && state !== 'none' && 'hatched-light')} />
                     </Link>
                   </td>

@@ -5,7 +5,7 @@ import clsx from 'clsx'
 import { AnimatePresence, motion } from 'motion/react'
 import { useState } from 'react'
 import type { TrialDetail } from '../../lib/types'
-import { Help } from '../ui'
+import { Badge, Empty, SectionHead } from '../ui'
 
 export type Source = NonNullable<NonNullable<TrialDetail['result']>['retrieved_documents']>[number]
 
@@ -43,15 +43,14 @@ export function Sources({ docs, relevant, cited, lit, onLight, shown = 1 }: {
   const fmtScore = (v: number) => (Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2))
   return (
     <section data-testid="sources">
-      <div className="t-label mb-2 flex items-center gap-2">
-        What the bot read{docs && <> · <span className="font-mono">{docs.length}</span> passage{docs.length === 1 ? '' : 's'}</>}
-        <Help title="What the bot read">
+      <SectionHead title="What the bot read" rule meta={docs ? `${docs.length} passage${docs.length === 1 ? '' : 's'}` : undefined}
+        help={<>
           <p>The passages search returned, best score first, with the score as a bar. Expected = a document the question needs; cited = the answer refers to it.</p>
           <p>A dashed red row is a needed document search never found. Hover a row to read its passage (click to keep it open); hover a citation in the answer to light the passage it came from.</p>
-        </Help>
-      </div>
-      {docs == null ? <p className="text-sm text-ink-3">The bot did not report what it read. Return the retrieved passages in its response to see them here.</p>
-        : docs.length === 0 ? <p className="text-sm text-ink-3">Search returned nothing.</p> : (
+        </>} />
+      <div className="pt-4" />
+      {docs == null ? <Empty title="The bot did not report what it read">Return the retrieved passages in its response to see them here.</Empty>
+        : docs.length === 0 ? <Empty title="Search returned nothing" /> : (
           <ol className="space-y-1">
             {docs.map((d, i) => {
               const on = lit === d.id || pinned === d.id
@@ -69,8 +68,8 @@ export function Sources({ docs, relevant, cited, lit, onLight, shown = 1 }: {
                       <span className="font-medium text-ink">{d.title ?? d.id}</span>{' '}
                       <span className="break-all font-mono text-xs text-ink-3">{d.id}{where ? ` · ${where}` : ''}{d.date ? ` · ${d.date}` : ''}</span>
                     </span>
-                    {expected.has(d.id) && <span className="rounded-full border border-good/40 bg-good-wash px-2 text-xs text-good-ink">expected</span>}
-                    {cited(d) && <span className="rounded-full border border-accent/40 bg-accent-wash px-2 text-xs text-accent-ink">cited</span>}
+                    {expected.has(d.id) && <Badge tone="pass">expected</Badge>}
+                    {cited(d) && <Badge tone="accent">cited</Badge>}
                   </div>
                   {d.score != null && (
                     <div className="mt-1.5 flex items-center gap-2 pl-6">

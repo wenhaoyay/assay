@@ -35,7 +35,7 @@ export function Power({ flipShare, n0 }: { flipShare: number; n0: number }) {
             {y.ticks(4).map((t) => (
               <g key={t}>
                 <line x1={M.l} x2={W - M.r} y1={y(t)} y2={y(t)} stroke="var(--line)" strokeDasharray="2 3" />
-                <text x={M.l - 6} y={y(t) + 4} textAnchor="end" className="c-num">{Math.round(t * 100)}pp</text>
+                <text x={M.l - 6} y={y(t) + 4} textAnchor="end" className="c-num">{Math.round(t * 100)} pp</text>
               </g>
             ))}
             <line x1={M.l} x2={W - M.r} y1={H - M.b} y2={H - M.b} stroke="var(--line-strong)" />
@@ -52,8 +52,8 @@ export function Power({ flipShare, n0 }: { flipShare: number; n0: number }) {
           <label htmlFor={id} className="t-label block">Questions in the set: <b className="font-mono font-medium text-ink">{n}</b></label>
           <input id={id} type="range" min={20} max={600} step={1} value={n} onChange={(e) => setN(+e.target.value)} className="w-full accent-[var(--accent)]" data-testid="power-slider" />
           <p className="t-readout" aria-live="polite" data-testid="power-readout">
-            With <span className="font-mono">{n}</span> questions you can trust changes of about <b className="font-mono font-medium text-accent-ink">{Math.round(mde(n) * 100)}pp</b> or more.{' '}
-            <span className="text-ink-2">Seeing a 5pp change takes about <span className="font-mono">{need5.toLocaleString()}</span>.</span>
+            With <span className="font-mono">{n}</span> questions you can trust changes of about <b className="font-mono font-medium text-accent-ink">{Math.round(mde(n) * 100)}&nbsp;pp</b> or more.{' '}
+            <span className="text-ink-2">Seeing a 5 pp change takes about <span className="font-mono">{need5.toLocaleString()}</span>.</span>
           </p>
         </div>
       </div>

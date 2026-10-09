@@ -2,7 +2,7 @@
 import clsx from 'clsx'
 import { useState } from 'react'
 import { pct } from '../../lib/format'
-import { rateColor, SampleSize } from '../instrument'
+import { RateLegend, rateColor, SampleSize } from '../instrument'
 import { Card } from '../ui'
 import { CaseChip, NothingPasses } from './bits'
 import { firstTries, plain, type XRow } from './data'
@@ -48,10 +48,10 @@ export function Heatmap({ rows }: { rows: XRow[] }) {
                     return (
                       <td key={dif} className="p-0">
                         <button type="button" onClick={() => setPick(on ? null : [cat, dif])} aria-pressed={on}
-                          className={clsx('h-12 w-full rounded-lg text-center transition-transform duration-150 hover:scale-105', on && 'ring-2 ring-ink')}
+                          className={clsx('h-12 w-full rounded-lg text-center transition-shadow duration-(--dur-fast) hover:ring-2 hover:ring-line-strong', on && 'ring-2 ring-ink')}
                           style={{ background: `color-mix(in srgb, ${rateColor(c.v)} 48%, var(--surface))` }}>
                           <div className="num font-mono text-sm font-medium text-ink">{pct(c.v, 0)}</div>
-                          <div className={clsx('num font-mono text-label', c.n < 8 ? 'text-warn-ink' : 'text-ink-2')}>n={c.n}</div>
+                          <SampleSize n={c.n} min={8} />
                         </button>
                       </td>
                     )
@@ -60,6 +60,7 @@ export function Heatmap({ rows }: { rows: XRow[] }) {
               ))}
             </tbody>
           </table>
+          <RateLegend none className="mt-3" />
           {picked && (
             <div className="mt-3 flex flex-wrap gap-1.5">
               {firstTries(picked.ts).map((r) => {
