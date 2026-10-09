@@ -13,6 +13,7 @@ from assay.providers.base import (
     ProviderSpec,
     resolve_key,
 )
+from assay.providers.locality import is_local_endpoint
 from assay.schemas import Usage
 
 
@@ -124,6 +125,12 @@ class ScriptedProvider(LLMProvider):
 
 
 def build_provider(spec: ProviderSpec) -> LLMProvider:
+    p = _build(spec)
+    p.local = is_local_endpoint(spec.provider, spec.model, spec.base_url)
+    return p
+
+
+def _build(spec: ProviderSpec) -> LLMProvider:
     common = {"temperature": spec.temperature, "max_tokens": spec.max_tokens}
     if spec.provider == "openai":
         return OpenAICompatibleProvider(spec.model, base_url=spec.base_url or "https://api.openai.com/v1",

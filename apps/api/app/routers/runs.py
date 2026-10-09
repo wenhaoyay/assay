@@ -4,15 +4,17 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from assay.analysis import FAILURE_TYPES
+from assay.errors import plain_error
 from assay.evaluators import REGISTRY, get_evaluator
 from assay.report import markdown_summary
 from assay.store import causes as cz
@@ -23,6 +25,7 @@ from .. import serializers as ser
 from ..deps import get_session
 
 router = APIRouter(prefix="/api")
+log = logging.getLogger("assay")
 
 _TASKS: set[asyncio.Task] = set()
 
@@ -31,6 +34,13 @@ def _spawn(coro) -> None:
     task = asyncio.create_task(coro)
     _TASKS.add(task)
     task.add_done_callback(_TASKS.discard)
+    task.add_done_callback(_log_failure)
+
+
+def _log_failure(task: asyncio.Task) -> None:
+    """A background job that dies still leaves a trace in the log (the job itself ends as failed)."""
+    if not task.cancelled() and (exc := task.exception()) is not None:
+        log.error("A background job stopped with an error", exc_info=exc)
 
 
 # --------------------------------------------------------------------------------------
@@ -54,7 +64,7 @@ class ExperimentIn(BaseModel):
     budget_usd: float | None = Field(default=None, ge=0)
     max_answers: int | None = Field(default=None, ge=1)  # stop after this many questions sent to the bot
     redact_fields: list[str] = Field(default_factory=list)
-    case_filter: dict[str, list[str]] | None = None  # reduced suite: {categories, tags, ids}
+    case_filter: dict[str, Any] | None = None  # reduced suite: {categories, tags, ids} and/or {sample, seed}
     gate_id: int | None = None
     # Questions written for another chatbot are off-topic for this one, and each answer may be billed:
     # refused unless asked for on purpose (a successor bot, a shared safety suite).
@@ -172,10 +182,12 @@ def get_run(run_id: int, s: Session = Depends(get_session)) -> dict[str, Any]:
 
 class ReaskIn(BaseModel):
     concurrency: int = Field(default=2, ge=1, le=16)
+    estimate_only: bool = False  # say how long and how much, start nothing
 
 
 @router.post("/runs/{run_id}/reask-load-errors", status_code=202)
-async def reask_load_errors(run_id: int, body: ReaskIn, s: Session = Depends(get_session)) -> dict[str, Any]:
+async def reask_load_errors(run_id: int, body: ReaskIn, response: Response,
+                            s: Session = Depends(get_session)) -> dict[str, Any]:
     """Ask again, fewer at a time, only the questions that failed with rate limits or timeouts."""
     run = svc.get(s, m.Run, run_id)
     errs = svc.load_errors(s, run_id)
@@ -185,6 +197,13 @@ async def reask_load_errors(run_id: int, body: ReaskIn, s: Session = Depends(get
     cfg = {k: v for k, v in (e.config or {}).items() if k not in ("evaluators", "judge")}
     cfg["concurrency"] = body.concurrency
     cfg["case_filter"] = {"ids": errs["case_ids"]}
+    if body.estimate_only:
+        from assay.store.insights import estimate_setup
+
+        est = estimate_setup(s, e.target_version_id, e.dataset_version_id, e.config["evaluators"],
+                             e.config.get("judge"), cfg.get("trials", 1), body.concurrency, cfg["case_filter"])
+        response.status_code = 200
+        return _estimate_out(est)
     exp = svc.create_experiment(s, e.project_id, f"{e.name} - re-ask {len(errs['case_ids'])} at {body.concurrency}",
                                 e.target_version_id, e.dataset_version_id, e.config["evaluators"], e.config.get("judge"),
                                 e.gate_id, description=f"Re-asked from run #{run_id}: rate-limited or timed-out answers.",
@@ -194,6 +213,12 @@ async def reask_load_errors(run_id: int, body: ReaskIn, s: Session = Depends(get
     s.commit()
     _spawn(svc.execute_run(new.id))
     return svc.run_header(s, new)
+
+
+def _estimate_out(est: dict[str, Any]) -> dict[str, Any]:
+    costs = [c for c in (est["target_cost_usd"], est["judge_cost_usd"]) if c is not None]
+    return {"seconds": est["estimated_seconds"], "judge_calls": est["judge_calls"],
+            "cost_usd": sum(costs) if costs else None}
 
 
 @router.get("/runs/{run_id}/trials")
@@ -227,12 +252,14 @@ class ReevaluateIn(BaseModel):
     evaluators: list[str] | None = None
     judge: dict[str, Any] | None = None
     name: str | None = None
+    estimate_only: bool = False  # say how long and how much, start nothing
 
 
 @router.post("/runs/{run_id}/reevaluate", status_code=202)
-async def reevaluate(run_id: int, body: ReevaluateIn, s: Session = Depends(get_session)) -> dict[str, Any]:
+async def reevaluate(run_id: int, body: ReevaluateIn, response: Response,
+                     s: Session = Depends(get_session)) -> dict[str, Any]:
     run = svc.get(s, m.Run, run_id)
-    if run.status in ("queued", "running"):
+    if run.status in ("queued", "running", "cancelling"):
         raise HTTPException(409, "Wait for the run to finish before re-evaluating it.")
     evaluators = body.evaluators if body.evaluators is not None else svc.get(s, m.Experiment, run.experiment_id).config["evaluators"]
     unknown = [e for e in evaluators if e not in REGISTRY]
@@ -246,6 +273,12 @@ async def reevaluate(run_id: int, body: ReevaluateIn, s: Session = Depends(get_s
 
     if reason := judge_allowed(s, run.snapshot.get("target", {}).get("id"), judge):
         raise HTTPException(422, reason)
+    if body.estimate_only:
+        from assay.store.insights import regrade_estimate
+
+        n = len(s.scalars(select(m.Trial.id).where(m.Trial.run_id == run_id, m.Trial.result.is_not(None))).all())
+        response.status_code = 200
+        return regrade_estimate(s, judge, evaluators, n)
     new = svc.prepare_reevaluation(s, run_id, body.evaluators, body.judge, body.name)
     s.commit()
     _spawn(svc.execute_reevaluation(new.id))
@@ -379,7 +412,7 @@ async def explain_trial(trial_id: int, s: Session = Depends(get_session)) -> dic
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(502, f"The grading model did not answer: {type(exc).__name__}") from exc
+        raise HTTPException(502, plain_error(exc)) from exc
     return {"cause_ai": ai, "cause": cz.trial_cause(s, t)}
 
 
@@ -388,7 +421,7 @@ async def reread(run_id: int, s: Session = Depends(get_session)) -> dict[str, An
     """Read this run's stored replies again with the connection's current reading. No bot calls;
     checks without a grading model run again, the grading model's verdicts are carried over."""
     run = svc.get(s, m.Run, run_id)
-    if run.status in ("queued", "running"):
+    if run.status in ("queued", "running", "cancelling"):
         raise HTTPException(409, "Wait for the run to finish first.")
     target_id = (run.snapshot or {}).get("target", {}).get("id")
     t = s.get(m.Target, target_id) if target_id else None

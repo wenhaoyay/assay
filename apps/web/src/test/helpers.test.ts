@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { buildPrompt } from '../components/Golden'
 import { findChatId, quotedLiterals } from '../pages/Connect'
+import { plural, spanOf } from '../lib/format'
+import { isCompleted, isLive, questionsOf } from '../lib/runstate'
+import { waitingLine } from '../components/run/LiveRun'
 import { describePattern, plainPattern } from '../lib/trials'
 import { flow } from '../components/run/Sankey'
-import type { ExploreTrial } from '../lib/types'
+import type { ExploreTrial, RunHeader, RunProgress } from '../lib/types'
 
 describe('plain-word rules', () => {
   it('turns words into patterns that do what they say', () => {
@@ -67,5 +70,45 @@ describe('where the answers went', () => {
     expect(targets([trial({ recall_at_k: { status: 'not_evaluated' } }, { needs_documents: true })])).not.toContain('Search found it')
     expect(targets([trial({}, { needs_tool: true })])).not.toContain('Right tool')
     expect(targets([trial({ recall_at_k: { status: 'pass' } }, { needs_documents: true })])).toContain('Search found it')
+  })
+})
+
+describe('plurals and spans', () => {
+  it('says one thing and many things', () => {
+    expect(plural(1, 'run')).toBe('1 run')
+    expect(plural(0, 'run')).toBe('0 runs')
+    expect(plural(2, 'try', 'tries')).toBe('2 tries')
+    expect(plural(1, 'try', 'tries')).toBe('1 try')
+    expect(plural(3480, 'call')).toBe(`${(3480).toLocaleString()} calls`)
+  })
+
+  it('puts long waits in plain words', () => {
+    expect(spanOf(30)).toBe('30 seconds')
+    expect(spanOf(600)).toBe('10 minutes')
+    expect(spanOf(104000)).toBe('29 hours')
+    expect(spanOf(400000)).toBe('5 days')
+  })
+})
+
+describe('run state', () => {
+  it('counts a cancelling run as live and only finished ones as completed', () => {
+    expect(isLive('cancelling')).toBe(true)
+    expect(isLive('cancelled')).toBe(false)
+    expect(isCompleted('completed_with_errors')).toBe(true)
+    expect(isCompleted('failed')).toBe(false)
+  })
+
+  it('reads the question count from the server, else from the tries', () => {
+    expect(questionsOf({ n_questions: 58, n_cases: null, progress_total: 174, trials_per_case: 3 })).toBe(58)
+    expect(questionsOf({ n_cases: null, progress_total: 174, trials_per_case: 3 })).toBe(58)
+    expect(questionsOf({ n_cases: null, progress_total: 0, trials_per_case: 3 })).toBeNull()
+  })
+
+  it('says what a run is waiting on', () => {
+    const hdr = (progress: RunProgress) => ({ n_cases: null, progress_total: 0, trials_per_case: 1, progress }) as unknown as RunHeader
+    expect(waitingLine(hdr({ waiting_on: 'bot' }))).toBe('Waiting for the bot')
+    expect(waitingLine(hdr({ waiting_on: 'grading_model', grading_model: 'ollama/llama3.1:8b', judge_calls_done: 41, judge_calls_total: 3480 })))
+      .toBe(`Grading with ollama/llama3.1:8b · call 41 of ${(3480).toLocaleString()}`)
+    expect(waitingLine(hdr({ waiting_on: null }))).toBeNull()
   })
 })

@@ -9,11 +9,11 @@ import { Confetti } from '../components/viz'
 import { AgreementGauge, TwoByTwo } from '../components/setup/Agreement'
 import { BakeoffScatter, hasPerItem } from '../components/setup/BakeoffScatter'
 import { SetupField } from '../components/setup/SetupField'
-import { Badge, Button, Card, Empty, ErrorState, Figs, Help, Input, Kbd, Loading, Notice, PageHeader, ProgressBar, Select, Stat, Table, Tabs, Term } from '../components/ui'
+import { Badge, Button, Card, Empty, ErrorState, Figs, Help, Input, Kbd, Loading, Notice, PageHeader, ProgressBar, Select, Stat, Table, Tabs, Term, useLongWork } from '../components/ui'
 import { api, qs } from '../lib/api'
 import { whereLabel } from '../lib/models'
 import { useCrumbs } from '../lib/crumbs'
-import { ms, pct, usd } from '../lib/format'
+import { ms, pct, plural, usd } from '../lib/format'
 import { useHotkey } from '../lib/hotkeys'
 import { useMotionOn, usePrefs } from '../lib/prefs'
 import type { Agreement, Bakeoff, CalibrationItem, CalibrationStats, ProviderConfig, RunHeader } from '../lib/types'
@@ -294,11 +294,13 @@ function BakeoffTab({ dimension }: { dimension: string }) {
   const latestId = active ?? past.data?.[0]?.id ?? null
   const current = useQuery({
     queryKey: ['bakeoff', latestId], queryFn: () => api.get<Bakeoff>(`/api/bakeoffs/${latestId}`), enabled: latestId !== null,
-    refetchInterval: (q) => (q.state.data?.status === 'running' ? 1000 : false),
+    refetchInterval: (q) => (q.state.data?.status === 'running' || q.state.data?.status === 'cancelling' ? 1000 : false),
   })
   const shown = current.data ?? past.data?.[0] ?? null
+  const bakeBody = () => ({ dimension, judges: picked.map((p) => (p === 'heuristic' ? { provider: 'heuristic' } : { provider_config_id: Number(p) })) })
+  const long = useLongWork()
   const start = useMutation({
-    mutationFn: () => api.post<Bakeoff>('/api/bakeoffs', { dimension, judges: picked.map((p) => (p === 'heuristic' ? { provider: 'heuristic' } : { provider_config_id: Number(p) })) }),
+    mutationFn: () => api.post<Bakeoff>('/api/bakeoffs', bakeBody()),
     onSuccess: (b) => { setActive(b.id); qc.invalidateQueries({ queryKey: ['bakeoffs'] }) },
   })
   const toggle = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.length >= 4 ? p : [...p, id]))
@@ -308,7 +310,7 @@ function BakeoffTab({ dimension }: { dimension: string }) {
   return (
     <div className="space-y-12">
       <Card title="Which grading model agrees with you most?" meta={n ? `${n} labelled` : undefined} help={<>
-        <p>Each judge grades the {n} {dim} answer(s) you labelled; Assay compares their verdicts with yours, and with each other.</p>
+        <p>Each judge grades the {plural(n, `${dim} answer`)} you labelled; Assay compares their verdicts with yours, and with each other.</p>
         <p>A local model on a CPU takes ~30 s per answer; cloud models cost money (see Settings for the per-100 price). Pick up to four.</p>
         <p>Pick the cheapest judge whose agreement with you is close to the best. A judge that agrees with you no better than chance (kappa near 0) should not gate a release.</p>
       </>}>
@@ -323,11 +325,12 @@ function BakeoffTab({ dimension }: { dimension: string }) {
               ))}
             </div>
             <div className="mt-4">
-              <Button variant="primary" loading={start.isPending} disabled={!picked.length || shown?.status === 'running'} onClick={() => start.mutate()}>
-                <Play className="size-3.5" />Run the bake-off ({picked.length} judge{picked.length === 1 ? '' : 's'} × {n} answers)
+              <Button variant="primary" loading={start.isPending || long.checking} disabled={!picked.length || shown?.status === 'running'} onClick={() => long.run(() => api.post<{ seconds?: number }>('/api/bakeoffs', { ...bakeBody(), estimate_only: true }), () => start.mutate())}>
+                <Play className="size-3.5" />Run the bake-off ({plural(picked.length, 'grading model')} × {plural(n, 'answer')})
               </Button>
             </div>
             {start.isError && <div className="mt-2"><ErrorState error={start.error} /></div>}
+            {long.dialog}
           </>
         )}
       </Card>

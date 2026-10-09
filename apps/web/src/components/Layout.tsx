@@ -17,17 +17,17 @@ import {
   Sun,
   Target,
 } from 'lucide-react'
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useCrumbsValue } from '../lib/crumbs'
 import { useHotkey } from '../lib/hotkeys'
-import { usePrefs } from '../lib/prefs'
+import { useMotionOn, usePrefs } from '../lib/prefs'
 import type { Project } from '../lib/types'
 import { CommandPalette, ShortcutSheet } from './CommandPalette'
 import { Tour } from './Tour'
 import { useLinkedHighlight } from './instrument'
-import { Kbd, ProjectMark, linkButton } from './ui'
+import { Kbd, ProjectMark, Toaster, linkButton } from './ui'
 
 const GROUPS = [
   {
@@ -176,6 +176,19 @@ export function Layout() {
   const live = (activity.data?.active_runs.length ?? 0) > 0
   const go = (to: string) => nav(to, { viewTransition: true })
   useLinkedHighlight()
+  const motionOn = useMotionOn()
+  // <main> is the scroll container, so a #hash link needs the element scrolled into view by hand;
+  // the target may render a moment after the route (data loads), so look a few times.
+  useEffect(() => {
+    const id = decodeURIComponent(loc.hash.replace(/^#/, ''))
+    if (!id) return
+    let tries = 0
+    const t = setInterval(() => {
+      const el = document.getElementById(id)
+      if (el || ++tries > 20) { clearInterval(t); el?.scrollIntoView({ block: 'start', behavior: motionOn ? 'smooth' : 'auto' }) }
+    }, 100)
+    return () => clearInterval(t)
+  }, [loc.pathname, loc.hash, motionOn])
 
   useHotkey('mod+k', () => setPalette((v) => !v))
   useHotkey('?', () => setShortcuts((v) => !v))
@@ -199,6 +212,7 @@ export function Layout() {
       </main>
       <CommandPalette open={palette} onClose={() => setPalette(false)} onShortcuts={() => setShortcuts(true)} onTour={() => setTour(true)} />
       <ShortcutSheet open={shortcuts} onClose={() => setShortcuts(false)} />
+      <Toaster />
       {tour && <Tour open onClose={() => setTour(false)} />}
     </div>
   )

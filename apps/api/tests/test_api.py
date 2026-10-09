@@ -33,7 +33,7 @@ def wait(c, run_id, timeout=60):
     t0 = time.time()
     while time.time() - t0 < timeout:
         r = c.get(f"/api/runs/{run_id}").json()
-        if r["status"] not in ("queued", "running"):
+        if r["status"] not in ("queued", "running", "cancelling"):
             return r
         time.sleep(0.1)
     raise AssertionError(f"run {run_id} did not finish")
@@ -170,7 +170,8 @@ def test_cancel_keeps_finished_trials(client):
     assert done["status"] == "cancelled"
     counts = done["summary"]["status_counts"]
     assert counts.get("cancelled", 0) > 0 and counts.get("unscored", 0) + counts.get("passed", 0) >= 1
-    assert c.post(f"/api/runs/{run['id']}/cancel").status_code == 409
+    again = c.post(f"/api/runs/{run['id']}/cancel")  # stopping a stopped run changes nothing
+    assert again.status_code == 200 and again.json()["status"] == "cancelled"
 
 
 def test_candidate_generation_requires_review(client, monkeypatch):

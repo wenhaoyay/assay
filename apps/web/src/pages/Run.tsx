@@ -17,13 +17,14 @@ import { ShareMenu } from '../components/Share'
 import { TraceViewer } from '../components/TraceViewer'
 import { Confetti, Stamp, StagePipeline } from '../components/viz'
 import {
-  Badge, Button, Card, Consistency, DotStrip, Empty, ErrorState, Field, Figs, GaugeArt, Help, Input, Json, Loading, Notice,
-  PageSkeleton, Segmented, Select, Stat, StatusBadge, Table, Tabs, Term, linkButton,
+  Badge, Button, Card, Consistency, DotStrip, Empty, ErrorState, Field, Figs, GaugeArt, Help, InlineError, Input, Json, Loading, Notice,
+  PageSkeleton, Segmented, Select, Stat, StatusBadge, Table, Tabs, Term, linkButton, useLongWork,
 } from '../components/ui'
 import { api, qs } from '../lib/api'
 import { whereLabel } from '../lib/models'
 import { useCrumbs } from '../lib/crumbs'
 import { duration, FAILURE_LABELS, ms, num, pct, score, usd, when } from '../lib/format'
+import { isCompleted, isLive, questionsOf } from '../lib/runstate'
 import { useHotkey, useListNav } from '../lib/hotkeys'
 import { groupByCase, type CaseGroup } from '../lib/trials'
 import type { EvaluatorInfo, Gate, GateResult, Metrics, ProviderConfig, Reliability, RunDetail, RunHeader, RunSummary, Stage, TrialDetail, TrialRow, Verdict } from '../lib/types'
@@ -47,16 +48,25 @@ export function RunPage() {
     queryFn: () => api.get<RunDetail>(`/api/runs/${id}`),
     refetchInterval: (q) => {
       const d = q.state.data
-      if (d && ['queued', 'running'].includes(d.status)) return 1500
+      if (d && isLive(d.status)) return 1500
       return sawActive && d && !d.gate_results.length && Date.now() - new Date(d.finished_at ?? 0).getTime() < 20000 ? 2000 : false
     },
   })
   const r0 = run.data
-  const active = !!r0 && (r0.status === 'queued' || r0.status === 'running')
+  const active = !!r0 && isLive(r0.status)
   useEffect(() => { if (active) setSawActive(true) }, [active])
-  const trials = useRunTrials(r0?.id, active || (sawActive && !!r0 && !active))
+  // Poll the tries only while the run is live; one last read when it ends.
+  const trials = useRunTrials(r0?.id, active)
+  const finalStatus = !active ? r0?.status : undefined
+  const r0id = r0?.id
+  useEffect(() => { if (sawActive && finalStatus && r0id) qc.invalidateQueries({ queryKey: ['trials', r0id] }) }, [sawActive, finalStatus, r0id, qc])
   const projects = useQuery({ queryKey: ['projects'], queryFn: () => api.get<{ id: number; name: string }[]>('/api/projects') })
-  const cancel = useMutation({ mutationFn: () => api.post(`/api/runs/${id}/cancel`), onSuccess: () => qc.invalidateQueries({ queryKey: ['run', id] }) })
+  const cancel = useMutation({ mutationFn: () => api.post(`/api/runs/${id}/cancel`), onSuccess: () => qc.invalidateQueries({ queryKey: ['run', id] }), meta: { silent: true } })
+  const again = useMutation({
+    mutationFn: () => api.post<{ id?: number; run_id?: number }>(`/api/experiments/${r0?.experiment_id}/run`),
+    onSuccess: (res) => { qc.invalidateQueries({ queryKey: ['runs'] }); const n = res?.run_id ?? res?.id; if (n) nav(`/runs/${n}`) },
+    meta: { silent: true },
+  })
   const prev = usePreviousComparable(r0)
   const baseId = r0?.gate_results?.[0]?.baseline_run_id ?? prev?.id ?? null
   const base = useRunHeader(baseId)
@@ -69,11 +79,11 @@ export function RunPage() {
   ], `run-${id}-${project?.name}`)
 
   useHotkey(['1', '2', '3', '4', '5', '6', '7'], (ev) => setTab(TABS[Number(ev.key) - 1]))
-  useHotkey('c', () => nav(prev ? `/compare?baseline=${prev.id}&candidate=${id}` : `/compare?candidate=${id}`, { viewTransition: true }), !!run.data)
+  useHotkey('c', () => nav(prev ? `/compare?baseline=${prev.id}&candidate=${id}` : `/compare?candidate=${id}`, { viewTransition: true }), !!run.data && isCompleted(run.data.status))
 
   // The finish: the gate stamps in, the receipt prints and, the first time a gate passes in this
   // browser session, confetti.
-  const justFinished = sawActive && !active && !!r0
+  const justFinished = sawActive && !active && !!r0 && isCompleted(r0.status)
   const gateNow = r0?.gate_results?.[0]
   const [fire, setFire] = useState(false)
   useEffect(() => {
@@ -129,7 +139,7 @@ export function RunPage() {
           </div>
           <h1 className="t-title mt-1.5" style={{ viewTransitionName: `run-title-${r.id}` }}>{v1}{v2 && <>, <em>{v2}</em></>}</h1>
           <p className="mt-2.5 max-w-3xl text-base text-ink-2">
-            Asked <span className="font-semibold text-ink"><span className="num">{r.n_cases ?? '?'}</span> questions × <span className="num">{r.trials_per_case}</span> {r.trials_per_case === 1 ? 'try' : 'tries'}</span>{r.case_filter && ' (a reduced set)'} from{' '}
+            Asked <span className="font-semibold text-ink"><span className="num">{questionsOf(r) ?? 'n/a'}</span> questions × <span className="num">{r.trials_per_case}</span> {r.trials_per_case === 1 ? 'try' : 'tries'}</span>{r.case_filter && ' (a reduced set)'} from{' '}
             {r.dataset_id ? <Link className="font-mono text-sm hover:underline" to={`/datasets/${r.dataset_id}`}>{r.dataset} v{r.dataset_version}</Link> : <span className="font-mono text-sm">{r.dataset} v{r.dataset_version}</span>}
             , graded by checks{r.judge ? <> and {heur
               ? <>the <span className="hatched rounded px-1">heuristic judge</span> (word overlap) <Help title="Heuristic judge"><p>Meaning checks (correctness, groundedness) were scored by word overlap with the reference, not by a grading model. Free and offline, but it cannot recognise paraphrase or negation, so those scores are hatched wherever they appear.</p><p>Re-grade the stored answers with a model in the Config tab.</p></Help></>
@@ -162,6 +172,7 @@ export function RunPage() {
       </div>
 
       {r.error && <div className="mb-4"><Notice tone="bad" title="Run failed">{r.error}</Notice></div>}
+      {r.status === 'cancelled' && r.stop_reason !== 'budget' && r.stop_reason !== 'max_answers' && <div className="mb-4"><Notice tone="warn" title="Stopped">Stopped. Answers finished before the stop are kept; the rest are marked cancelled.</Notice></div>}
       {r.stop_reason === 'budget' && <div className="mb-4"><Notice tone="warn" title="Stopped at the spend cap">Trials after the cap was reached were not run and are marked cancelled.</Notice></div>}
       {r.stop_reason === 'max_answers' && <div className="mb-4"><Notice tone="warn" title="Stopped at the answer limit">The run reached its "Max answers" limit; the questions after it were not asked and are marked cancelled.</Notice></div>}
       {!active && (r.load_errors?.count ?? 0) > 0 && <LoadErrors r={r} />}
@@ -170,7 +181,13 @@ export function RunPage() {
         <section className="mb-10">
           <div className="mb-5 flex flex-wrap items-end justify-between gap-4 border-b border-line pb-4">
             <LiveFigures r={r} rows={trials.data ?? []} now={Date.now()} />
-            {active && <Button variant="danger" loading={cancel.isPending} onClick={() => cancel.mutate()}><Square className="size-3.5" /> Cancel</Button>}
+            {active && (
+              <div className="flex flex-col items-end gap-1">
+                <Button variant="danger" loading={cancel.isPending} disabled={r.status === 'cancelling'} onClick={() => cancel.mutate()}><Square className="size-3.5" /> {r.status === 'cancelling' ? 'Stopping…' : 'Stop run'}</Button>
+                {r.status === 'cancelling' && <p className="max-w-xs text-right text-xs text-ink-2">Stopping the answers still in flight. Answers finished so far are kept.</p>}
+                <InlineError error={cancel.error} />
+              </div>
+            )}
           </div>
           <LiveRun r={r} rows={trials.data ?? []} gate={floor} />
           {justFinished && <FinishedGate r={r} />}
@@ -195,14 +212,20 @@ export function RunPage() {
         </div>
         {!active && (
           <div className="flex shrink-0 items-center gap-2 pb-1.5">
-            <Link className={linkButton('secondary', 'sm')} to={prev ? `/compare?baseline=${prev.id}&candidate=${r.id}` : `/compare?candidate=${r.id}`} viewTransition title="Compare (C)">
-              <GitCompareArrows className="size-3.5" /> {prev ? `Compare with #${prev.id}` : 'Compare'}</Link>
+            {isCompleted(r.status) && <Link className={linkButton('secondary', 'sm')} to={prev ? `/compare?baseline=${prev.id}&candidate=${r.id}` : `/compare?candidate=${r.id}`} viewTransition title="Compare (C)">
+              <GitCompareArrows className="size-3.5" /> {prev ? `Compare with #${prev.id}` : 'Compare'}</Link>}
             <ShareMenu runId={r.id} baselineId={prev?.id} />
           </div>
         )}
       </div>
       <div className="mt-6">
-        {!s ? (active ? <p className="text-sm text-ink-3">The tabs fill in when the run finishes.</p> : <Loading label="Waiting for the first results" />) : (
+        {!s ? (active ? <p className="text-sm text-ink-3">The tabs fill in when the run finishes.</p>
+          : r.status === 'failed' || r.status === 'cancelled' ? (
+            <Empty title={r.status === 'failed' ? 'This run failed before any results were written' : 'This run was stopped before any results were written'}
+              action={r.experiment_id ? <div className="flex flex-col items-start gap-1"><Button variant="primary" loading={again.isPending} onClick={() => again.mutate()}><RotateCcw className="size-3.5" /> Run again</Button><InlineError error={again.error} /></div> : undefined}>
+              {r.error ?? 'No answers were kept.'}
+            </Empty>
+          ) : <Loading label="Waiting for the first results" />) : (
           <AnimatePresence mode="wait">
             <motion.div key={tab} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
               {tab === 'summary' && <SummaryTab r={r} s={s} base={base} cmpCats={cmp.data?.by_category ?? null} />}
@@ -683,8 +706,11 @@ function ConfigTab({ r }: { r: RunDetail }) {
   const nav = useNavigate()
   const models = useQuery({ queryKey: ['models'], queryFn: () => api.get<ProviderConfig[]>('/api/models') })
   const [judge, setJudge] = useState('')
+  const regradeBody = () => (judge ? { judge: judge === 'heuristic' ? { provider: 'heuristic' } : { provider_config_id: Number(judge) }, name: `${r.experiment} (re-graded)` } : {})
+  const long = useLongWork()
   const reeval = useMutation({
-    mutationFn: () => api.post<RunHeader>(`/api/runs/${r.id}/reevaluate`, judge ? { judge: judge === 'heuristic' ? { provider: 'heuristic' } : { provider_config_id: Number(judge) }, name: `${r.experiment} (re-graded)` } : {}),
+    mutationFn: () => api.post<RunHeader>(`/api/runs/${r.id}/reevaluate`, regradeBody()),
+    meta: { silent: true },
     onSuccess: (n) => { qc.invalidateQueries({ queryKey: ['runs'] }); nav(`/runs/${n.id}`, { viewTransition: true }) },
   })
   return (
@@ -699,10 +725,11 @@ function ConfigTab({ r }: { r: RunDetail }) {
               {(models.data ?? []).map((m) => <option key={m.id} value={m.id}>{m.name} ({whereLabel(m)})</option>)}
             </Select>
           </Field>
-          <Button variant="primary" loading={reeval.isPending} onClick={() => reeval.mutate()}><RotateCcw className="size-3.5" /> Re-grade</Button>
+          <Button variant="primary" loading={reeval.isPending || long.checking} onClick={() => long.run(() => api.post<{ seconds?: number }>(`/api/runs/${r.id}/reevaluate`, { ...regradeBody(), estimate_only: true }), () => reeval.mutate())}><RotateCcw className="size-3.5" /> Re-grade</Button>
         </div>
         {reeval.isError && <div className="mt-2"><ErrorState error={reeval.error} /></div>}
       </Card>
+      {long.dialog}
       <Card title="Snapshot"
         help={<p>Everything this run used, frozen at launch: connection configuration and version, dataset version and content hash, check versions, grading model and rubric hashes, and the run settings.</p>}>
         <Json value={r.snapshot} maxHeight={640} />

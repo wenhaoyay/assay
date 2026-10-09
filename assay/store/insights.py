@@ -12,6 +12,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from assay.providers.locality import is_cloud_model_name, is_local_endpoint, is_local_url  # noqa: F401
 from assay.store import models as m
 from assay.store import service as svc
 
@@ -358,73 +359,63 @@ def estimate_setup(s: Session, target_version_id: int, dataset_version_id: int, 
     per_call_ms = statistics.median(lat) if lat else None
     judge_ids = [e for e in evaluators if get_evaluator(e).kind == "llm_judge"]
     judge_calls = n_calls * len(judge_ids) if judge else 0
-    judge_ms = 0.0
-    judge_cost = None
-    if judge and judge_ids:
-        if judge.get("provider") == "heuristic":
-            judge_ms, judge_cost = 0.0, 0.0
-        else:
-            pc = s.get(m.ProviderConfig, judge.get("provider_config_id"))
-            local = pc is not None and is_local_provider(pc)
-            judge_ms = 30_000.0 if local else 2_500.0  # rough: CPU local models are slow, APIs are not
-            if pc is not None:
-                # ~1,500 prompt tokens (question, reference, answer, context) and ~120 out per judge call
-                price = svc.pricing(s).find(pc.provider, pc.model)
-                judge_cost = 0.0 if local else (None if price is None else
-                                                judge_calls * (1500 * price.input_per_1m + 120 * price.output_per_1m) / 1e6)
+    prof = judge_profile(s, judge if judge_ids else None)
+    judge_ms, judge_cost = prof["ms"], (prof["cost_per_call"] * judge_calls if prof["cost_per_call"] is not None else None)
     # The bot's own cost: measured in past runs (token counts x price), or the per-answer figure
     # the person set on the connection, or unknown (the bot reports no tokens).
     target_cost = (statistics.median(cost) * n_calls) if cost else None
     cost_source = "past runs" if cost else None
     if target_cost is None and target.cost_per_answer_usd is not None:
         target_cost, cost_source = target.cost_per_answer_usd * n_calls, "per answer (set on the connection)"
-    total_ms = ((per_call_ms or 0) * n_calls + judge_ms * judge_calls) / max(1, concurrency if judge_ms < 10_000 else 1)
+    # The bot answers `concurrency` at a time; a local grading model takes one call at a time.
+    total_ms = ((per_call_ms or 0) * n_calls / max(1, concurrency)
+                + judge_ms * judge_calls / (1 if prof["local"] else max(1, concurrency)))
     return {"cases": len(cases), "trials": trials, "target_calls": n_calls,
             "per_call_ms": per_call_ms, "based_on_runs": len(lat),
             "target_cost_usd": target_cost, "target_cost_source": cost_source,
             "target_cost_visible": target_cost is not None,
             "cost_per_answer_usd": target.cost_per_answer_usd, "shared": bool(target.shared),
             "judge_calls": judge_calls, "judge_cost_usd": judge_cost, "judge_ms_per_call": judge_ms or None,
-            "judge_local": bool(judge and judge.get("provider") != "heuristic" and judge_ms >= 10_000),
+            "judge_local": bool(judge and judge_ids and prof["local"]),
             "estimated_seconds": round(total_ms / 1000) if (per_call_ms is not None or judge_calls) else None,
             "note": ("From the median latency of past runs of this target." if lat else
                      "No past runs of this target: time unknown until the first run.")}
 
 
-def is_cloud_model_name(model: str | None) -> bool:
-    """Ollama's hosted models ("gpt-oss:120b-cloud", "...:cloud") are reached through the local
-    Ollama but run on Ollama's servers: the question and answer leave this machine."""
-    name = (model or "").lower()
-    return name.endswith("-cloud") or name.endswith(":cloud")
+def judge_profile(s: Session, judge: dict[str, Any] | None) -> dict[str, Any]:
+    """What one grading-model call takes and costs: rough, said as such. Time in ms, cost in USD
+    (None when the price is unknown); a local model is slow and free, an API quick and billed."""
+    if not judge or judge.get("provider") == "heuristic":
+        return {"ms": 0.0, "cost_per_call": 0.0 if judge else None, "local": False}
+    pc = s.get(m.ProviderConfig, judge.get("provider_config_id"))
+    local = pc is not None and is_local_provider(pc)
+    ms = 30_000.0 if local else 2_500.0  # rough: CPU local models are slow, APIs are not
+    cost: float | None = None
+    if pc is not None:
+        # ~1,500 prompt tokens (question, reference, answer, context) and ~120 out per judge call
+        price = svc.pricing(s).find(pc.provider, pc.model)
+        cost = 0.0 if local else (None if price is None else (1500 * price.input_per_1m + 120 * price.output_per_1m) / 1e6)
+    return {"ms": ms, "cost_per_call": cost, "local": local}
+
+
+def judge_job_estimate(s: Session, judge: dict[str, Any] | None, calls: int, ms_factor: float = 1.0,
+                       extra_seconds: float = 0.0, extra_cost: float | None = None) -> dict[str, Any]:
+    """{seconds, judge_calls, cost_usd} for a job made of `calls` one-at-a-time grading-model calls."""
+    prof = judge_profile(s, judge)
+    cost = prof["cost_per_call"] * calls if prof["cost_per_call"] is not None else None
+    if extra_cost is not None:
+        cost = (cost or 0.0) + extra_cost
+    return {"seconds": round(extra_seconds + prof["ms"] * ms_factor * calls / 1000), "judge_calls": calls,
+            "cost_usd": cost}
+
+
+def regrade_estimate(s: Session, judge: dict[str, Any] | None, evaluators: list[str], n_answers: int) -> dict[str, Any]:
+    """Grading stored answers again: no bot calls, one grading-model call at a time."""
+    from assay.evaluators import get_evaluator
+
+    n_judge = sum(1 for e in evaluators if get_evaluator(e).kind == "llm_judge") if judge else 0
+    return judge_job_estimate(s, judge, n_answers * n_judge)
 
 
 def is_local_provider(pc: m.ProviderConfig) -> bool:
-    if is_cloud_model_name(pc.model):
-        return False
-    if not pc.base_url:
-        return pc.provider == "ollama"  # Ollama's default address is http://localhost:11434
-    return is_local_url(pc.base_url)
-
-
-LOCAL_HOSTS = {"localhost", "host.docker.internal"}
-
-
-def is_local_url(url: str) -> bool:
-    """True only when the URL's host is this machine (or the Docker host); malformed means no."""
-    import ipaddress
-    from urllib.parse import urlsplit
-
-    try:
-        parts = urlsplit(url.strip())
-        host = (parts.hostname or "").lower()
-        parts.port  # noqa: B018 - raises on a malformed port
-    except ValueError:
-        return False
-    if parts.scheme not in ("http", "https") or not host:
-        return False
-    if host in LOCAL_HOSTS:
-        return True
-    try:
-        return ipaddress.ip_address(host).is_loopback
-    except ValueError:
-        return False
+    return is_local_endpoint(pc.provider, pc.model, pc.base_url)

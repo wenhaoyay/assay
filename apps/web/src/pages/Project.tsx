@@ -259,6 +259,7 @@ function ColorPicker({ projectId, current }: { projectId: number; current: strin
   const save = useMutation({
     mutationFn: (color: string) => api.patch(`/api/projects/${projectId}`, { color }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['project-home'] }); qc.invalidateQueries({ queryKey: ['projects'] }); qc.invalidateQueries({ queryKey: ['home'] }); setOpen(false) },
+    meta: { silent: true },
   })
   return (
     <div className="relative">
@@ -266,8 +267,9 @@ function ColorPicker({ projectId, current }: { projectId: number; current: strin
       {open && (
         <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="absolute left-0 z-20 mt-1 flex gap-1.5 rounded-lg border border-line bg-surface p-2 shadow-pop">
           {Object.entries(PROJECT_COLORS).map(([k, c]) => (
-            <button key={k} type="button" title={k} onClick={() => save.mutate(k)} className={clsx('size-6 rounded-md ring-offset-2 ring-offset-surface', current === k && 'ring-2 ring-accent')} style={{ background: c }} />
+            <button key={k} type="button" title={k} disabled={save.isPending} onClick={() => save.mutate(k)} className={clsx('size-6 rounded-md ring-offset-2 ring-offset-surface', current === k && 'ring-2 ring-accent')} style={{ background: c }} />
           ))}
+          {save.isError && <span role="alert" className="ml-1 self-center text-xs text-bad-ink">{save.error.message}</span>}
         </motion.div>
       )}
     </div>

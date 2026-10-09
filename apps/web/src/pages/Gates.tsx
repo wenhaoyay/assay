@@ -9,6 +9,7 @@ import { SetupField } from '../components/setup/SetupField'
 import { Button, Card, Empty, ErrorState, Input, Loading, PageHeader, Segmented, Select, Textarea } from '../components/ui'
 import { api } from '../lib/api'
 import { useCrumbs } from '../lib/crumbs'
+import { plural } from '../lib/format'
 import { projectOption, useProjects } from '../lib/projects'
 import type { EvaluatorInfo, Gate, ProjectHome, RunDetail, RunHeader } from '../lib/types'
 
@@ -199,7 +200,7 @@ function WhatIf({ gate }: { gate: Gate }) {
     .map((p) => ({ run_id: p.run_id, pass_rate: p.pass_rate as number, p95_latency_ms: p.p95_latency_ms, variant: p.variant }))
     .sort((a, b) => a.run_id - b.run_id)
   return (
-    <Card title="What if the gate were stricter?" meta={runs.length ? `${runs.length} runs` : undefined} help={<>
+    <Card title="What if the gate were stricter?" meta={runs.length ? plural(runs.length, 'run') : undefined} help={<>
       <p>Every comparable past run of this chatbot (same questions, same checks), re-judged against a gate you set. Each bar is a run's pass rate.</p>
       <p>Drag the dashed line (or focus it and use the arrow keys) to move the pass-rate limit; the slider under the chart sets the p95 limit. The stamps flip as runs cross the line, and the count says how many would have shipped.</p>
       <p>Only the pass-rate and p95 rules are re-judged here; the gate's other rules are not. Nothing is saved: edit the gate to change it.</p>

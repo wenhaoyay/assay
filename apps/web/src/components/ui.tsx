@@ -7,6 +7,7 @@ import {
   useId,
   useRef,
   useState,
+  useSyncExternalStore,
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
@@ -16,6 +17,7 @@ import {
 import { createPortal } from 'react-dom'
 import { ApiError } from '../lib/api'
 import { GLOSSARY, type GlossaryKey } from '../lib/glossary'
+import { LONG_SECONDS, spanOf } from '../lib/format'
 import { useMotionOn } from '../lib/prefs'
 
 export function Button({
@@ -154,6 +156,7 @@ const STATUS: Record<string, { tone: Tone; text: string; icon?: 'check' | 'x' | 
   cancelled: { tone: 'neutral', text: 'Cancelled', icon: 'slash' },
   queued: { tone: 'info', text: 'Queued' },
   running: { tone: 'info', text: 'Running' },
+  cancelling: { tone: 'warn', text: 'Stopping…' },
   completed: { tone: 'good', text: 'Completed', icon: 'check' },
   completed_with_errors: { tone: 'warn', text: 'Completed with errors', icon: 'warn' },
   draft: { tone: 'info', text: 'Draft' },
@@ -169,7 +172,7 @@ export function StatusBadge({ status, className }: { status: string; className?:
   const Icon = s.icon === 'check' ? Check : s.icon === 'x' ? X : s.icon === 'slash' ? CircleSlash : s.icon === 'warn' ? AlertTriangle : null
   return (
     <Badge tone={s.tone} className={className}>
-      {status === 'running' ? <Loader2 className="size-3 animate-spin" aria-hidden /> : Icon && <Icon className="size-3" aria-hidden />}
+      {status === 'running' || status === 'cancelling' ? <Loader2 className="size-3 animate-spin" aria-hidden /> : Icon && <Icon className="size-3" aria-hidden />}
       {s.text}
     </Badge>
   )
@@ -214,7 +217,7 @@ export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
   return <select {...props} className={clsx(control, width(props.className), 'h-8 pr-7', props.className)} />
 }
 
-export function Toggle({ checked, onChange, label, hint }: { checked: boolean; onChange: (v: boolean) => void; label: ReactNode; hint?: ReactNode }) {
+export function Toggle({ checked, onChange, label, hint, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: ReactNode; hint?: ReactNode; disabled?: boolean }) {
   return (
     <div className="flex items-start gap-3">
       <button
@@ -222,8 +225,9 @@ export function Toggle({ checked, onChange, label, hint }: { checked: boolean; o
         role="switch"
         aria-checked={checked}
         aria-label={typeof label === 'string' ? label : undefined}
+        disabled={disabled}
         onClick={() => onChange(!checked)}
-        className={clsx('relative mt-0.5 inline-flex h-5 w-9 shrink-0 rounded-full transition-colors', checked ? 'bg-accent' : 'bg-line-strong')}
+        className={clsx('relative mt-0.5 inline-flex h-5 w-9 shrink-0 rounded-full transition-colors disabled:cursor-wait disabled:opacity-60', checked ? 'bg-accent' : 'bg-line-strong')}
       >
         <motion.span layout transition={{ type: 'spring', stiffness: 600, damping: 35 }}
           className={clsx('absolute top-0.5 size-4 rounded-full bg-white shadow', checked ? 'right-0.5' : 'left-0.5')} />
@@ -655,4 +659,79 @@ export function Dialog({ open, onClose, title, children, width = 560 }: { open: 
     </div>,
     document.body,
   )
+}
+
+// ---------------------------------------------------------------------------------------------
+// Toasts: a failed action says so, wherever it was started
+// ---------------------------------------------------------------------------------------------
+
+interface ToastItem { id: number; message: string; tone: 'bad' | 'good' | 'info' }
+let toasts: ToastItem[] = []
+let toastSeq = 0
+const toastListeners = new Set<() => void>()
+const emitToasts = () => toastListeners.forEach((l) => l())
+
+export function dismissToast(id: number) {
+  toasts = toasts.filter((t) => t.id !== id)
+  emitToasts()
+}
+
+/** Show a small message for a few seconds. Errors stay a little longer. */
+export function toast(message: string, tone: ToastItem['tone'] = 'info') {
+  if (toasts.some((t) => t.message === message)) return
+  const id = ++toastSeq
+  toasts = [...toasts.slice(-3), { id, message, tone }]
+  emitToasts()
+  setTimeout(() => dismissToast(id), tone === 'bad' ? 8000 : 4000)
+}
+
+export function Toaster() {
+  const items = useSyncExternalStore((cb) => { toastListeners.add(cb); return () => { toastListeners.delete(cb) } }, () => toasts)
+  const motionOn = useMotionOn()
+  return (
+    <div className="pointer-events-none fixed bottom-4 right-4 z-[120] flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2" data-testid="toaster">
+      {items.map((t) => (
+        <motion.div key={t.id} role={t.tone === 'bad' ? 'alert' : 'status'} initial={motionOn ? { opacity: 0, y: 8 } : false} animate={{ opacity: 1, y: 0 }} transition={{ duration: motionOn ? 0.16 : 0 }}
+          className={clsx('pointer-events-auto flex items-start gap-2 rounded-lg border bg-surface px-3 py-2.5 text-sm shadow-pop', t.tone === 'bad' ? 'border-bad/40' : t.tone === 'good' ? 'border-good/40' : 'border-line-strong')}>
+          {t.tone === 'bad' ? <AlertTriangle className="mt-0.5 size-4 shrink-0 text-bad-ink" aria-hidden /> : <Info className="mt-0.5 size-4 shrink-0 text-accent-ink" aria-hidden />}
+          <span className="min-w-0 flex-1">{t.message}</span>
+          <button type="button" aria-label="Dismiss" onClick={() => dismissToast(t.id)} className="rounded p-0.5 text-ink-3 hover:bg-surface-2 hover:text-ink"><X className="size-3.5" /></button>
+        </motion.div>
+      ))}
+    </div>
+  )
+}
+
+/** A line for an action that failed, next to the button that started it. */
+export function InlineError({ error }: { error: unknown }) {
+  if (!error) return null
+  const m = error instanceof Error ? error.message : 'Something went wrong'
+  return <span role="alert" className="text-xs text-bad-ink">{m}</span>
+}
+
+/**
+ * Asks before long work: `run(estimate, start)` calls the estimate; above an hour it opens the
+ * dialog and starts only on "Start anyway". If the estimate fails (an older server), it starts.
+ */
+export function useLongWork() {
+  const [pending, setPending] = useState<{ seconds: number; go: () => void } | null>(null)
+  const [checking, setChecking] = useState(false)
+  const run = async (estimate: () => Promise<{ seconds?: number | null } | null | undefined>, start: () => void) => {
+    setChecking(true)
+    let s: number | null = null
+    try { s = (await estimate())?.seconds ?? null } catch { s = null }
+    setChecking(false)
+    if (s !== null && s > LONG_SECONDS) setPending({ seconds: s, go: start })
+    else start()
+  }
+  const dialog = (
+    <Dialog open={!!pending} onClose={() => setPending(null)} title="This will take a while" width={440}>
+      <p className="text-sm text-ink-2">This will take about {pending ? spanOf(pending.seconds) : ''} on this computer. Start anyway?</p>
+      <div className="mt-4 flex justify-end gap-2">
+        <Button onClick={() => setPending(null)}>Cancel</Button>
+        <Button variant="primary" onClick={() => { const g = pending?.go; setPending(null); g?.() }}>Start anyway</Button>
+      </div>
+    </Dialog>
+  )
+  return { run, checking, dialog }
 }

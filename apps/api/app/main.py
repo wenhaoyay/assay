@@ -10,14 +10,13 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
-from sqlalchemy import select
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from assay import __version__
 from assay.datasets import DatasetError
 from assay.env import load_dotenv
 from assay.store import db
-from assay.store import models as m
+from assay.store import service as svc
 from assay.store.service import Conflict, NotFound, PolicyError
 
 from .routers import core, datasets, runs, workspace
@@ -31,9 +30,7 @@ WEB_DIST = Path(__file__).resolve().parents[2] / "web" / "dist"
 async def lifespan(_: FastAPI):
     db.upgrade()
     with db.session() as s:
-        # A run cannot survive a server restart: say so instead of showing it as running forever.
-        for run in s.scalars(select(m.Run).where(m.Run.status.in_(["queued", "running"]))):
-            run.status, run.error = "failed", "Interrupted: the server stopped while this run was in progress."
+        svc.recover_after_restart(s)  # what a restart interrupted is said to be failed or stopped, not left running
     yield
 
 

@@ -17,6 +17,7 @@ import { Confetti, DeltaList, ForestPlot } from '../components/viz'
 import { api } from '../lib/api'
 import { direction, fmtDelta, fmtValue, pairCases, reading } from '../lib/compare'
 import { useCrumbs } from '../lib/crumbs'
+import { isCompleted } from '../lib/runstate'
 import { pct } from '../lib/format'
 import type { Comparison, ComparisonRow, EvaluatorInfo, RunHeader, TrialRow } from '../lib/types'
 
@@ -55,7 +56,7 @@ export function MetricTable({ rows }: { rows: ComparisonRow[] }) {
 export function ComparePage() {
   const [params, setParams] = useSearchParams()
   const runs = useQuery({ queryKey: ['runs'], queryFn: () => api.get<RunHeader[]>('/api/runs?limit=300') })
-  const done = useMemo(() => (runs.data ?? []).filter((r) => r.status === 'completed' || r.status === 'completed_with_errors'), [runs.data])
+  const done = useMemo(() => (runs.data ?? []).filter((r) => isCompleted(r.status)), [runs.data])
   const baseline = Number(params.get('baseline')) || null
   const candidate = Number(params.get('candidate')) || null
   useCrumbs([{ label: 'Compare' }, ...(baseline && candidate ? [{ label: `#${baseline} vs #${candidate}` }] : [])], `compare-${baseline}-${candidate}`)
@@ -77,6 +78,7 @@ export function ComparePage() {
   const set = (k: 'baseline' | 'candidate', v: number) => setParams((p) => { p.set(k, String(v)); return p })
 
   if (runs.isLoading) return <PageSkeleton />
+  if (runs.isError) return <ErrorState error={runs.error} retry={() => runs.refetch()} />
   return (
     <>
       <div className="flex flex-wrap items-center gap-3 max-md:flex-col max-md:items-stretch" data-testid="run-pickers">

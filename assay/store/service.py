@@ -8,6 +8,8 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
+import random
 import re
 from datetime import UTC, datetime
 from typing import Any
@@ -18,12 +20,13 @@ from sqlalchemy.orm import Session
 from assay import analysis
 from assay.adapters import build_adapter
 from assay.datasets import content_hash
-from assay.evaluators import get_evaluator
+from assay.errors import plain_error
+from assay.evaluators import REGISTRY, get_evaluator
 from assay.evaluators.llm_judge.judge import HeuristicJudge, Judge, load_rubric
 from assay.gates import evaluate_gates
 from assay.pricing import PricingRegistry
 from assay.providers import ProviderSpec, build_provider
-from assay.runner import RunSpec, TrialRecord, evaluate_trial, run_trials, trial_status
+from assay.runner import JobState, RunSpec, TrialRecord, evaluate_trial, run_trials, trial_status
 from assay.schemas import (
     EvalStatus,
     EvaluationResult,
@@ -36,6 +39,8 @@ from assay.schemas import (
 )
 from assay.store import models as m
 from assay.traces import add_evaluator_spans
+
+log = logging.getLogger("assay")
 
 
 class NotFound(LookupError):
@@ -346,14 +351,39 @@ DEFAULT_RUN_CONFIG = {"trials": 1, "concurrency": 4, "seed": 7, "k": 5, "options
 
 
 def select_cases(cases: list[TestCase], case_filter: dict[str, Any] | None) -> list[TestCase]:
-    """Enabled cases, optionally reduced to a suite: any listed category, tag or id matches."""
+    """Enabled cases, optionally reduced to a suite: any listed category, tag or id matches. A
+    ``sample`` (with a ``seed``) then keeps that many, spread across the categories."""
     enabled = [c for c in cases if c.enabled]
     if not case_filter:
         return enabled
     cats, tags, ids = (set(case_filter.get(k) or []) for k in ("categories", "tags", "ids"))
-    if not (cats or tags or ids):
-        return enabled  # an empty filter means "no filter", not "no cases"
-    return [c for c in enabled if c.category in cats or c.id in ids or tags & set(c.tags)]
+    chosen = [c for c in enabled if c.category in cats or c.id in ids or tags & set(c.tags)]         if (cats or tags or ids) else enabled  # an empty filter means "no filter", not "no cases"
+    n = case_filter.get("sample")
+    return sample_cases(chosen, int(n), int(case_filter.get("seed") or 0)) if n else chosen
+
+
+def sample_cases(cases: list[TestCase], n: int, seed: int) -> list[TestCase]:
+    """n cases, the same ones for the same seed, each category in proportion to its size (and at
+    least one from every category when n allows). Kept in the dataset's order."""
+    n = max(1, n)
+    if n >= len(cases):
+        return cases
+    groups: dict[str, list[TestCase]] = {}
+    for c in cases:
+        groups.setdefault(c.category or "", []).append(c)
+    names = sorted(groups)
+    raw = {g: n * len(groups[g]) / len(cases) for g in names}
+    quota = {g: int(raw[g]) for g in names}
+    for g in sorted(names, key=lambda g: (-(raw[g] - quota[g]), g))[: n - sum(quota.values())]:
+        quota[g] += 1
+    if n >= len(names):  # nothing is left out entirely: borrow from the biggest shares
+        for g in [g for g in names if quota[g] == 0]:
+            donor = max(names, key=lambda x: (quota[x], x))
+            quota[donor] -= 1
+            quota[g] = 1
+    rng = random.Random(seed)
+    picked = {c.id for g in names for c in rng.sample(groups[g], min(quota[g], len(groups[g])))}
+    return [c for c in cases if c.id in picked]
 
 
 def create_experiment(s: Session, project_id: int, name: str, target_version_id: int, dataset_version_id: int,
@@ -442,6 +472,8 @@ def start_run(s: Session, experiment_id: int, source: str = "live", parent_run_i
         "evaluators": record_evaluator_versions(s, e.config["evaluators"]),
         "judge": judge.describe() if judge else None,
         "not_measured": not_measured(target.adapter, tv.config or {}, e.config["evaluators"]),
+        "n_questions": len(cases),
+        "estimate": run_estimate(s, tv.id, dv.id, e.config, len(cases)),
     }
     run = m.Run(experiment_id=e.id, status="queued", source=source, parent_run_id=parent_run_id,
                 progress_total=len(cases) * e.config["trials"], snapshot=snapshot)
@@ -450,8 +482,25 @@ def start_run(s: Session, experiment_id: int, source: str = "live", parent_run_i
     return run
 
 
-# Runs being executed in this process -> cancel flag
-ACTIVE: dict[int, dict[str, bool]] = {}
+def run_estimate(s: Session, target_version_id: int, dataset_version_id: int, cfg: dict[str, Any],
+                 n_cases: int) -> dict[str, Any]:
+    """The time and cost promised when the run starts, kept in its snapshot; the screen's first
+    "time left" until the run has measured its own pace. An estimate that fails is no reason not to run."""
+    from assay.store.insights import estimate_setup
+
+    try:
+        est = estimate_setup(s, target_version_id, dataset_version_id, cfg["evaluators"], cfg.get("judge"),
+                             cfg["trials"], cfg["concurrency"], cfg.get("case_filter"))
+    except Exception:
+        log.warning("Could not estimate a run", exc_info=True)
+        return {"seconds": None, "judge_calls": None, "cost_usd": None}
+    costs = [c for c in (est["target_cost_usd"], est["judge_cost_usd"]) if c is not None]
+    return {"seconds": est["estimated_seconds"], "judge_calls": est["judge_calls"] if cfg.get("judge") else None,
+            "cost_usd": sum(costs) if costs else None, "n_questions": n_cases}
+
+
+# Jobs being executed in this process: the stop request, the cancellable tasks, live progress.
+ACTIVE: dict[int, JobState] = {}
 
 
 def _save_trial(s: Session, run_id: int, case_rows: dict[str, int], rec: TrialRecord) -> m.Trial:
@@ -490,64 +539,119 @@ def _session_factory():
     return session
 
 
-async def execute_run(run_id: int) -> None:
-    """Run every trial, persisting as we go. Safe to call from the API (background task) or the CLI."""
-    session = _session_factory()
-    with session() as s:
-        run = get(s, m.Run, run_id)
-        e = get(s, m.Experiment, run.experiment_id)
-        tv = get(s, m.TargetVersion, e.target_version_id)
-        keep = {c.id for c in select_cases([c for _, c in version_cases(s, e.dataset_version_id)],
-                                           e.config.get("case_filter"))}
-        pairs = [(r, c) for r, c in version_cases(s, e.dataset_version_id) if c.id in keep]
-        case_rows = {c.id: r.id for r, c in pairs}
-        cfg = e.config
-        adapter = adapter_for(s, tv)
-        target = get(s, m.Target, tv.target_id)
-        spec = RunSpec(cases=[c for _, c in pairs], adapter=adapter, evaluators=cfg["evaluators"],
-                       judge=build_judge(s, cfg.get("judge")), pricing=pricing(s), trials=cfg["trials"],
-                       concurrency=cfg["concurrency"], seed=cfg["seed"], k=cfg["k"], options=cfg.get("options") or {},
-                       budget_usd=cfg.get("budget_usd"), redact_fields=set(cfg.get("redact_fields") or []),
-                       max_answers=cfg.get("max_answers"), cost_per_answer_usd=target.cost_per_answer_usd,
-                       run_id=str(run_id), not_measured=set((run.snapshot or {}).get("not_measured") or []))
-        run.status, run.started_at = "running", now()
-        ran = record_evaluator_versions(s, cfg["evaluators"])
-        queued = {e["id"]: e.get("definition_hash") for e in (run.snapshot or {}).get("evaluators") or []}
-        if changed := sorted(e["id"] for e in ran if queued.get(e["id"]) != e["definition_hash"]):
-            run.snapshot = {**run.snapshot, "evaluators": ran,
-                            "evaluators_changed_since_queued": {"checks": changed, "queued": queued}}
-    flag = ACTIVE.setdefault(run_id, {"cancel": False})
+def judge_check_count(cases: list[TestCase], evaluator_ids: list[str]) -> int:
+    """Grading-model checks one round of answers needs: per question, the checks that use the model."""
+    n = 0
+    for c in cases:
+        ids = c.evaluators if c.evaluators is not None else evaluator_ids
+        n += sum(1 for e in ids if e in REGISTRY and REGISTRY[e].kind == "llm_judge")
+    return n
 
-    def persist(rec: TrialRecord) -> None:
-        with session() as s:
-            _save_trial(s, run_id, case_rows, rec)  # cancelled trials are kept, marked as such
-            run = get(s, m.Run, run_id)
-            run.progress_done += 1
 
-    async def on_trial(rec: TrialRecord) -> None:
-        await asyncio.to_thread(persist, rec)
-
+def _end_job(session: Any, model_cls: type, job_id: int, live: JobState | None, error: str | None) -> None:
+    """Last resort: a job that could not be finished properly still ends, with a sentence saying why."""
     try:
-        records, stop = await run_trials(spec, on_trial, lambda: flag["cancel"])
-        error = None
+        with session() as s:
+            row = get(s, model_cls, job_id)
+            if row.status not in ("completed", "completed_with_errors", "failed", "cancelled"):
+                stopped = bool(live and live.cancel)
+                row.status = "cancelled" if stopped else "failed"
+                if stopped:
+                    row.stop_reason = "cancelled"
+                else:
+                    row.error = error or plain_error(RuntimeError(""))
+                if model_cls is m.Run:
+                    row.finished_at = now()
+    except Exception:
+        log.error("Could not record how job %s ended", job_id, exc_info=True)
+
+
+async def execute_run(run_id: int) -> None:
+    """Run every trial, persisting as we go. Safe to call from the API (background task) or the CLI.
+    However it goes wrong, the run ends: finished, stopped, or failed with a sentence saying why."""
+    session = _session_factory()
+    live = ACTIVE[run_id] = JobState(loop=asyncio.get_running_loop())
+    adapter = None
+    records: list[TrialRecord] = []
+    stop: str | None = None
+    error: str | None = None
+    try:
+        with session() as s:
+            run = get(s, m.Run, run_id)
+            if run.status != "queued":
+                ACTIVE.pop(run_id, None)
+                return  # stopped before it began
+            e = get(s, m.Experiment, run.experiment_id)
+            tv = get(s, m.TargetVersion, e.target_version_id)
+            keep = {c.id for c in select_cases([c for _, c in version_cases(s, e.dataset_version_id)],
+                                               e.config.get("case_filter"))}
+            pairs = [(r, c) for r, c in version_cases(s, e.dataset_version_id) if c.id in keep]
+            case_rows = {c.id: r.id for r, c in pairs}
+            cfg = e.config
+            adapter = adapter_for(s, tv)
+            target = get(s, m.Target, tv.target_id)
+            judge = build_judge(s, cfg.get("judge"))
+            spec = RunSpec(cases=[c for _, c in pairs], adapter=adapter, evaluators=cfg["evaluators"],
+                           judge=judge, pricing=pricing(s), trials=cfg["trials"],
+                           concurrency=cfg["concurrency"], seed=cfg["seed"], k=cfg["k"],
+                           options=cfg.get("options") or {},
+                           budget_usd=cfg.get("budget_usd"), redact_fields=set(cfg.get("redact_fields") or []),
+                           max_answers=cfg.get("max_answers"), cost_per_answer_usd=target.cost_per_answer_usd,
+                           run_id=str(run_id), not_measured=set((run.snapshot or {}).get("not_measured") or []))
+            live.total = run.progress_total
+            live.seed_s = ((run.snapshot or {}).get("estimate") or {}).get("seconds")
+            if judge is not None:
+                live.judge = judge
+                live.judge_total = judge_check_count(spec.cases, cfg["evaluators"]) * cfg["trials"]
+                d = judge.describe()
+                live.grading_model = f"{d['provider']}/{d['model']}"
+                if hasattr(judge, "provider"):
+                    judge.provider.parallel = cfg["concurrency"]
+            run.status, run.started_at = "running", now()
+            ran = record_evaluator_versions(s, cfg["evaluators"])
+            queued = {e["id"]: e.get("definition_hash") for e in (run.snapshot or {}).get("evaluators") or []}
+            if changed := sorted(e["id"] for e in ran if queued.get(e["id"]) != e["definition_hash"]):
+                run.snapshot = {**run.snapshot, "evaluators": ran,
+                                "evaluators_changed_since_queued": {"checks": changed, "queued": queued}}
+
+        def persist(rec: TrialRecord) -> None:
+            with session() as s:
+                _save_trial(s, run_id, case_rows, rec)  # stopped answers are kept, marked as such
+                if rec.status != "cancelled":
+                    get(s, m.Run, run_id).progress_done += 1
+
+        async def on_trial(rec: TrialRecord) -> None:
+            await asyncio.to_thread(persist, rec)
+
+        records, stop = await run_trials(spec, on_trial, lambda: live.cancel, live)
     except Exception as exc:  # the run fails; finished trials stay
-        records, stop, error = [], None, f"{type(exc).__name__}: {exc}"
+        log.error("Run %s failed", run_id, exc_info=True)
+        error = plain_error(exc, 2000)
     finally:
-        await adapter.aclose()
+        if adapter is not None:
+            try:
+                await adapter.aclose()
+            except Exception:
+                log.warning("Could not close the connection of run %s", run_id, exc_info=True)
+    try:
+        with session() as s:
+            run = get(s, m.Run, run_id)
+            run.finished_at = now()
+            if live.cancel or stop == "cancelled":
+                run.status, run.stop_reason, run.error = "cancelled", "cancelled", None
+            elif error:
+                run.status, run.error = "failed", error
+            else:
+                errs = sum(1 for r in records if r.status == "error")
+                run.status = "completed_with_errors" if errs or stop in ("budget", "max_answers") else "completed"
+                run.stop_reason = stop
+            refresh_summary(s, run)
+            auto_gate(s, run)
+    except Exception as exc:
+        log.error("Could not finish run %s", run_id, exc_info=True)
+        _end_job(session, m.Run, run_id, live, plain_error(exc, 2000))
+    finally:
         ACTIVE.pop(run_id, None)
-    with session() as s:
-        run = get(s, m.Run, run_id)
-        run.finished_at = now()
-        if error:
-            run.status, run.error = "failed", error[:2000]
-        elif stop == "cancelled":
-            run.status, run.stop_reason = "cancelled", "cancelled"
-        else:
-            errs = sum(1 for r in records if r.status == "error")
-            run.status = "completed_with_errors" if errs or stop in ("budget", "max_answers") else "completed"
-            run.stop_reason = stop
-        refresh_summary(s, run)
-        auto_gate(s, run)
 
 
 def auto_gate(s: Session, run: m.Run) -> m.GateResult | None:
@@ -576,16 +680,44 @@ def auto_gate(s: Session, run: m.Run) -> m.GateResult | None:
     return apply_gate(s, run.id, gate.config, baseline, gate.id)
 
 
+FINISHED = ("completed", "completed_with_errors", "failed", "cancelled")
+
+
 def cancel_run(s: Session, run_id: int) -> m.Run:
+    """Stop a run. ``cancelling`` is saved at once; the answers in flight are dropped and the run
+    reaches ``cancelled`` within seconds. Stopping a run already being stopped changes nothing."""
     run = get(s, m.Run, run_id)
+    if run.status in ("cancelling", "cancelled"):
+        return run
     if run.status not in ("queued", "running"):
-        raise Conflict(f"Run {run_id} is {run.status}; only queued or running runs can be cancelled")
-    if run_id in ACTIVE:
-        ACTIVE[run_id]["cancel"] = True
-    else:  # not executing in this process (queued, or the process restarted)
+        raise Conflict("This run has already finished, so it cannot be stopped.")
+    live = ACTIVE.get(run_id)
+    if live is None:  # not executing in this process (queued, or the process restarted)
         run.status, run.stop_reason, run.finished_at = "cancelled", "cancelled", now()
         refresh_summary(s, run)
+        return run
+    run.status = "cancelling"
+    s.commit()  # persisted before anything is dropped, so the screen never sees "running" after a stop
+    live.request_cancel()
     return run
+
+
+def recover_after_restart(s: Session) -> None:
+    """Jobs cannot survive a server restart: say so instead of showing them as running for ever."""
+    from assay.store.workspace import recover_bakeoffs
+
+    for run in s.scalars(select(m.Run).where(m.Run.status.in_(["queued", "running"]))):
+        run.status, run.error, run.finished_at = "failed", RESTART_ERROR, now()
+    for run in s.scalars(select(m.Run).where(m.Run.status == "cancelling")):
+        run.status, run.stop_reason, run.finished_at = "cancelled", "cancelled", now()
+        try:
+            refresh_summary(s, run)
+        except Exception:
+            log.warning("Could not summarise run %s after a restart", run.id, exc_info=True)
+    recover_bakeoffs(s)
+
+
+RESTART_ERROR = "The server stopped while this was running."
 
 
 # --------------------------------------------------------------------------------------
@@ -655,6 +787,7 @@ def run_header(s: Session, run: m.Run) -> dict[str, Any]:
         "concurrency": snap.get("experiment", {}).get("config", {}).get("concurrency"),
         "judge": snap.get("judge"),
         "progress_done": run.progress_done, "progress_total": run.progress_total,
+        "n_questions": n_questions(run), "progress": run_progress(run),
         "created_at": run.created_at.isoformat() if run.created_at else None,
         "started_at": run.started_at.isoformat() if run.started_at else None,
         "finished_at": run.finished_at.isoformat() if run.finished_at else None,
@@ -664,6 +797,35 @@ def run_header(s: Session, run: m.Run) -> dict[str, Any]:
         "overall_ci": [(summary.get("overall") or {}).get("ci_low"), (summary.get("overall") or {}).get("ci_high")],
         "off_topic": off_topic(s, run),
     }
+
+
+def n_questions(run: m.Run) -> int | None:
+    """How many questions the run asks: known from the start (kept in its snapshot)."""
+    snap = run.snapshot or {}
+    if snap.get("n_questions") is not None:
+        return snap["n_questions"]
+    n = (run.summary or {}).get("n_cases")
+    if n is not None:
+        return n
+    trials = snap.get("experiment", {}).get("config", {}).get("trials") or 1
+    return round(run.progress_total / trials) if run.progress_total else None
+
+
+def run_progress(run: m.Run) -> dict[str, Any]:
+    """Live figures while this process runs it; otherwise what was saved (asked = graded, nothing waiting)."""
+    live = ACTIVE.get(run.id)
+    if live is not None and run.status in ("running", "cancelling"):
+        return {**live.progress(), "total": run.progress_total or live.total}
+    snap = run.snapshot or {}
+    est = snap.get("estimate") or {}
+    judge = snap.get("judge")
+    total, done = run.progress_total, run.progress_done
+    calls = est.get("judge_calls") if judge else None
+    return {"total": total, "asked": done, "graded": done,
+            "judge_calls_done": round(calls * done / total) if calls and total else (0 if calls is not None else None),
+            "judge_calls_total": calls, "waiting_on": None,
+            "grading_model": f"{judge.get('provider')}/{judge.get('model')}" if judge else None,
+            "eta_s": est.get("seconds") if run.status == "queued" else None}
 
 
 def off_topic(s: Session, run: m.Run) -> str | None:
@@ -730,6 +892,10 @@ def prepare_reevaluation(s: Session, run_id: int, evaluators: list[str] | None =
     run = start_run(s, e2.id, source="reevaluated", parent_run_id=run_id)
     run.progress_total = len(s.scalars(select(m.Trial.id).where(m.Trial.run_id == run_id,
                                                                  m.Trial.result.is_not(None))).all())
+    from assay.store.insights import regrade_estimate
+
+    evs = [x for x in e2.config["evaluators"] if reread is None or get_evaluator(x).kind != "llm_judge"]
+    run.snapshot = {**run.snapshot, "estimate": regrade_estimate(s, e2.config.get("judge"), evs, run.progress_total)}
     return run
 
 
@@ -743,51 +909,72 @@ async def reevaluate(run_id: int, evaluators: list[str] | None = None, judge: di
 
 
 async def execute_reevaluation(new_run_id: int) -> None:
+    """Grade the stored answers again. Like ``execute_run``, it always ends: finished, stopped, or failed
+    with a sentence saying why."""
     session = _session_factory()
-    with session() as s:
-        run = get(s, m.Run, new_run_id)
-        run_id = run.parent_run_id
-        e2 = get(s, m.Experiment, run.experiment_id)
-        run.status, run.started_at = "running", now()
-        cases = {c.id: (r, c) for r, c in version_cases(s, e2.dataset_version_id)}
-        old = s.scalars(select(m.Trial).where(m.Trial.run_id == run_id).order_by(m.Trial.id)).all()
-        reread = (e2.config.get("reread") or {}).get("mapping")
-        jobs = [(t.case_key, t.trial_index, _reread(t, reread) if reread is not None else t.result, t.raw,
-                 t.target_cost_usd, t.attempts, trace_for(s, t.id),
-                 [_kept(sc) for sc in t.scores if sc.kind == "llm_judge"] if reread is not None else [])
-                for t in old if t.result is not None]
-        j = build_judge(s, e2.config.get("judge"))
-        from assay.evaluators.base import EvalContext
-
-        ctx = EvalContext(k=e2.config["k"], judge=j, pricing=pricing(s), options=e2.config.get("options") or {},
-                          not_measured=frozenset() if reread is not None
-                          else frozenset((run.snapshot or {}).get("not_measured") or []))
-        new_run_id, evs = run.id, e2.config["evaluators"]
-        if reread is not None:  # the grading model's verdicts are carried over, not asked again
-            evs = [x for x in evs if get_evaluator(x).kind != "llm_judge"]
-    flag = ACTIVE.setdefault(new_run_id, {"cancel": False})
-    cancelled, failed, error = False, 0, None
+    live = ACTIVE[new_run_id] = JobState(loop=asyncio.get_running_loop())
+    cancelled, error = False, None
     try:
-        await _regrade(jobs, cases, evs, ctx, new_run_id, flag, session)
-    except _Cancelled:
-        cancelled = True
+        with session() as s:
+            run = get(s, m.Run, new_run_id)
+            if run.status != "queued":
+                ACTIVE.pop(new_run_id, None)
+                return  # stopped before it began
+            run_id = run.parent_run_id
+            e2 = get(s, m.Experiment, run.experiment_id)
+            run.status, run.started_at = "running", now()
+            cases = {c.id: (r, c) for r, c in version_cases(s, e2.dataset_version_id)}
+            old = s.scalars(select(m.Trial).where(m.Trial.run_id == run_id).order_by(m.Trial.id)).all()
+            reread = (e2.config.get("reread") or {}).get("mapping")
+            jobs = [(t.case_key, t.trial_index, _reread(t, reread) if reread is not None else t.result, t.raw,
+                     t.target_cost_usd, t.attempts, trace_for(s, t.id),
+                     [_kept(sc) for sc in t.scores if sc.kind == "llm_judge"] if reread is not None else [])
+                    for t in old if t.result is not None]
+            j = build_judge(s, e2.config.get("judge"))
+            from assay.evaluators.base import EvalContext
+
+            ctx = EvalContext(k=e2.config["k"], judge=j, pricing=pricing(s), options=e2.config.get("options") or {},
+                              not_measured=frozenset() if reread is not None
+                              else frozenset((run.snapshot or {}).get("not_measured") or []))
+            evs = e2.config["evaluators"]
+            if reread is not None:  # the grading model's verdicts are carried over, not asked again
+                evs = [x for x in evs if get_evaluator(x).kind != "llm_judge"]
+            live.total = run.progress_total
+            live.seed_s = ((run.snapshot or {}).get("estimate") or {}).get("seconds")
+            if j is not None:
+                live.judge = j
+                live.judge_total = sum(1 for x in evs if x in REGISTRY and REGISTRY[x].kind == "llm_judge") * len(jobs)
+                d = j.describe()
+                live.grading_model = f"{d['provider']}/{d['model']}"
+        # The work is its own task, so a stop request can drop the grading call in flight.
+        work = asyncio.ensure_future(_regrade(jobs, cases, evs, ctx, new_run_id, live, session))
+        live.tasks.add(work)
+        try:
+            await work
+        except _Cancelled:
+            cancelled = True
     except Exception as exc:
-        error = f"{type(exc).__name__}: {exc}"[:2000]
+        log.error("Re-grading run %s failed", new_run_id, exc_info=True)
+        error = plain_error(exc, 2000)
+    try:
+        with session() as s:
+            run = get(s, m.Run, new_run_id)
+            failed = s.scalar(select(func.count(m.Trial.id)).where(m.Trial.run_id == new_run_id,
+                                                                      m.Trial.status == "error")) or 0
+            run.finished_at = now()
+            if cancelled or live.cancel:
+                run.status, run.stop_reason, run.error = "cancelled", "cancelled", None
+            elif error:
+                run.status, run.error = "failed", error
+            else:
+                run.status = "completed_with_errors" if failed else "completed"
+            refresh_summary(s, run)
+            auto_gate(s, run)
+    except Exception as exc:
+        log.error("Could not finish run %s", new_run_id, exc_info=True)
+        _end_job(session, m.Run, new_run_id, live, plain_error(exc, 2000))
     finally:
         ACTIVE.pop(new_run_id, None)
-    with session() as s:
-        run = get(s, m.Run, new_run_id)
-        failed = s.scalar(select(func.count(m.Trial.id)).where(m.Trial.run_id == new_run_id,
-                                                                  m.Trial.status == "error")) or 0
-        run.finished_at = now()
-        if error:
-            run.status, run.error = "failed", error
-        elif cancelled:
-            run.status, run.stop_reason = "cancelled", "cancelled"
-        else:
-            run.status = "completed_with_errors" if failed else "completed"
-        refresh_summary(s, run)
-        auto_gate(s, run)
 
 
 class _Cancelled(Exception):
@@ -819,24 +1006,50 @@ def _kept(sc: m.Score) -> EvaluationResult:
                             metadata={**(sc.metadata_ or {}), "gating": sc.gating, "carried_over": True})
 
 
-async def _regrade(jobs, cases, evs, ctx, new_run_id, flag, session) -> None:
-    for key, idx, result_json, raw, tcost, attempts, trace, kept in jobs:
-        if flag["cancel"]:
+async def _regrade(jobs, cases, evs, ctx, new_run_id, live: JobState, session) -> None:
+    rows = {k: v[0].id for k, v in cases.items()}
+
+    def save(rec: TrialRecord) -> None:
+        with session() as s:
+            _save_trial(s, new_run_id, rows, rec)
+            if rec.status != "cancelled":
+                get(s, m.Run, new_run_id).progress_done += 1
+
+    def stopped(key: str, idx: int) -> None:
+        save(TrialRecord(key, idx, "cancelled", None, None, []))
+
+    for n, (key, idx, result_json, raw, tcost, attempts, trace, kept) in enumerate(jobs):
+        if live.cancel:
+            for k2, i2, *_ in jobs[n:]:
+                if k2 in cases:
+                    stopped(k2, i2)
             raise _Cancelled
         if key not in cases:
             continue
         result = NormalizedTargetResult.model_validate(result_json)
         case = cases[key][1]
-        scores = await evaluate_trial(case, result, trace, evs, ctx) + kept
+        live.in_grading += 1
+        try:
+            await asyncio.sleep(0)  # let a stop request or a progress question through
+            scores = await evaluate_trial(case, result, trace, evs, ctx) + kept
+        except asyncio.CancelledError:
+            if not live.cancel:
+                raise
+            for k2, i2, *_ in jobs[n:]:  # the answer being graded, and every one after it
+                if k2 in cases:
+                    stopped(k2, i2)
+            raise _Cancelled from None
+        finally:
+            live.in_grading -= 1
         if trace:
             trace.spans = [sp for sp in trace.spans if sp.type != "evaluator"]
             add_evaluator_spans(trace, scores)
         jc = [x.judge_cost_usd for x in scores if x.judge_cost_usd is not None]
         rec = TrialRecord(key, idx, trial_status(result, scores), result, trace, scores, raw=raw, attempts=attempts,
                           target_cost_usd=tcost, judge_cost_usd=sum(jc) if jc else None)
-        with session() as s:
-            _save_trial(s, new_run_id, {k: v[0].id for k, v in cases.items()}, rec)
-            get(s, m.Run, new_run_id).progress_done += 1
+        save(rec)
+        live.graded += 1
+        live.asked = live.graded
 
 
 # --------------------------------------------------------------------------------------

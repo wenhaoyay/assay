@@ -193,8 +193,8 @@ export function CauseCard({ t }: { t: TrialDetail }) {
   const [editing, setEditing] = useState(false)
   const v = t.cause
   const refresh = () => { qc.invalidateQueries({ queryKey: ['trial', t.id] }); qc.invalidateQueries({ queryKey: ['causes', t.run_id] }) }
-  const set = useMutation({ mutationFn: (cause: string | null) => api.put(`/api/trials/${t.id}/cause`, { cause }), onSuccess: () => { refresh(); setEditing(false) } })
-  const ask = useMutation({ mutationFn: () => api.post(`/api/trials/${t.id}/explain`), onSuccess: refresh })
+  const set = useMutation({ mutationFn: (cause: string | null) => api.put(`/api/trials/${t.id}/cause`, { cause }), onSuccess: () => { refresh(); setEditing(false) }, meta: { silent: true } })
+  const ask = useMutation({ mutationFn: () => api.post(`/api/trials/${t.id}/explain`), onSuccess: refresh, meta: { silent: true } })
   if (!v) return null
   const ruleSaid = v.rule ?? v.cause
   return (
@@ -218,12 +218,13 @@ export function CauseCard({ t }: { t: TrialDetail }) {
         {editing && (
           <div className="space-y-2 rounded-lg border border-line p-3">
             <Field label={<span className="inline-flex items-center gap-1.5">Cause <Help title="Your choice counts">Run summaries and comparisons count your choice.</Help></span>}>
-              <Select defaultValue={v.cause} onChange={(e) => set.mutate(e.target.value)} aria-label="Cause">
+              <Select defaultValue={v.cause} disabled={set.isPending} onChange={(e) => set.mutate(e.target.value)} aria-label="Cause">
                 {Object.entries(CAUSE_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
               </Select>
             </Field>
+            {set.isError && <ErrorState error={set.error} />}
             <div className="flex gap-2">
-              {v.source === 'you' && <Button size="sm" variant="ghost" onClick={() => set.mutate(null)}>Back to automatic</Button>}
+              {v.source === 'you' && <Button size="sm" variant="ghost" loading={set.isPending} onClick={() => set.mutate(null)}>Back to automatic</Button>}
               <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Close</Button>
             </div>
           </div>

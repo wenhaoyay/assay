@@ -9,6 +9,8 @@ import { Sparkline } from '../components/viz'
 import { Button, Card, Code, Empty, ErrorState, Input, Kbd, Loading, PageHeader, Segmented, Select, Term, linkButton } from '../components/ui'
 import { api } from '../lib/api'
 import { useCrumbs } from '../lib/crumbs'
+import { plural } from '../lib/format'
+import { isLive, questionsOf } from '../lib/runstate'
 import type { Project, RunHeader } from '../lib/types'
 
 export function RunsPage() {
@@ -17,7 +19,7 @@ export function RunsPage() {
   const runs = useQuery({
     queryKey: ['runs'],
     queryFn: () => api.get<RunHeader[]>('/api/runs?limit=300'),
-    refetchInterval: (q) => (q.state.data?.some((r) => r.status === 'running' || r.status === 'queued') ? 2000 : false),
+    refetchInterval: (q) => (q.state.data?.some((r) => isLive(r.status)) ? 2000 : false),
   })
   const projects = useQuery({ queryKey: ['projects'], queryFn: () => api.get<Project[]>('/api/projects') })
   const [selected, setSelected] = useState<number[]>([])
@@ -48,7 +50,7 @@ export function RunsPage() {
         title="Runs"
         help={<>
           <p>Each run asked one chatbot version every question in a dataset, and graded the answers.</p>
-          <p>Runs are grouped by <Term k="comparable">comparable setup</Term>: runs in one group asked the same questions with the same checks and judge, so their numbers can be read side by side. Across groups they cannot. The line beside each group is its pass rate, oldest to newest.</p>
+          <p>Runs are grouped by <Term k="comparable">comparable setup</Term>: runs in one group asked the same questions with the same checks and grading model, so their numbers can be read side by side. Across groups they cannot. The line beside each group is its pass rate, oldest to newest.</p>
           <p>Tick two runs to compare them. J/K move through the first group, Enter opens the picked run.</p>
         </>}
         actions={<Link to="/runs/new" viewTransition className={linkButton('primary')}><Play className="size-3.5" /> New run</Link>}
@@ -66,19 +68,20 @@ export function RunsPage() {
           ? <Empty title="No runs yet. The needle is resting on zero." action={<Link to="/runs/new" className={linkButton('primary')}>Start a run</Link>}>Run a chatbot version on a dataset, or load the Acme demo with <Code>assay seed --run</Code>.</Empty>
           : <Empty title="Nothing matches that search.">Clear the search or pick all chatbots.</Empty>
       ) : group === 'flat' ? (
-        <Card title="All runs" meta={`${rows.length} runs`} padded={false}><RunsTable runs={rows} selectable selected={selected} onToggle={toggle} keyboard /></Card>
+        <Card title="All runs" meta={plural(rows.length, 'run')} padded={false}><RunsTable runs={rows} selectable selected={selected} onToggle={toggle} keyboard /></Card>
       ) : (
         <div className="space-y-10">
           {groups.map((g, i) => {
             const r0 = g[0]
+            const nq = g.map(questionsOf).find((v) => v != null) ?? null
             const heur = r0.judge?.provider === 'heuristic'
             const trend = [...g].reverse().filter((r) => !r.off_topic).map((r) => r.metrics?.overall_pass_rate ?? null)
             return (
               <Card key={r0.comparability_key ?? i} padded={false}
                 title={<>{r0.dataset} <span className="font-mono text-sm font-medium text-ink-3">v{r0.dataset_version}</span></>}
-                meta={<>{g.length} {g.length === 1 ? 'run' : 'runs'} · {r0.n_cases ?? '?'} questions{r0.case_filter ? ' (reduced)' : ''} · setup {r0.comparability_key?.slice(0, 6)}</>}
+                meta={<>{plural(g.length, 'run')} · {nq != null ? plural(nq, 'question') : 'questions'}{r0.case_filter ? ' (reduced)' : ''} · setup {r0.comparability_key?.slice(0, 6)}</>}
                 help={<>
-                  <p>These runs asked the same {r0.n_cases ?? ''} questions{r0.case_filter ? ' (a reduced suite)' : ''} with the same checks and judge, so their pass rates can be read side by side.</p>
+                  <p>These runs asked the same {nq ?? ''} questions{r0.case_filter ? ' (a reduced suite)' : ''} with the same checks and grading model, so their pass rates can be read side by side.</p>
                   <p>Judge: {r0.judge ? (heur ? 'heuristic word overlap (a rough guide, hatched wherever it appears)' : `${r0.judge.provider}/${r0.judge.model}`) : 'none'}. Setup {r0.comparability_key}: runs with different checks count different things in their pass rate.</p>
                   <p>The line is each run's pass rate, oldest to newest; runs that asked another chatbot's questions are left out of it.</p>
                 </>}

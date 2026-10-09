@@ -9,7 +9,7 @@ import { ParallelHelp } from '../components/helpTexts'
 import { QueueViz } from '../components/QueueViz'
 import { RunReceipt, duration, type Estimate } from '../components/setup/RunReceipt'
 import { SetupField } from '../components/setup/SetupField'
-import { Badge, Button, Card, Dialog, ErrorState, Help, Input, Notice, PageHeader, PageSkeleton, Segmented, Select, Term } from '../components/ui'
+import { Badge, Button, Card, Dialog, ErrorState, Help, Input, Notice, PageHeader, PageSkeleton, Segmented, Select, Term, useLongWork } from '../components/ui'
 import { api } from '../lib/api'
 import { whereLabel } from '../lib/models'
 import { validateSetup } from '../lib/compare'
@@ -27,8 +27,9 @@ const KIND_LABEL: Record<string, string> = {
 // Used in default run names (month-day); fixed at load so a render never reads the clock.
 const TODAY = new Date().toISOString().slice(5, 10)
 
-type Preset = 'smoke' | 'release' | 'full' | 'search' | 'custom'
+type Preset = 'quick' | 'smoke' | 'release' | 'full' | 'search' | 'custom'
 const PRESETS: { id: Preset; title: string; body: string; icon: typeof Zap }[] = [
+  { id: 'quick', title: 'Quick check', body: '30 questions across the categories, the same 30 each time, 1 try. Objective checks plus correctness.', icon: Zap },
   { id: 'smoke', title: 'Quick smoke', body: 'Objective checks only, 1 try per question. Free and fast.', icon: Zap },
   { id: 'release', title: 'Release gate', body: 'Default checks, 3 tries (shows flakiness), the release gate.', icon: ShieldCheck },
   { id: 'full', title: 'Full + grading model', body: 'Everything, including meaning checks by the default judge.', icon: Sparkles },
@@ -71,7 +72,7 @@ export function NewRunPage() {
   const [pickedDataset, setDatasetVersionId] = useState<number | ''>('')
   const [allowOther, setAllowOther] = useState(false)
   const [typedName, setName] = useState<string | null>(null)
-  const [preset, setPreset] = useState<Preset>('release')
+  const [preset, setPreset] = useState<Preset>('quick')
   const [custom, setCustom] = useState<string[] | null>(null)
   const [showChecks, setShowChecks] = useState(false)
   const [judge, setJudge] = useState<string | null>(null) // null = use default
@@ -94,7 +95,8 @@ export function NewRunPage() {
   // Presets set the checks, tries and gate; "custom" keeps whatever is ticked.
   const defaults = evs.data?.defaults ?? []
   const presetChecks =
-    preset === 'smoke' ? evaluators.filter((e) => ['deterministic', 'retrieval', 'agent', 'performance'].includes(e.kind) && e.gating).map((e) => e.id)
+    preset === 'quick' ? [...evaluators.filter((e) => ['deterministic', 'retrieval', 'agent', 'performance'].includes(e.kind) && e.gating).map((e) => e.id), ...(judgeIds.includes('correctness') ? ['correctness'] : [])]
+    : preset === 'smoke' ? evaluators.filter((e) => ['deterministic', 'retrieval', 'agent', 'performance'].includes(e.kind) && e.gating).map((e) => e.id)
     : preset === 'release' ? defaults.filter((e) => !judgeIds.includes(e) || judgeValue)
     : preset === 'full' ? [...evaluators.filter((e) => e.kind !== 'llm_judge').map((e) => e.id), ...judgeIds]
     : preset === 'search' ? evaluators.filter((e) => e.kind === 'retrieval').map((e) => e.id)
@@ -102,7 +104,7 @@ export function NewRunPage() {
   const checks = preset === 'custom' ? (custom ?? presetChecks) : presetChecks
   const choosePreset = (p: Preset) => {
     setPreset(p)
-    if (p === 'smoke' || p === 'search') setTrials(1)
+    if (p === 'quick' || p === 'smoke' || p === 'search') setTrials(1)
     if (p === 'release' || p === 'full') setTrials(3)
   }
 
@@ -134,8 +136,8 @@ export function NewRunPage() {
   const errors = validateSetup({ targetVersionId, datasetVersionId, evaluators: effectiveChecks, judge: judgeValue }, judgeIds)
 
   const est = useQuery({
-    queryKey: ['estimate', targetVersionId, datasetVersionId, effectiveChecks.join(','), judgeValue, trials, concurrency],
-    queryFn: () => api.post<Estimate>('/api/estimate', { target_version_id: targetVersionId, dataset_version_id: datasetVersionId, evaluators: effectiveChecks, judge: judgeBody, trials, concurrency }),
+    queryKey: ['estimate', targetVersionId, datasetVersionId, effectiveChecks.join(','), judgeValue, trials, concurrency, preset === 'quick'],
+    queryFn: () => api.post<Estimate>('/api/estimate', { target_version_id: targetVersionId, dataset_version_id: datasetVersionId, evaluators: effectiveChecks, judge: judgeBody, trials, concurrency, ...(preset === 'quick' ? { case_filter: { sample: 30, seed: 7 } } : {}) }),
     enabled: !!targetVersionId && !!datasetVersionId,
     placeholderData: (prev) => prev,
   })
@@ -154,10 +156,13 @@ export function NewRunPage() {
       gate_id: gateValue || null,
       options: maxLatency ? { max_latency_ms: Number(maxLatency) } : {},
       allow_other_chatbot: !!otherPicked && allowOther,
+      ...(preset === 'quick' ? { case_filter: { sample: 30, seed: 7 } } : {}),
     }),
+    meta: { silent: true },
     onSuccess: (r) => { qc.invalidateQueries({ queryKey: ['runs'] }); qc.invalidateQueries({ queryKey: ['activity'] }); nav(`/runs/${r.id}`, { viewTransition: true }) },
   })
 
+  const long = useLongWork()
   const ready = !!targetVersionId && !!datasetVersionId
   const e = ready ? est.data : undefined
   const answers = (e?.cases ?? 0) * trials
@@ -255,15 +260,16 @@ export function NewRunPage() {
           <Card title="2 · How thoroughly" help={<>
             <p>A preset sets the checks, the tries per question and the release gate. Pick Custom (or tick a check below) to choose each check yourself.</p>
             <p>Meaning checks need a grading model (section 3); without one they are skipped.</p>
+            <p>Quick check is the default: 30 questions spread across the categories, the same 30 each time so runs can be compared, 1 try, the objective checks plus correctness{preset === 'quick' && e?.estimated_seconds ? <>. About {duration(e.estimated_seconds).replace('~', '')} with the default grading model</> : ''}. Pick Release gate or Full for every question.</p>
           </>}>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" role="radiogroup" aria-label="Preset">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5" role="radiogroup" aria-label="Preset">
               {PRESETS.map((p) => {
                 const on = preset === p.id
                 const slim = p.id === 'custom'
                 return (
                   <button key={p.id} type="button" role="radio" aria-checked={on} onClick={() => { choosePreset(p.id); if (p.id === 'custom') { setCustom(checks); setShowChecks(true) } }}
                     className={clsx('relative flex rounded-xl border bg-surface text-left shadow-card transition-[transform,box-shadow,border-color] duration-200',
-                      slim ? 'items-center gap-2.5 px-4 py-2.5 sm:col-span-2 lg:col-span-4' : 'flex-col items-start p-4',
+                      slim ? 'items-center gap-2.5 px-4 py-2.5 sm:col-span-2 lg:col-span-5' : 'flex-col items-start p-4',
                       on ? '-translate-y-0.5 border-accent ring-[3px] ring-accent-wash' : 'border-line hover:-translate-y-px hover:border-line-strong')}>
                     <p.icon className={clsx('size-4 shrink-0', on ? 'text-accent-ink' : 'text-ink-3')} aria-hidden />
                     <div className={clsx('text-base font-semibold', !slim && 'mt-2')}>{p.title}</div>
@@ -276,7 +282,7 @@ export function NewRunPage() {
               <button type="button" onClick={() => setShowChecks((v) => !v)} className="flex items-center gap-1 text-sm font-medium text-accent-ink" aria-expanded={showChecks}>
                 <ChevronDown className={clsx('size-4 transition-transform', showChecks && 'rotate-180')} />{showChecks ? 'Hide' : 'Show'} the <span className="num font-mono">{effectiveChecks.length}</span> checks
               </button>
-              {!judgeBody && needsJudge.length > 0 && <span className="text-xs text-warn-ink"><span className="num font-mono">{needsJudge.length}</span> meaning check(s) skipped: no grading model chosen.</span>}
+              {!judgeBody && needsJudge.length > 0 && <span className="text-xs text-warn-ink"><span className="num font-mono">{needsJudge.length}</span> meaning {needsJudge.length === 1 ? 'check' : 'checks'} skipped: no grading model chosen.</span>}
             </div>
             <AnimatePresence initial={false}>
               {showChecks && (
@@ -373,10 +379,11 @@ export function NewRunPage() {
           {touched && errors.length > 0 && <Notice tone="warn" title="Before starting"><ul className="list-disc pl-4">{errors.map((x) => <li key={x}>{x}</li>)}</ul></Notice>}
           {start.isError && <ErrorState error={start.error} />}
           <Button variant="primary" size="lg" className="w-full" loading={start.isPending} disabled={!!e?.blocked || (!!otherPicked && !allowOther)}
-            onClick={() => { setTouched(true); if (!errors.length) start.mutate() }}>
+            onClick={() => { setTouched(true); if (!errors.length) long.run(async () => ({ seconds: e?.estimated_seconds }), () => start.mutate()) }}>
             <Play className="size-4" /> Create and run
           </Button>
         </aside>
+        {long.dialog}
       </div>
     </>
   )

@@ -6,11 +6,11 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { DatasetAdd } from '../components/DatasetAdd'
 import { AddVariations, BuildPanel, ProvenanceBadge, TermChips } from '../components/Golden'
 import { CaseMatrixView, MatrixLegend } from '../components/viz'
-import { Badge, Button, Card, Code, Empty, ErrorState, Field, Input, Json, Loading, Notice, PageHeader, Segmented, Select, StatusBadge, Table, Tabs, Textarea, Help, linkButton } from '../components/ui'
+import { Badge, Button, Card, Code, Empty, ErrorState, Field, Input, Json, Loading, Notice, PageHeader, Segmented, Select, StatusBadge, Table, Tabs, Textarea, Help, linkButton, useLongWork } from '../components/ui'
 import { LabelHelp } from '../components/LabelHelp'
 import { api } from '../lib/api'
 import { useCrumbs } from '../lib/crumbs'
-import { when } from '../lib/format'
+import { plural, when } from '../lib/format'
 import { usePrefs } from '../lib/prefs'
 import { plainPattern } from '../lib/trials'
 import { projectOption, useProjects } from '../lib/projects'
@@ -118,7 +118,7 @@ function DatasetRow({ d, projects }: { d: Dataset; projects: Project[] }) {
         <tr><td colSpan={6} className="bg-surface-2/50">
           {confirm && (
             <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span>Delete <span className="font-semibold">{d.name}</span> and its <span className="font-mono">{d.latest?.case_count ?? 0}</span> question(s)? No run used it. This cannot be undone.</span>
+              <span>Delete <span className="font-semibold">{d.name}</span> and its <span className="font-mono">{d.latest?.case_count ?? 0}</span> {(d.latest?.case_count ?? 0) === 1 ? 'question' : 'questions'}? No run used it. This cannot be undone.</span>
               <Button size="sm" variant="bad" loading={del.isPending} onClick={() => del.mutate()}>Delete</Button>
               <Button size="sm" variant="ghost" onClick={() => setConfirm(false)}>Cancel</Button>
             </div>
@@ -136,7 +136,9 @@ type DTab = 'cases' | 'build' | 'history' | 'generate' | 'versions'
 export function DatasetPage() {
   const { id } = useParams()
   const [params, setParams] = useSearchParams()
-  const [tab, setTab] = useState<DTab>((params.get('tab') as DTab) ?? 'cases')
+  // The tab lives in the address, so links to ?tab=build work from anywhere (and keep ?v=).
+  const tab = (params.get('tab') as DTab) ?? 'cases'
+  const setTab = (t: DTab) => setParams((p) => { p.set('tab', t); return p })
   const ds = useQuery({ queryKey: ['dataset', id], queryFn: () => api.get<Dataset>(`/api/datasets/${id}`) })
   const versionId = Number(params.get('v')) || ds.data?.latest?.id
   const version = useQuery({
@@ -289,7 +291,7 @@ function CasesPanel({ version, onEdited, matrix, focus }: { version: DatasetVers
         <Notice tone="info" title="This version is frozen">A run used it, so it stays exactly as it was. Editing a case saves your change to a new draft version.</Notice>
       )}
       {(lint.data?.issues.length ?? 0) > 0 && (
-        <p className="text-xs text-warn-ink">{lint.data!.issues.length} possible problem{lint.data!.issues.length === 1 ? '' : 's'} in this set (duplicates, phrases too generic to test anything, cases that always fail). <Link className="underline" to="?tab=build">See them on Build</Link>.</p>
+        <p className="text-xs text-warn-ink">{plural(lint.data!.issues.length, 'possible problem')} in this set (duplicates, phrases too generic to test anything, cases that always fail). <Link className="underline" to={`?v=${version.id}&tab=build`}>See them on Build</Link>.</p>
       )}
       {editing && <CaseEditor versionId={version.id} initial={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={(r) => { setEditing(null); onEdited(r) }} />}
       <div className="flex flex-wrap items-center gap-2">
@@ -444,7 +446,7 @@ function GeneratePanel({ datasetId, versionId, onPromoted }: { datasetId: number
     onSuccess: () => qc.invalidateQueries({ queryKey: ['docs', datasetId] }),
   })
   const generate = useMutation({
-    mutationFn: () => api.post<{ created: number; errors: { document: string; error: string }[]; notice: string }>(`/api/datasets/${datasetId}/generate-candidates`, { document_ids: selected, provider_config_id: provider || providers.data?.[0]?.id }),
+    mutationFn: () => api.post<{ created: number; errors: { document: string; error: string }[]; notice: string }>(`/api/datasets/${datasetId}/generate-candidates`, genBody()),
     onSuccess: refresh,
   })
   const review = useMutation({
@@ -453,7 +455,10 @@ function GeneratePanel({ datasetId, versionId, onPromoted }: { datasetId: number
       return api.post(`/api/candidates/${id}/review`, { action, reviewer })
     },
     onSuccess: refresh,
+    meta: { silent: true },
   })
+  const long = useLongWork()
+  const genBody = () => ({ document_ids: selected, provider_config_id: provider || providers.data?.[0]?.id })
   const edit = useMutation({ mutationFn: (id: number) => api.put(`/api/candidates/${id}`, { case: JSON.parse(editText) }), onSuccess: () => { setEditingId(null); refresh() } })
   const promote = useMutation({ mutationFn: () => api.post<EditResult>(`/api/dataset-versions/${versionId}/approve-candidates`, {}), onSuccess: (r) => { refresh(); onPromoted(r) } })
 
@@ -486,11 +491,11 @@ function GeneratePanel({ datasetId, versionId, onPromoted }: { datasetId: number
                 {(providers.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </Select>
             </Field>
-            {providers.data?.length === 0 && <Notice tone="warn">Add a model provider under <Link className="underline" to="/evaluators?tab=providers">Evaluators &gt; Judge providers</Link> first.</Notice>}
-            <Button variant="primary" disabled={!selected.length || !providers.data?.length} loading={generate.isPending} onClick={() => generate.mutate()}>
+            {providers.data?.length === 0 && <Notice tone="warn">Add a model under <Link className="underline" to="/settings?tab=models">Settings &gt; Models &amp; keys</Link> first.</Notice>}
+            <Button variant="primary" disabled={!selected.length || !providers.data?.length} loading={generate.isPending || long.checking} onClick={() => long.run(() => api.post<{ seconds?: number }>(`/api/datasets/${datasetId}/generate-candidates`, { ...genBody(), estimate_only: true }), () => generate.mutate())}>
               <Sparkles className="size-3.5" /> Generate candidates
             </Button>
-            {generate.data && <Notice tone={generate.data.errors.length ? 'warn' : 'good'} title={`${generate.data.created} candidate(s) added to the review queue`}>{generate.data.errors.map((e) => <div key={e.document}>{e.document}: {e.error}</div>)}</Notice>}
+            {generate.data && <Notice tone={generate.data.errors.length ? 'warn' : 'good'} title={`${plural(generate.data.created, 'candidate')} added to the review queue`}>{generate.data.errors.map((e) => <div key={e.document}>{e.document}: {e.error}</div>)}</Notice>}
             {generate.isError && <ErrorState error={generate.error} />}
           </div>
         </Card>
@@ -510,6 +515,7 @@ function GeneratePanel({ datasetId, versionId, onPromoted }: { datasetId: number
         }
       >
         {promote.isError && <div className="mb-3"><ErrorState error={promote.error} /></div>}
+        {review.isError && <div className="mb-3"><ErrorState error={review.error} /></div>}
         {!reviewer && <p className="mb-3 text-xs text-warn-ink">Enter your name to approve or reject: every decision records who made it.</p>}
         {cands.isLoading ? <Loading /> : (cands.data ?? []).length === 0 ? (
           <Empty title="Nothing in this queue." />
@@ -541,9 +547,9 @@ function GeneratePanel({ datasetId, versionId, onPromoted }: { datasetId: number
                   </div>
                 ) : !c.approved_in_version_id && (
                   <div className="mt-3 flex gap-2">
-                    <Button size="sm" variant="primary" disabled={!reviewer} onClick={() => review.mutate({ id: c.id, action: 'approve' })}>Approve</Button>
+                    <Button size="sm" variant="primary" disabled={!reviewer || review.isPending} loading={review.isPending && review.variables?.id === c.id && review.variables.action === 'approve'} onClick={() => review.mutate({ id: c.id, action: 'approve' })}>Approve</Button>
                     <Button size="sm" disabled={!reviewer} onClick={() => { setEditingId(c.id); setEditText(JSON.stringify(c.case, null, 2)) }}>Edit</Button>
-                    <Button size="sm" variant="danger" disabled={!reviewer} onClick={() => review.mutate({ id: c.id, action: 'reject' })}>Reject</Button>
+                    <Button size="sm" variant="danger" disabled={!reviewer || review.isPending} loading={review.isPending && review.variables?.id === c.id && review.variables.action === 'reject'} onClick={() => review.mutate({ id: c.id, action: 'reject' })}>Reject</Button>
                     {c.status !== 'unreviewed' && <Button size="sm" variant="ghost" onClick={() => review.mutate({ id: c.id, action: 'reset' })}>Undo</Button>}
                   </div>
                 )}
@@ -553,6 +559,7 @@ function GeneratePanel({ datasetId, versionId, onPromoted }: { datasetId: number
           </ul>
         )}
       </Card>
+      {long.dialog}
     </div>
   )
 }

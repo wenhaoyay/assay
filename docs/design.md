@@ -74,3 +74,57 @@ A heading carries its title, a circled **?**, and its controls. Nothing else.
   home card or a trend.
 - Sparse data is designed, not drawn as broken: one run is a "first reading" with a dotted ghost
   line; an unreported figure is one quiet line saying how to turn it on, not a 28px "n/a".
+
+## Layout and components
+
+- **Page rhythm**: a page is `PageHeader`, then sections spaced `space-y-12`; inside a section
+  `space-y-6`. Nothing else sets the gap between sections.
+- **Heading row** (one component for every section heading): title (18/600), `?`, an optional
+  count/sample chip, then actions on the right. On a narrow screen the actions wrap below; the
+  title never truncates. No captions beside the title ("vs #4" goes in the `?` or the content).
+- **Tables**: headers are `.t-label`; a header sits over its content's alignment (figures and
+  their headers right-aligned); stacked tables on one page share column widths; a change is
+  always `<Delta>` (`+23.6 pp`, `−120 ms`), never a bare arrow and number.
+- **States** have one look each, via `Badge` / `Chip`: pass, fail, flaky, unscored, not measured,
+  error, heuristic (hatched), cancelled. A failed run and a failed gate use the same fail style.
+  Pass-rate colour scales (heatmap, by category) snap to pass / flaky / fail bands and carry a
+  legend.
+- **Use the shared pieces**: `Button`, `Input`, `Select`, `Checkbox`, `FileInput`, `Segmented`,
+  `Table`, `Card` (boxed for panels), `Help` / `LabelHelp`, `Empty`, `Loading`, `Dialog`, `Menu`.
+  No hand-rolled versions.
+- **Empty states**: a plain title without a full stop ("No datasets yet"), one sentence (the
+  gauge line can live here), one action.
+- **Narrow screens (390 px)**: heroes stack (gauge, stamp and receipt go below the title); wide
+  tables scroll inside their section with a visible edge; chip rows wrap; no horizontal page
+  scroll.
+- At most two serif lines per page: the page title and the verdict.
+
+## Words
+
+One name per thing, on screen and in every message the server writes:
+
+| Say | Not |
+|---|---|
+| chatbot (headings, labels), bot (sentences) | assistant, agent, target |
+| connection | target, connector |
+| dataset (the object), questions (its contents) | question set, golden set, suite, test cases |
+| question | case (except the ID column) |
+| try | trial |
+| check | evaluator, metric (for a grading rule) |
+| grading model | judge (only in the glossary and one Settings explanation), grader |
+| run, run setup | experiment |
+| release gate | regression gate |
+| this computer | this PC, this machine |
+| per answer | per question, / answer |
+
+- Sentence case everywhere; "pass" / "fail" in lower case in sentences (capitals only on the gate
+  stamp).
+- Address the reader as "you"; no "me" / "my" / "I" in titles or buttons.
+- Verbs: "New X" opens a form, "Save X" submits, "Add X" adds to a list, "Delete X" deletes,
+  "Stop run" stops, "Cancel" only closes a dialog, "Test X" is a health check, "Apply gate"
+  runs a gate, "Re-grade" re-scores.
+- Real plurals (`plural(n, 'source')`), never "source(s)".
+- "…" not "...", curly quotes and apostrophes in copy, no em dashes, units spaced ("1.2 s",
+  "340 ms", "+3.1 pp"), one path separator: "Settings > Models & keys".
+- UK spelling (colour, labelled, organisation).
+- Server errors are sentences for the screen: no field names, no exception class names.

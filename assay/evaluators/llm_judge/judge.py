@@ -15,6 +15,7 @@ Design choices worth defending:
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import re
@@ -27,6 +28,7 @@ import yaml
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from assay.providers import ChatMessage, LLMProvider, json_from_text
+from assay.providers.base import GRADE_TIMEOUT
 from assay.schemas import NormalizedTargetResult, TestCase, Usage
 from assay.text import looks_like_refusal, normalize
 
@@ -187,6 +189,8 @@ class Judge:
     """Wraps a provider + pricing; one ``grade`` call per rubric per trial."""
 
     kind = "llm"
+    deadline_s = 300.0  # one grade, the time spent waiting for the model's queue not counted
+    calls_done = 0  # grades finished, however they ended (a run reads it for its progress)
 
     def __init__(self, provider: LLMProvider, pricing: Any = None):
         self.provider = provider
@@ -200,6 +204,23 @@ class Judge:
         return chars // 4, 120
 
     async def grade(self, rubric: Rubric, case: TestCase, result: NormalizedTargetResult) -> Verdict:
+        try:
+            async with asyncio.timeout(self.deadline_s) as cm:
+                token = GRADE_TIMEOUT.set(cm)
+                try:
+                    return await self._grade(rubric, case, result)
+                finally:
+                    GRADE_TIMEOUT.reset(token)
+        except TimeoutError:
+            if not cm.expired():
+                raise
+            meta = {**self.describe(), "rubric": rubric.id, "rubric_version": rubric.version,
+                    "prompt_hash": rubric.prompt_hash}
+            return Verdict("ERROR", None, "The grading model took longer than 5 minutes.", [], None, None, meta)
+        finally:
+            self.calls_done += 1
+
+    async def _grade(self, rubric: Rubric, case: TestCase, result: NormalizedTargetResult) -> Verdict:
         messages = build_messages(rubric, case, result)
         meta = {**self.describe(), "rubric": rubric.id, "rubric_version": rubric.version,
                 "prompt_hash": rubric.prompt_hash}
@@ -253,7 +274,7 @@ class HeuristicJudge(Judge):
     def estimate_tokens(self, rubric, case, result):
         return 0, 0
 
-    async def grade(self, rubric: Rubric, case: TestCase, result: NormalizedTargetResult) -> Verdict:
+    async def _grade(self, rubric: Rubric, case: TestCase, result: NormalizedTargetResult) -> Verdict:
         answer = result.answer or ""
         meta = {**self.describe(), "rubric": rubric.id, "rubric_version": rubric.version,
                 "prompt_hash": "heuristic-v1"}

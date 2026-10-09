@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import statistics
 import time
 from typing import Any
@@ -15,13 +16,17 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from assay.errors import plain_error
 from assay.evaluators.base import EvalContext
 from assay.providers import ChatMessage, ProviderError, ProviderSpec, build_provider, json_from_text
+from assay.runner import JobState
 from assay.schemas import NormalizedTargetResult, TestCase
 from assay.secrets import describe as describe_secret
 from assay.store import models as m
 from assay.store import service as svc
 from assay.store.insights import is_cloud_model_name, is_local_provider
+
+log = logging.getLogger("assay")
 
 DEFAULTS: dict[str, Any] = {
     "default_judge": None,  # {"provider_config_id": n} | {"provider": "heuristic"} | None
@@ -201,9 +206,10 @@ def labelled_items(s: Session, dimension: str) -> list[tuple[m.Trial, str]]:
     return list(latest.values())
 
 
-def start_bakeoff(s: Session, dimension: str, judges: list[dict[str, Any]]) -> m.JudgeBakeoff:
+def check_bakeoff(s: Session, dimension: str, judges: list[dict[str, Any]]) -> list[tuple[m.Trial, str]]:
+    """The labelled answers a bake-off would use, after every rule that could stop it."""
     if not judges or len(judges) > 4:
-        raise ValueError("Pick between 1 and 4 judges")
+        raise ValueError("Pick between 1 and 4 grading models.")
     for j in judges:
         if j.get("provider") != "heuristic":
             svc.get(s, m.ProviderConfig, int(j["provider_config_id"]))
@@ -217,11 +223,27 @@ def start_bakeoff(s: Session, dimension: str, judges: list[dict[str, Any]]) -> m
         for tid in {run_targets.get(t.run_id) for t, _ in items}:
             if tid is not None and (reason := judge_allowed(s, int(tid), j)):
                 raise svc.PolicyError(reason)
+    return items
+
+
+def start_bakeoff(s: Session, dimension: str, judges: list[dict[str, Any]]) -> m.JudgeBakeoff:
+    items = check_bakeoff(s, dimension, judges)
     b = m.JudgeBakeoff(dimension=dimension, judges=judges, status="running", progress_total=len(items) * len(judges),
                        progress_done=0)
     s.add(b)
     s.flush()
     return b
+
+
+def estimate_bakeoff(s: Session, dimension: str, judges: list[dict[str, Any]]) -> dict[str, Any]:
+    """{seconds, judge_calls, cost_usd}: every labelled answer graded by every model, one call at a time."""
+    from assay.store.insights import judge_job_estimate
+
+    items = check_bakeoff(s, dimension, judges)
+    parts = [judge_job_estimate(s, j, len(items)) for j in judges]
+    costs = [p["cost_usd"] for p in parts if p["cost_usd"] is not None]
+    return {"seconds": sum(p["seconds"] for p in parts), "judge_calls": sum(p["judge_calls"] for p in parts),
+            "cost_usd": sum(costs) if costs else None}
 
 
 def _kappa(a: list[str], b: list[str]) -> float | None:
@@ -230,69 +252,160 @@ def _kappa(a: list[str], b: list[str]) -> float | None:
     return binary_agreement(a, b).as_dict().get("kappa")
 
 
+class _Calls:
+    """Counts a bake-off's grading-model calls for its progress."""
+
+    calls_done = 0
+
+
+ACTIVE_BAKEOFFS: dict[int, JobState] = {}
+BAKEOFF_ENDED = ("completed", "failed", "cancelled")
+
+
 async def run_bakeoff(bakeoff_id: int) -> None:
+    """Grade the labelled answers with each model in turn. Like a run, it always ends: finished,
+    stopped, or failed with a sentence saying why; a stop request drops the call in flight."""
+    factory = svc._session_factory()
+    live = ACTIVE_BAKEOFFS[bakeoff_id] = JobState(loop=asyncio.get_running_loop())
+    live.judge = _Calls()
+    status, error, out = "completed", None, None
+    try:
+        with factory() as s:
+            b = svc.get(s, m.JudgeBakeoff, bakeoff_id)
+            if b.status != "running":
+                ACTIVE_BAKEOFFS.pop(bakeoff_id, None)
+                return  # stopped before it began
+            dimension, judge_cfgs = b.dimension, list(b.judges)
+            live.total = live.judge_total = b.progress_total
+            items = [(t.id, TestCase.model_validate(s.get(m.TestCaseRow, t.test_case_id).content),
+                      NormalizedTargetResult.model_validate(t.result), label)
+                     for t, label in labelled_items(s, dimension)]
+            judges = [(cfg, j) for cfg in judge_cfgs if (j := svc.build_judge(s, cfg)) is not None]
+            names = [f"{j.describe()['provider']}/{j.describe()['model']}" for _cfg, j in judges]
+            pricing = svc.pricing(s)
+            from assay.store.insights import judge_job_estimate
+
+            live.seed_s = sum(judge_job_estimate(s, cfg, len(items))["seconds"] for cfg, _ in judges)
+        work = asyncio.ensure_future(_bakeoff(bakeoff_id, factory, live, dimension, items, judges, names, pricing))
+        live.tasks.add(work)
+        out = await work
+    except asyncio.CancelledError:
+        if not live.cancel:
+            raise
+        status = "cancelled"
+    except Exception as exc:  # report, never hang
+        log.error("Bake-off %s failed", bakeoff_id, exc_info=True)
+        status, error = "failed", plain_error(exc, 1000)
+    try:
+        with factory() as s:
+            b = svc.get(s, m.JudgeBakeoff, bakeoff_id)
+            if live.cancel:
+                b.status, b.results, b.error = "cancelled", None, None
+            elif status == "failed":
+                b.status, b.error = "failed", error
+            else:
+                b.results, b.status = json.loads(json.dumps(out, default=str)), "completed"
+    except Exception as exc:
+        log.error("Could not finish bake-off %s", bakeoff_id, exc_info=True)
+        with factory() as s:
+            b = svc.get(s, m.JudgeBakeoff, bakeoff_id)
+            if b.status not in BAKEOFF_ENDED:
+                b.status, b.error = "failed", plain_error(exc, 1000)
+    finally:
+        ACTIVE_BAKEOFFS.pop(bakeoff_id, None)
+
+
+async def _bakeoff(bakeoff_id: int, factory: Any, live: JobState, dimension: str, items: list[Any],
+                   judges: list[Any], names: list[str], pricing: Any) -> dict[str, Any]:
     from assay.evaluators import get_evaluator
     from assay.statistics import binary_agreement
 
-    factory = svc._session_factory()
-    with factory() as s:
-        b = svc.get(s, m.JudgeBakeoff, bakeoff_id)
-        dimension, judge_cfgs = b.dimension, list(b.judges)
-        items = [(t.id, TestCase.model_validate(s.get(m.TestCaseRow, t.test_case_id).content),
-                  NormalizedTargetResult.model_validate(t.result), label) for t, label in labelled_items(s, dimension)]
-        judges = [(cfg, j) for cfg in judge_cfgs if (j := svc.build_judge(s, cfg)) is not None]
-        names = [f"{j.describe()['provider']}/{j.describe()['model']}" for _cfg, j in judges]
-        pricing = svc.pricing(s)
     ev = get_evaluator(dimension)
     results: list[dict[str, Any]] = []
-    try:
-        for (cfg, judge), name in zip(judges, names, strict=True):
-            labels, human, ms, cost, unknown = [], [], [], 0.0, 0
-            scores: list[float | None] = []
-            reasons: list[str] = []
-            for _trial_id, case, result, human_label in items:
-                ctx = EvalContext(judge=judge, pricing=pricing)
-                t0 = time.perf_counter()
+    for (cfg, judge), name in zip(judges, names, strict=True):
+        live.grading_model = name
+        labels, human, ms, cost, unknown = [], [], [], 0.0, 0
+        scores: list[float | None] = []
+        reasons: list[str] = []
+        for _trial_id, case, result, human_label in items:
+            ctx = EvalContext(judge=judge, pricing=pricing)
+            t0 = time.perf_counter()
+            live.in_grading += 1
+            try:
                 sc = await ev.run(case, result, None, ctx)
-                ms.append((time.perf_counter() - t0) * 1000)
-                cost += sc.judge_cost_usd or 0.0
-                status = sc.status.value if hasattr(sc.status, "value") else str(sc.status)
-                verdict = (sc.label or status).upper()
-                if verdict not in ("PASS", "FAIL"):
-                    unknown += 1
-                labels.append(verdict)
-                scores.append(sc.score)
-                reasons.append((sc.explanation or "")[:300])
-                human.append(human_label)
-                with factory() as s:
-                    svc.get(s, m.JudgeBakeoff, bakeoff_id).progress_done += 1
-                await asyncio.sleep(0)
-            agg = binary_agreement(human, labels).as_dict()
-            results.append({"judge": cfg, "name": name, "agreement": agg, "labels": labels, "unknown": unknown,
-                            "scores": scores, "reasons": reasons,
-                            "median_ms": round(statistics.median(ms)) if ms else None,
-                            "cost_usd": cost, "n": len(items)})
-        pairwise = []
-        for i in range(len(results)):
-            for k in range(i + 1, len(results)):
-                pairwise.append({"a": results[i]["name"], "b": results[k]["name"],
-                                 "kappa": _kappa(results[i]["labels"], results[k]["labels"])})
-        ranked = sorted(results, key=lambda r: (-(r["agreement"].get("kappa") or -2), r["cost_usd"]))
-        out = {"judges": results, "pairwise": pairwise, "human": [lbl for *_, lbl in items],
-               "trial_ids": [tid for tid, *_ in items],
-               "winner": ranked[0]["name"] if ranked and (ranked[0]["agreement"].get("kappa") is not None) else None}
-        with factory() as s:
-            b = svc.get(s, m.JudgeBakeoff, bakeoff_id)
-            b.results, b.status = json.loads(json.dumps(out, default=str)), "completed"
-    except Exception as exc:  # report, never hang
-        with factory() as s:
-            b = svc.get(s, m.JudgeBakeoff, bakeoff_id)
-            b.status, b.error = "failed", f"{type(exc).__name__}: {exc}"[:1000]
+            finally:
+                live.in_grading -= 1
+            ms.append((time.perf_counter() - t0) * 1000)
+            cost += sc.judge_cost_usd or 0.0
+            status = sc.status.value if hasattr(sc.status, "value") else str(sc.status)
+            verdict = (sc.label or status).upper()
+            if verdict not in ("PASS", "FAIL"):
+                unknown += 1
+            labels.append(verdict)
+            scores.append(sc.score)
+            reasons.append((sc.explanation or "")[:300])
+            human.append(human_label)
+            with factory() as s:
+                svc.get(s, m.JudgeBakeoff, bakeoff_id).progress_done += 1
+            live.graded += 1
+            live.asked = live.graded
+            live.judge.calls_done += 1
+            await asyncio.sleep(0)
+        agg = binary_agreement(human, labels).as_dict()
+        results.append({"judge": cfg, "name": name, "agreement": agg, "labels": labels, "unknown": unknown,
+                        "scores": scores, "reasons": reasons,
+                        "median_ms": round(statistics.median(ms)) if ms else None,
+                        "cost_usd": cost, "n": len(items)})
+    pairwise = []
+    for i in range(len(results)):
+        for k in range(i + 1, len(results)):
+            pairwise.append({"a": results[i]["name"], "b": results[k]["name"],
+                             "kappa": _kappa(results[i]["labels"], results[k]["labels"])})
+    ranked = sorted(results, key=lambda r: (-(r["agreement"].get("kappa") or -2), r["cost_usd"]))
+    return {"judges": results, "pairwise": pairwise, "human": [lbl for *_, lbl in items],
+            "trial_ids": [tid for tid, *_ in items],
+            "winner": ranked[0]["name"] if ranked and (ranked[0]["agreement"].get("kappa") is not None) else None}
+
+
+def cancel_bakeoff(s: Session, bakeoff_id: int) -> m.JudgeBakeoff:
+    """Stop a bake-off: ``cancelling`` at once, ``cancelled`` within seconds. Stopping twice changes nothing."""
+    b = svc.get(s, m.JudgeBakeoff, bakeoff_id)
+    if b.status in ("cancelling", "cancelled"):
+        return b
+    if b.status != "running":
+        raise svc.Conflict("This comparison has already finished, so it cannot be stopped.")
+    live = ACTIVE_BAKEOFFS.get(bakeoff_id)
+    if live is None:  # not running in this process
+        b.status = "cancelled"
+        return b
+    b.status = "cancelling"
+    s.commit()
+    live.request_cancel()
+    return b
+
+
+def recover_bakeoffs(s: Session) -> None:
+    """After a restart: what was running did not finish; what was being stopped is stopped."""
+    for b in s.scalars(select(m.JudgeBakeoff).where(m.JudgeBakeoff.status.in_(["running", "cancelling"]))):
+        if b.status == "cancelling":
+            b.status = "cancelled"
+        else:
+            b.status, b.error = "failed", svc.RESTART_ERROR
+
+
+def bakeoff_progress(b: m.JudgeBakeoff) -> dict[str, Any]:
+    live = ACTIVE_BAKEOFFS.get(b.id)
+    if live is not None and b.status in ("running", "cancelling"):
+        return {**live.progress(), "total": b.progress_total}
+    n = b.progress_done
+    return {"total": b.progress_total, "asked": n, "graded": n, "judge_calls_done": n,
+            "judge_calls_total": b.progress_total, "waiting_on": None, "grading_model": None, "eta_s": None}
 
 
 def bakeoff_public(b: m.JudgeBakeoff) -> dict[str, Any]:
     return {"id": b.id, "dimension": b.dimension, "status": b.status, "judges": b.judges,
-            "progress_done": b.progress_done, "progress_total": b.progress_total, "results": b.results,
+            "progress_done": b.progress_done, "progress_total": b.progress_total,
+            "progress": bakeoff_progress(b), "results": b.results,
             "error": b.error, "created_at": b.created_at.isoformat() if b.created_at else None}
 
 
@@ -317,16 +430,21 @@ def judge_allowed(s: Session, target_id: int, judge: dict[str, Any] | None) -> s
 
 
 def dry_run_summary(calls: list[dict[str, Any]], dataset_cases: int, trials: int, concurrency: int,
-                    pricing: Any) -> dict[str, Any]:
+                    pricing: Any, grading: dict[str, Any] | None = None) -> dict[str, Any]:
+    """``grading`` is the default grading model's profile (see ``insights.judge_profile``): a full run
+    also waits for it, one call at a time when it runs on this computer."""
     ok = [c for c in calls if c.get("ok")]
     lat = [c["elapsed_ms"] for c in ok if c.get("elapsed_ms")]
     costs = [float(c["cost_usd"]) for c in ok if c.get("cost_usd") is not None]
     per = statistics.median(lat) if lat else None
     total_calls = dataset_cases * trials
+    grade_ms = (grading or {}).get("ms") or 0.0
+    grade_s = grade_ms * total_calls / (1 if (grading or {}).get("local") else max(1, concurrency)) / 1000
     return {"calls": calls, "ok": len(ok), "median_ms": round(per) if per else None,
             "per_answer_cost_usd": statistics.mean(costs) if costs else None,
             "full_run_calls": total_calls,
-            "full_run_seconds": round(per * total_calls / max(1, concurrency) / 1000) if per else None,
+            "full_run_seconds": round(per * total_calls / max(1, concurrency) / 1000 + grade_s) if per else None,
+            "full_run_grading_seconds": round(grade_s) if grade_s else None,
             "full_run_cost_usd": (statistics.mean(costs) * total_calls) if costs else None}
 
 

@@ -16,17 +16,68 @@ Semantics worth knowing:
 from __future__ import annotations
 
 import asyncio
+import logging
 import random
+import time
 import zlib
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
 from assay.adapters.base import AdapterContext, TargetAdapter, TargetCall, TransientTargetError, now
+from assay.errors import plain_error
 from assay.evaluators import get_evaluator
 from assay.evaluators.base import EvalContext
 from assay.schemas import EvalStatus, EvaluationResult, NormalizedTargetResult, TestCase, Trace
 from assay.traces import add_evaluator_spans, build_trace, redact
+
+log = logging.getLogger("assay")
+
+
+@dataclass
+class JobState:
+    """What a running job is doing right now, in this process: the stop request, the tasks that can
+    be cancelled, and the counters the screen's progress bar reads."""
+
+    loop: asyncio.AbstractEventLoop | None = None
+    cancel: bool = False
+    tasks: set[asyncio.Future[Any]] = field(default_factory=set)
+    total: int = 0
+    asked: int = 0
+    graded: int = 0  # answers fully graded; stopped ones never count
+    in_bot: int = 0
+    in_grading: int = 0
+    judge: Any = None
+    judge_total: int | None = None
+    grading_model: str | None = None
+    seed_s: float | None = None  # the estimate made when the job started
+    started: float = field(default_factory=time.monotonic)
+
+    def request_cancel(self) -> None:
+        """Safe from any thread: stop asking, and drop every call in flight."""
+        self.cancel = True
+        if self.loop is not None and not self.loop.is_closed():
+            self.loop.call_soon_threadsafe(self._drop_tasks)
+
+    def _drop_tasks(self) -> None:
+        for task in list(self.tasks):
+            task.cancel()
+
+    def eta_s(self) -> int | None:
+        left = max(0, self.total - self.graded)
+        if self.graded >= 3:
+            return round((time.monotonic() - self.started) / self.graded * left)
+        if self.seed_s is not None and self.total:
+            return round(self.seed_s * left / self.total)
+        return None
+
+    def progress(self) -> dict[str, Any]:
+        waiting = ("grading_model" if self.in_grading and self.in_grading >= self.in_bot
+                   else "bot" if self.in_bot else None)
+        return {"total": self.total, "asked": self.asked, "graded": self.graded,
+                "judge_calls_done": getattr(self.judge, "calls_done", 0) if self.judge is not None else 0,
+                "judge_calls_total": self.judge_total, "waiting_on": waiting,
+                "grading_model": self.grading_model, "eta_s": self.eta_s()}
 
 
 @dataclass
@@ -141,8 +192,12 @@ def _sum(values: list[float | None]) -> float | None:
 
 
 async def run_trials(spec: RunSpec, on_trial: Callable[[TrialRecord], Awaitable[None]] | None = None,
-                     should_stop: Callable[[], bool] | None = None) -> tuple[list[TrialRecord], str | None]:
-    """Returns (records, stop_reason). stop_reason is None, 'cancelled', 'budget' or 'max_answers'."""
+                     should_stop: Callable[[], bool] | None = None,
+                     live: JobState | None = None) -> tuple[list[TrialRecord], str | None]:
+    """Returns (records, stop_reason). stop_reason is None, 'cancelled', 'budget' or 'max_answers'.
+
+    With ``live``, a stop request also cancels the answers in flight (the call to the bot or to the
+    grading model is dropped) and they are kept as ``cancelled``."""
     ctx = EvalContext(k=spec.k, judge=spec.judge, pricing=spec.pricing, options=spec.options,
                       not_measured=frozenset(spec.not_measured))
     sem = asyncio.Semaphore(max(1, spec.concurrency))
@@ -157,12 +212,13 @@ async def run_trials(spec: RunSpec, on_trial: Callable[[TrialRecord], Awaitable[
     stop_reason: str | None = None
     lock = asyncio.Lock()
     records: list[TrialRecord] = []
+    seen: set[tuple[str, int]] = set()
 
     def stopping() -> bool:
         nonlocal stop_reason
         if stop_reason:
             return True
-        if should_stop and should_stop():
+        if (should_stop and should_stop()) or (live and live.cancel):
             stop_reason = "cancelled"
         elif spec.budget_usd is not None and (spent >= spec.budget_usd or
                                               (expected() > 0 and spent + reserved + expected() > spec.budget_usd)):
@@ -171,49 +227,84 @@ async def run_trials(spec: RunSpec, on_trial: Callable[[TrialRecord], Awaitable[
             stop_reason = "max_answers"
         return stop_reason is not None
 
-    async def one(case: TestCase, trial: int) -> None:
+    async def save(rec: TrialRecord) -> None:
+        async with lock:
+            records.append(rec)
+            if on_trial:
+                await on_trial(rec)
+        seen.add((rec.case_id, rec.trial_index))
+        if live and rec.status != "cancelled":
+            live.graded += 1
+
+    async def answer(case: TestCase, trial: int) -> TrialRecord:
         nonlocal spent, asked, reserved
         async with sem:
             if stopping():
-                rec = TrialRecord(case.id, trial, "cancelled", None, None, [])
-            else:
-                asked += 1
-                hold = expected()
-                reserved += hold  # no await between the check and this: no other answer can slip in
-                test_input = case.input.model_dump()
-                actx = AdapterContext(case_id=case.id, trial_index=trial,
-                                      seed=zlib.crc32(f"{spec.seed}:{case.id}:{trial}".encode()), run_id=spec.run_id)
-                try:
-                    call, attempts = await call_with_retry(spec.adapter, test_input, actx, spec.max_retries)
-                except Exception as exc:  # a target bug or an unmappable reply is this trial's error, not the run's
-                    t = now()
-                    call = TargetCall(result=NormalizedTargetResult(error=f"{type(exc).__name__}: {exc}"[:500]),
-                                      started_at=t, ended_at=t)
-                    attempts = 1
-                result = call.result
-                t_cost = target_cost(result, spec.pricing)
-                if t_cost is None and spec.cost_per_answer_usd is not None and not result.error:
-                    t_cost = spec.cost_per_answer_usd
-                    result.metadata["cost_source"] = "cost per answer set on the connection"
-                if t_cost is not None:
-                    result.metadata["estimated_cost_usd"] = t_cost
-                trace = build_trace(test_input, call, spec.pricing)
+                return TrialRecord(case.id, trial, "cancelled", None, None, [])
+            asked += 1
+            if live:
+                live.asked = asked
+            hold = expected()
+            reserved += hold  # no await between the check and this: no other answer can slip in
+            test_input = case.input.model_dump()
+            actx = AdapterContext(case_id=case.id, trial_index=trial,
+                                  seed=zlib.crc32(f"{spec.seed}:{case.id}:{trial}".encode()), run_id=spec.run_id)
+            if live:
+                live.in_bot += 1
+            try:
+                call, attempts = await call_with_retry(spec.adapter, test_input, actx, spec.max_retries)
+            except Exception as exc:  # a target bug or an unmappable reply is this trial's error, not the run's
+                log.warning("The bot raised while answering a question", exc_info=True)
+                t = now()
+                call = TargetCall(result=NormalizedTargetResult(error=f"The bot failed: {plain_error(exc)}"),
+                                  started_at=t, ended_at=t)
+                attempts = 1
+            finally:
+                if live:
+                    live.in_bot -= 1
+            result = call.result
+            t_cost = target_cost(result, spec.pricing)
+            if t_cost is None and spec.cost_per_answer_usd is not None and not result.error:
+                t_cost = spec.cost_per_answer_usd
+                result.metadata["cost_source"] = "cost per answer set on the connection"
+            if t_cost is not None:
+                result.metadata["estimated_cost_usd"] = t_cost
+            trace = build_trace(test_input, call, spec.pricing)
+            if live:
+                live.in_grading += 1
+            try:
                 scores = await evaluate_trial(case, result, trace, spec.evaluators, ctx)
-                add_evaluator_spans(trace, scores)
-                j_cost = _sum([s.judge_cost_usd for s in scores])
-                total = _sum([t_cost, j_cost])
-                result, stored_trace, scores = redact_record(result, trace, scores, spec.redact_fields)
-                rec = TrialRecord(case.id, trial, trial_status(result, scores), result, stored_trace, scores,
-                                  raw=redact(call.raw, spec.redact_fields), attempts=attempts, cost_usd=total,
-                                  target_cost_usd=t_cost, judge_cost_usd=j_cost)
-                reserved -= hold
-                costs.append(total or 0.0)
-                if total:
-                    spent += total
-            async with lock:
-                records.append(rec)
-                if on_trial:
-                    await on_trial(rec)
+            finally:
+                if live:
+                    live.in_grading -= 1
+            add_evaluator_spans(trace, scores)
+            j_cost = _sum([s.judge_cost_usd for s in scores])
+            total = _sum([t_cost, j_cost])
+            result, stored_trace, scores = redact_record(result, trace, scores, spec.redact_fields)
+            rec = TrialRecord(case.id, trial, trial_status(result, scores), result, stored_trace, scores,
+                              raw=redact(call.raw, spec.redact_fields), attempts=attempts, cost_usd=total,
+                              target_cost_usd=t_cost, judge_cost_usd=j_cost)
+            reserved -= hold
+            costs.append(total or 0.0)
+            if total:
+                spent += total
+            return rec
+
+    async def one(case: TestCase, trial: int) -> None:
+        saving: list[asyncio.Future[None]] = []  # the save in progress, once the answer is done
+        try:
+            rec = await answer(case, trial)
+            saving.append(asyncio.ensure_future(save(rec)))
+            await asyncio.shield(saving[0])  # a stop never leaves a half-saved answer
+        except asyncio.CancelledError:
+            if not (live and live.cancel):
+                raise
+            if task := asyncio.current_task():
+                task.uncancel()  # a stop request ends this answer, not the whole run
+            if saving:
+                await saving[0]
+            else:
+                await save(TrialRecord(case.id, trial, "cancelled", None, None, []))
 
     # A TaskGroup cancels every sibling if one trial fails unexpectedly (e.g. the database), so no
     # orphaned task keeps writing after the run has been marked failed.
@@ -221,6 +312,15 @@ async def run_trials(spec: RunSpec, on_trial: Callable[[TrialRecord], Awaitable[
         for c in spec.cases:
             if c.enabled:
                 for t in range(spec.trials):
-                    tg.create_task(one(c, t))
-    records.sort(key=lambda r: ([c.id for c in spec.cases].index(r.case_id), r.trial_index))
+                    task = tg.create_task(one(c, t))
+                    if live:
+                        live.tasks.add(task)
+                        task.add_done_callback(live.tasks.discard)
+    if live and live.cancel:  # an answer stopped before it even began leaves no record: add it
+        for c in spec.cases:
+            for t in range(spec.trials if c.enabled else 0):
+                if (c.id, t) not in seen:
+                    await save(TrialRecord(c.id, t, "cancelled", None, None, []))
+    order = {c.id: i for i, c in enumerate(spec.cases)}
+    records.sort(key=lambda r: (order[r.case_id], r.trial_index))
     return records, stop_reason

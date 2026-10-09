@@ -20,6 +20,8 @@ from typing import Any
 
 import httpx
 
+from assay.errors import plain_error
+
 DEFAULT_URL = "http://localhost:11434"
 
 # Rough figures for advice only: download size, memory it needs, and seconds per grading call.
@@ -123,7 +125,8 @@ async def pull(model: str, base_url: str = DEFAULT_URL) -> None:
     state = PULLS[model] = {"model": model, "status": "starting", "completed": 0, "total": None,
                             "done": False, "error": None, "started": time.time()}
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(30, read=None)) as c, \
+        # No chunk for 60 s means the download has stalled (Ollama sends progress lines steadily).
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30, read=60)) as c, \
                 c.stream("POST", f"{base_url.rstrip('/')}/api/pull", json={"model": model, "name": model, "stream": True}) as r:
             r.raise_for_status()
             async for line in r.aiter_lines():
@@ -136,8 +139,18 @@ async def pull(model: str, base_url: str = DEFAULT_URL) -> None:
                 if ev.get("total"):
                     state["total"], state["completed"] = ev["total"], ev.get("completed", 0)
         state["status"], state["done"] = "success", True
+    except httpx.TimeoutException:
+        state["error"], state["done"] = "The download stopped: Ollama sent nothing for 60 seconds. Start it again.", True
     except Exception as exc:
-        state["error"], state["done"] = f"{type(exc).__name__}: {str(exc)[:200]}", True
+        state["error"], state["done"] = plain_error(exc, 200), True
+
+
+LOST = {"status": "lost", "done": True, "error": "The server restarted during the download. Start it again."}
+
+
+def pull_progress(model: str) -> dict[str, Any]:
+    """The download's progress; a model this server knows nothing about was lost in a restart."""
+    return PULLS.get(model) or {"model": model, "completed": 0, "total": None, **LOST}
 
 
 _TASKS: set[asyncio.Task[None]] = set()  # strong references, so a running download is not collected

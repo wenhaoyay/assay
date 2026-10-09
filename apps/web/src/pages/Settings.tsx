@@ -8,7 +8,7 @@ import { Badge, Button, Card, Empty, ErrorState, Field, Help, Input, Json, Loadi
 import { api } from '../lib/api'
 import { whereLabel } from '../lib/models'
 import { useCrumbs } from '../lib/crumbs'
-import { ms, pct, usd } from '../lib/format'
+import { ms, pct, plural, usd } from '../lib/format'
 import { usePrefs } from '../lib/prefs'
 import type { CatalogEntry, ConnectorTemplate, ModelCheck, ProviderConfig, Settings } from '../lib/types'
 import { LocalModelsCard } from '../components/LocalModels'
@@ -60,7 +60,7 @@ function ModelsTab() {
         <p>Keys are stored in your operating system's credential store and never shown again.</p>
         <p>Check sends five grading calls and reports speed, how many verdicts came back as valid JSON, and what 100 calls would cost.</p>
       </>}>
-        {models.isLoading ? <Loading /> : (models.data ?? []).length === 0 ? (
+        {models.isLoading ? <Loading /> : models.isError ? <ErrorState error={models.error} retry={() => models.refetch()} /> : (models.data ?? []).length === 0 ? (
           <Empty title="No grading model yet. Objective checks still run; meaning needs a judge.">Connect OpenAI below (or a local model) to enable meaning checks and the judge bake-off.</Empty>
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">
@@ -95,9 +95,9 @@ function ModelsTab() {
 
 function ModelCard({ m, settings, onChange }: { m: ProviderConfig; settings?: Settings; onChange: () => void }) {
   const [check, setCheck] = useState<ModelCheck | null>(null)
-  const run = useMutation({ mutationFn: () => api.post<ModelCheck>(`/api/models/${m.id}/check`), onSuccess: setCheck })
-  const setDefault = useMutation({ mutationFn: (key: 'default_judge' | 'default_generator') => api.put('/api/settings', { [key]: { provider_config_id: m.id } }), onSuccess: onChange })
-  const del = useMutation({ mutationFn: () => api.del(`/api/providers/${m.id}`), onSuccess: onChange })
+  const run = useMutation({ mutationFn: () => api.post<ModelCheck>(`/api/models/${m.id}/check`), onSuccess: setCheck, meta: { silent: true } })
+  const setDefault = useMutation({ mutationFn: (key: 'default_judge' | 'default_generator') => api.put('/api/settings', { [key]: { provider_config_id: m.id } }), onSuccess: onChange, meta: { silent: true } })
+  const del = useMutation({ mutationFn: () => api.del(`/api/providers/${m.id}`), onSuccess: onChange, meta: { silent: true } })
   const isJudge = settings?.default_judge?.provider_config_id === m.id
   const isGen = settings?.default_generator?.provider_config_id === m.id
   return (
@@ -136,11 +136,13 @@ function ModelCard({ m, settings, onChange }: { m: ProviderConfig; settings?: Se
       </AnimatePresence>
       <div className="mt-3 flex flex-wrap gap-1.5">
         <Button size="sm" loading={run.isPending} onClick={() => run.mutate()}><RefreshCw className="size-3.5" />Check (5 calls)</Button>
-        {!isJudge && <Button size="sm" variant="ghost" onClick={() => setDefault.mutate('default_judge')}>Make default judge</Button>}
-        {!isGen && <Button size="sm" variant="ghost" onClick={() => setDefault.mutate('default_generator')}>Use to draft test cases</Button>}
+        {!isJudge && <Button size="sm" variant="ghost" loading={setDefault.isPending && setDefault.variables === 'default_judge'} onClick={() => setDefault.mutate('default_judge')}>Make default grading model</Button>}
+        {!isGen && <Button size="sm" variant="ghost" loading={setDefault.isPending && setDefault.variables === 'default_generator'} onClick={() => setDefault.mutate('default_generator')}>Use to draft test cases</Button>}
         {!m.used_by_runs && <Button size="sm" variant="ghost" className="ml-auto text-bad-ink" loading={del.isPending} onClick={() => del.mutate()}><Trash2 className="size-3.5" />Remove</Button>}
       </div>
       {del.isError && <div className="mt-2"><ErrorState error={del.error} /></div>}
+      {run.isError && <div className="mt-2"><ErrorState error={run.error} /></div>}
+      {setDefault.isError && <div className="mt-2"><ErrorState error={setDefault.error} /></div>}
     </motion.div>
   )
 }
@@ -165,8 +167,9 @@ function ConnectProvider({ entry, keyring, onClose, onDone }: { entry: CatalogEn
   const [name, setName] = useState('')
   const [makeDefault, setMakeDefault] = useState(true)
   const storeKey = useMutation({ mutationFn: () => api.put<{ ref: string; hint: string }>(`/api/secrets/${keyName}`, { value: key }), onSuccess: (r) => { setKeyRef(r.ref); setKey(''); setKeyMode('stored') } })
-  const list = useMutation({ mutationFn: () => api.post<{ ok: boolean; models: string[]; error?: string }>('/api/models/list', { provider: entry.kind, base_url: baseUrl || null, api_key_ref: keyRef || null }) })
+  const list = useMutation({ meta: { silent: true }, mutationFn: () => api.post<{ ok: boolean; models: string[]; error?: string }>('/api/models/list', { provider: entry.kind, base_url: baseUrl || null, api_key_ref: keyRef || null }) })
   const add = useMutation({
+    meta: { silent: true },
     mutationFn: async () => {
       const m = await api.post<ProviderConfig>('/api/models', { name: name || `${entry.label} - ${model}`, provider: entry.kind, model, base_url: baseUrl || null, api_key_ref: keyRef || null })
       if (makeDefault) await api.put('/api/settings', { default_judge: { provider_config_id: m.id } })
@@ -212,7 +215,7 @@ function ConnectProvider({ entry, keyring, onClose, onDone }: { entry: CatalogEn
             <div className="flex flex-wrap items-end gap-2">
               <Button loading={list.isPending} onClick={() => list.mutate()}><RefreshCw className="size-3.5" />Load models from {entry.label}</Button>
               {list.data?.ok && (
-                <Field label={`${list.data.models.length} models`}>
+                <Field label={plural(list.data.models.length, 'model')}>
                   <Select className="w-72" value={model} onChange={(e) => setModel(e.target.value)} aria-label="Model">
                     <option value="">Choose...</option>{list.data.models.map((x) => <option key={x}>{x}</option>)}
                   </Select>
@@ -221,6 +224,7 @@ function ConnectProvider({ entry, keyring, onClose, onDone }: { entry: CatalogEn
               <Field label="or type a model id"><Input className="w-56" value={model} onChange={(e) => setModel(e.target.value)} placeholder="model id" /></Field>
             </div>
             {list.data && !list.data.ok && <p className="mt-2 text-xs text-bad-ink">{list.data.error}</p>}
+            {list.isError && <div className="mt-2"><ErrorState error={list.error} /></div>}
           </li>
           <li className={clsx(!model && 'pointer-events-none opacity-40')}>
             <div className="mb-2 flex items-center gap-2 text-sm font-semibold"><span className="flex size-5 items-center justify-center rounded-full bg-accent font-mono text-label text-on-accent">3</span>Name and save
@@ -415,9 +419,11 @@ function ShapeTab() {
 function TemplatesTab() {
   const qc = useQueryClient()
   const t = useQuery({ queryKey: ['connector-templates'], queryFn: () => api.get<ConnectorTemplate[]>('/api/connector-templates') })
-  const del = useMutation({ mutationFn: (id: string) => api.del(`/api/connector-templates/${id.split(':')[1]}`), onSuccess: () => qc.invalidateQueries({ queryKey: ['connector-templates'] }) })
+  const del = useMutation({ mutationFn: (id: string) => api.del(`/api/connector-templates/${id.split(':')[1]}`), onSuccess: () => { setConfirm(null); qc.invalidateQueries({ queryKey: ['connector-templates'] }) }, meta: { silent: true } })
   const [open, setOpen] = useState<string | null>(null)
+  const [confirm, setConfirm] = useState<string | null>(null)
   if (t.isLoading) return <Loading />
+  if (t.isError) return <ErrorState error={t.error} retry={() => t.refetch()} />
   return (
     <Card padded={false} title="Connection templates" meta={`${(t.data ?? []).length}`} help={<>
       <p>Start a new connection from one of these in the connect wizard. Save your own from a connection's page.</p>
@@ -434,7 +440,9 @@ function TemplatesTab() {
                 <td className="text-ink-2">{x.description}</td>
                 <td className="whitespace-nowrap text-right">
                   <Button size="sm" variant="ghost" onClick={() => setOpen(open === x.id ? null : x.id)}>{open === x.id ? 'Hide' : 'Show'}</Button>
-                  {!x.builtin && <Button size="sm" variant="ghost" className="text-bad-ink" onClick={() => del.mutate(x.id)}><Trash2 className="size-3.5" /></Button>}
+                  {!x.builtin && (confirm === x.id
+                    ? <><Button size="sm" variant="bad" loading={del.isPending} onClick={() => del.mutate(x.id)}>Delete template</Button><Button size="sm" variant="ghost" onClick={() => setConfirm(null)}>Keep</Button></>
+                    : <Button size="sm" variant="ghost" className="text-bad-ink" aria-label={`Delete template ${x.name}`} onClick={() => { del.reset(); setConfirm(x.id) }}><Trash2 className="size-3.5" /></Button>)}
                 </td>
               </tr>
               {open === x.id && <tr><td colSpan={4}><Json value={x.config} maxHeight={300} /></td></tr>}
@@ -442,6 +450,7 @@ function TemplatesTab() {
           ))}
         </tbody>
       </Table>
+      {del.isError && <div className="p-3"><ErrorState error={del.error} /></div>}
       <p className="flex items-center gap-1.5 border-t border-line py-2 text-xs text-ink-2"><ShieldCheck className="size-3.5 text-good-ink" />Templates hold key references (env:/keyring:), never keys.</p>
     </Card>
   )

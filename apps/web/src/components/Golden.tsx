@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { useDeferredValue, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
+import { plural } from '../lib/format'
 import { usePrefs } from '../lib/prefs'
 import type { Dataset, DatasetVersion, EditResult, Project, RunHeader, TestCase, TrialRow } from '../lib/types'
 import { Badge, Button, Card, Dialog, Empty, ErrorState, Field, Help, Input, Kbd, Loading, Notice, ProgressBar, Select, Textarea } from './ui'
@@ -376,12 +377,12 @@ function PromptKit({ dataset, project }: { dataset: Dataset; project?: Project }
       <Textarea rows={12} readOnly value={prompt} aria-label="Prompt" />
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="primary" onClick={() => { void navigator.clipboard?.writeText(prompt); setCopied(true) }}><ClipboardCopy className="size-3.5" />{copied ? 'Copied' : 'Copy the prompt'}</Button>
-        <span className="text-xs text-ink-2">{(docs.data ?? []).length ? `Lists the ${(docs.data ?? []).length} document(s) uploaded for this chatbot.` : 'No documents uploaded here: the prompt refers to the ones you attach.'}</span>
+        <span className="text-xs text-ink-2">{(docs.data ?? []).length ? `Lists the ${plural((docs.data ?? []).length, 'document')} uploaded for this chatbot.` : 'No documents uploaded here: the prompt refers to the ones you attach.'}</span>
       </div>
       <div className="border-t border-line pt-3">
         <Field label="Upload the result (CSV, YAML or JSON)"><input type="file" accept=".csv,.yaml,.yml,.json" aria-label="Drafted cases file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="block w-full text-xs file:mr-3 file:rounded-md file:border file:border-line-strong file:bg-surface file:px-2.5 file:py-1 file:text-xs" /></Field>
         <Button className="mt-2" disabled={!file} loading={upload.isPending} onClick={() => upload.mutate()}><FileUp className="size-3.5" />Send to the review queue</Button>
-        {upload.data && <div className="mt-2"><Notice tone="good" title={`${upload.data.created} draft case(s) in the review queue`}>{upload.data.notice} Open <span className="font-semibold">Generate &amp; review</span> to go through them.</Notice></div>}
+        {upload.data && <div className="mt-2"><Notice tone="good" title={`${plural(upload.data.created, 'draft case')} in the review queue`}>{upload.data.notice} Open <span className="font-semibold">Generate &amp; review</span> to go through them.</Notice></div>}
         {upload.isError && <div className="mt-2"><ErrorState error={upload.error} /></div>}
       </div>
     </div>
@@ -433,7 +434,7 @@ function RealQuestions({ version, onEdited }: { version: DatasetVersion; onEdite
           <Button variant="primary" disabled={!picked.length} loading={add.isPending} onClick={() => void addAll()}>Add {picked.length || ''} question{picked.length === 1 ? '' : 's'}</Button>
         </>
       )}
-      {done > 0 && <Notice tone="good" title={`${done} real question(s) added`} />}
+      {done > 0 && <Notice tone="good" title={`${plural(done, 'real question')} added`} />}
       {add.isError && <ErrorState error={add.error} />}
     </div>
   )
@@ -553,7 +554,7 @@ export function AddVariations({ versionId, caseId }: { versionId: number; caseId
         </div>
         <p className="mt-2 text-xs text-ink-2">Other words and translations use the drafting model from Settings › Defaults.</p>
         <Button className="mt-3" variant="primary" disabled={!kinds.length} loading={make.isPending} onClick={() => make.mutate()}>Create {kinds.length} variation{kinds.length === 1 ? '' : 's'}</Button>
-        {make.data && <div className="mt-3"><Notice tone="good" title={`${make.data.created} variation(s) in the review queue`}>{make.data.errors.length ? `Not created: ${make.data.errors.join('; ')}` : 'Open Generate & review to approve them.'}</Notice></div>}
+        {make.data && <div className="mt-3"><Notice tone="good" title={`${plural(make.data.created, 'variation')} in the review queue`}>{make.data.errors.length ? `Not created: ${make.data.errors.join('; ')}` : 'Open Generate & review to approve them.'}</Notice></div>}
         {make.isError && <div className="mt-3"><ErrorState error={make.error} /></div>}
       </Dialog>
     </>

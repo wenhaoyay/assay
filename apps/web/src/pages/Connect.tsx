@@ -11,12 +11,12 @@ import { useState, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { CleanupMethodHelp, ConnectionHelp, MethodHelp } from '../components/helpTexts'
 import { JsonTree } from '../components/JsonTree'
-import { Badge, Button, Card, ErrorState, Field, Input, Json, Notice, PageHeader, PageSkeleton, Segmented, Select, Table, Textarea, Toggle } from '../components/ui'
+import { Badge, Button, Card, ErrorState, Field, Input, Json, Notice, PageHeader, PageSkeleton, Segmented, Select, Table, Textarea, Toggle, toast } from '../components/ui'
 import { LabelHelp } from '../components/LabelHelp'
 import { api } from '../lib/api'
 import { useCrumbs } from '../lib/crumbs'
 import { projectOption, useProjects } from '../lib/projects'
-import { ms, usd } from '../lib/format'
+import { ms, plural, usd } from '../lib/format'
 import type { Capability, ConnectorTemplate, Dataset, Project, Target, TargetResult } from '../lib/types'
 
 type Route = 'curl' | 'http' | 'stream' | 'openai' | 'python' | 'logs' | 'template'
@@ -127,6 +127,7 @@ function ConnectWizard({ editing }: { editing: Target | null }) {
 
 
   const runProbe = useMutation({
+    meta: { silent: true },
     mutationFn: () => api.post<Probe>('/api/connect/probe', { adapter, config: cfg, message }),
     onSuccess: (p) => {
       setProbe(p)
@@ -144,6 +145,7 @@ function ConnectWizard({ editing }: { editing: Target | null }) {
     },
   })
   const runTest = useMutation({
+    meta: { silent: true },
     mutationFn: () => api.post<TestResult>('/api/connect/test', { adapter, config: cfg, message }),
     onSuccess: setTest,
   })
@@ -168,7 +170,7 @@ function ConnectWizard({ editing }: { editing: Target | null }) {
               {step === 1 && (route === 'logs' ? null : <StepRequest route={route} adapter={adapter} cfg={cfg} setCfg={setCfg} />)}
               {step === 2 && (
                 <StepMap adapter={adapter} cfg={cfg} setCfg={setCfg} standard={standard} setStandard={setStandard} message={message} setMessage={setMessage}
-                  probe={probe} runProbe={() => runProbe.mutate()} probing={runProbe.isPending} test={test} runTest={() => runTest.mutate()} testing={runTest.isPending}
+                  probe={probe} runProbe={() => runProbe.mutate()} probing={runProbe.isPending} test={test} runTest={() => runTest.mutate()} testing={runTest.isPending} probeError={runProbe.error} testError={runTest.error}
                   picking={picking} setPicking={(p) => { setPicking(p); setPickError(null) }} pickError={pickError} setPickError={setPickError} />
               )}
               {step === 3 && <StepSave adapter={adapter} cfg={cfg} setCfg={setCfg} projects={projects.visible} editing={editing}
@@ -461,10 +463,10 @@ function marksFor(m: Mapping): Record<string, string> {
 function StepMap(props: {
   adapter: 'http' | 'python'; cfg: Cfg; setCfg: (f: (c: Cfg) => Cfg) => void; standard: boolean; setStandard: (v: boolean) => void
   message: string; setMessage: (v: string) => void; probe: Probe | null; runProbe: () => void; probing: boolean
-  test: TestResult | null; runTest: () => void; testing: boolean
+  test: TestResult | null; runTest: () => void; testing: boolean; probeError?: unknown; testError?: unknown
   picking: string | null; setPicking: (p: string | null) => void; pickError: string | null; setPickError: (e: string | null) => void
 }) {
-  const { adapter, cfg, setCfg, standard, setStandard, message, setMessage, probe, runProbe, probing, test, runTest, testing, picking, setPicking, pickError, setPickError } = props
+  const { adapter, cfg, setCfg, standard, setStandard, message, setMessage, probe, runProbe, probing, test, runTest, testing, probeError, testError, picking, setPicking, pickError, setPickError } = props
   const mapping = (cfg.response ?? {}) as Mapping
   const isStream = probe?.kind === 'sse' || probe?.kind === 'ndjson'
   const raw = probe?.kind === 'json' ? probe.json : probe?.kind === 'text' ? probe.text : isStream ? probe?.collected : undefined
@@ -494,8 +496,9 @@ function StepMap(props: {
           <Input value={message} onChange={(e) => setMessage(e.target.value)} aria-label="Test question" />
           <Button variant="primary" loading={probing} onClick={runProbe}><Send className="size-3.5" />Send</Button>
         </div>
+        {!!probeError && <div className="mt-3"><ErrorState error={probeError} /></div>}
         {probe && !probe.ok && <div className="mt-3"><Notice tone="bad" title={probe.explanation ?? 'The request failed'}><span className="font-mono text-xs">{probe.error}</span></Notice></div>}
-        {probe?.ok && <p className="num mt-2 text-xs text-good-ink">Reply received{probe.status ? ` (HTTP ${probe.status}` : ''}{probe.elapsed_ms ? `, ${ms(probe.elapsed_ms)})` : ')'}{isStream ? `: a stream of ${probe.events?.length} event type(s)` : ''}.</p>}
+        {probe?.ok && <p className="num mt-2 text-xs text-good-ink">Reply received{probe.status ? ` (HTTP ${probe.status}` : ''}{probe.elapsed_ms ? `, ${ms(probe.elapsed_ms)})` : ')'}{isStream ? `: a stream of ${plural(probe.events?.length ?? 0, 'event type')}` : ''}.</p>}
       </Card>
 
       {probe?.ok && adapter === 'http' && standard && probe.suggestion && (
@@ -560,6 +563,7 @@ function StepMap(props: {
 
       {probe?.ok && (
         <Card title="What Assay will see" help={<p>Runs the whole connection (request and mapping) and shows the result as Assay reads it, and which checks that makes possible.</p>} actions={<Button variant="primary" loading={testing} onClick={runTest}><Check className="size-3.5" />Check the mapping</Button>}>
+          {!!testError && <div className="mb-3"><ErrorState error={testError} /></div>}
           {!test ? <p className="text-sm text-ink-2">Not checked yet: press Check the mapping.</p> : !test.ok ? (
             <Notice tone="bad" title={test.explanation ?? test.error ?? 'No answer'}>{test.error}</Notice>
           ) : (
@@ -567,8 +571,8 @@ function StepMap(props: {
               <div className="space-y-2 text-sm">
                 <div className="t-label">Answer · <span className="font-mono normal-case">{ms(test.elapsed_ms)}</span></div>
                 <div className="line-clamp-6 rounded-lg border border-line bg-surface-2/50 px-3 py-2">{test.normalized?.answer}</div>
-                {test.normalized?.retrieved_documents && <div className="text-xs text-ink-2">{test.normalized.retrieved_documents.length} source(s): {test.normalized.retrieved_documents.slice(0, 5).map((d) => <code key={d.id} className="mr-1">{d.id}</code>)}</div>}
-                {test.normalized?.tool_calls && <div className="text-xs text-ink-2">{test.normalized.tool_calls.length} tool call(s): {test.normalized.tool_calls.map((t, i) => <code key={i} className="mr-1">{t.name}</code>)}</div>}
+                {test.normalized?.retrieved_documents && <div className="text-xs text-ink-2">{plural(test.normalized.retrieved_documents.length, 'source')}: {test.normalized.retrieved_documents.slice(0, 5).map((d) => <code key={d.id} className="mr-1">{d.id}</code>)}</div>}
+                {test.normalized?.tool_calls && <div className="text-xs text-ink-2">{plural(test.normalized.tool_calls.length, 'tool call')}: {test.normalized.tool_calls.map((t, i) => <code key={i} className="mr-1">{t.name}</code>)}</div>}
               </div>
               <Capabilities caps={test.capabilities ?? []} />
             </div>
@@ -689,7 +693,7 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved, reply, tes
         t = await api.post<Target>('/api/targets', { project_id: pid, name, adapter, config: cfg, variant_label: label })
       }
       if (asTemplate) await api.post('/api/connector-templates', { name: name || 'My connection', adapter, config: cfg, description: label })
-      await api.post(`/api/targets/${t.id}/check`).catch(() => null)
+      try { await api.post(`/api/targets/${t.id}/check`) } catch (e) { toast(`Saved, but the first check failed: ${e instanceof Error ? e.message : 'no answer'}`, 'bad') }
       return t
     },
     onSuccess: (t) => onSaved(t.id),
@@ -813,7 +817,7 @@ function StepSave({ adapter, cfg, setCfg, projects, editing, onSaved, reply, tes
             ))}
             {dry.data.load && (
               <Notice tone={dry.data.load.verdict === 'copes' ? 'good' : dry.data.load.verdict === 'unknown' ? 'info' : 'warn'}
-                title={`Alone: ${ms(dry.data.load.alone_ms)} per answer. ${dry.data.load.n} at once: ${ms(dry.data.load.together_ms)}${dry.data.load.ratio ? ` (x${dry.data.load.ratio})` : ''}${dry.data.load.errors ? `, ${dry.data.load.errors} error(s)` : ''}.`}>
+                title={`Alone: ${ms(dry.data.load.alone_ms)} per answer. ${dry.data.load.n} at once: ${ms(dry.data.load.together_ms)}${dry.data.load.ratio ? ` (x${dry.data.load.ratio})` : ''}${dry.data.load.errors ? `, ${plural(dry.data.load.errors, 'error')}` : ''}.`}>
                 This bot {LOAD_TEXT[dry.data.load.verdict]} Suggested <span className="font-semibold">In parallel: <span className="font-mono">{dry.data.load.suggested_concurrency}</span></span>.
               </Notice>
             )}
@@ -944,7 +948,7 @@ function LogsImport({ projects, onDone }: { projects: Project[]; onDone: (target
               <tbody>{preview.data.rows.slice(0, 10).map((r, i) => <tr key={i} className="border-t border-line">{cols.slice(0, 8).map((c) => <td key={c.name} className="max-w-48 truncate px-2 py-1">{typeof r[c.name] === 'object' ? JSON.stringify(r[c.name]) : String(r[c.name] ?? '')}</td>)}</tr>)}</tbody>
             </table>
           </div>
-          {preview.data.bad_lines > 0 && <p className="text-xs text-warn-ink">{preview.data.bad_lines} unreadable line(s) will be skipped.</p>}
+          {preview.data.bad_lines > 0 && <p className="text-xs text-warn-ink">{plural(preview.data.bad_lines, 'unreadable line')} will be skipped.</p>}
           <div className="grid gap-3 md:grid-cols-2">
             <Field label="Chatbot"><Select value={projectId} onChange={(e) => setProjectId(Number(e.target.value))}>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
             <Field label="Name"><Input value={name} onChange={(e) => setName(e.target.value)} /></Field>

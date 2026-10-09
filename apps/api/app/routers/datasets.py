@@ -6,7 +6,7 @@ import hashlib
 import json
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import select
@@ -273,12 +273,21 @@ class GenerateIn(BaseModel):
     per_document: int = Field(default=6, ge=1, le=20)
     kinds: list[str] | None = None
     tools: list[dict[str, Any]] | None = None
+    estimate_only: bool = False  # say how long and how much, start nothing
 
 
 @router.post("/datasets/{dataset_id}/generate-candidates")
-async def generate(dataset_id: int, body: GenerateIn, s: Session = Depends(get_session)) -> dict[str, Any]:
+async def generate(dataset_id: int, body: GenerateIn, response: Response,
+                   s: Session = Depends(get_session)) -> dict[str, Any]:
     svc.get(s, m.Dataset, dataset_id)
     pc = svc.get(s, m.ProviderConfig, body.provider_config_id)
+    if body.estimate_only:
+        from assay.store.insights import judge_job_estimate
+
+        for doc_id in body.document_ids:
+            svc.get(s, m.DocumentSource, doc_id)
+        # one model call per document; writing questions takes about three times as long as grading one answer
+        return judge_job_estimate(s, {"provider_config_id": pc.id}, len(body.document_ids), ms_factor=3.0)
     provider = build_provider(ProviderSpec(provider=pc.provider, model=pc.model, base_url=pc.base_url,
                                            api_key_ref=pc.api_key_ref, temperature=0.3, max_tokens=2500))
     created, errors = [], []

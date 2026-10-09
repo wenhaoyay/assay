@@ -5,8 +5,9 @@ import * as d3 from 'd3'
 import { motion } from 'motion/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ms, pct, usd } from '../../lib/format'
+import { ms, num, pct, usd } from '../../lib/format'
 import { useMotionOn } from '../../lib/prefs'
+import { isLive } from '../../lib/runstate'
 import type { RunHeader, TrialRow } from '../../lib/types'
 import { Odometer, SampleSize } from '../instrument'
 import { Card, Help } from '../ui'
@@ -21,10 +22,19 @@ export function finishedTries(rows: TrialRow[]) {
 
 function clock(sec: number) {
   if (!Number.isFinite(sec) || sec < 0) return '–'
+  if (sec >= 3600) { const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60); return m ? `${h}h ${String(m).padStart(2, '0')}m` : `${h}h` }
   const m = Math.floor(sec / 60), s = Math.round(sec % 60)
   return m ? `${m}m ${String(s).padStart(2, '0')}s` : `${s}s`
 }
 
+/** What the run is waiting on right now, in words ("Grading with ollama/llama3.1:8b · call 41 of 3,480"). */
+export function waitingLine(r: RunHeader): string | null {
+  const p = r.progress
+  if (!p || !p.waiting_on) return null
+  if (p.waiting_on === 'bot') return 'Waiting for the bot'
+  const who = p.grading_model ? `Grading with ${p.grading_model}` : 'Grading'
+  return p.judge_calls_total ? `${who} · call ${num(Math.min(p.judge_calls_done ?? 0, p.judge_calls_total))} of ${num(p.judge_calls_total)}` : who
+}
 export function LiveFigures({ r, rows, now }: { r: RunHeader; rows: TrialRow[]; now: number }) {
   const fin = finishedTries(rows)
   const pass = fin.filter((t) => t.status === 'passed').length
@@ -33,9 +43,12 @@ export function LiveFigures({ r, rows, now }: { r: RunHeader; rows: TrialRow[]; 
   const total = r.progress_total || rows.length
   const elapsed = r.started_at ? ((r.finished_at ? new Date(r.finished_at).getTime() : now) - new Date(r.started_at).getTime()) / 1000 : 0
   const done = Math.max(n, r.progress_done)
-  const left = done > 0 && done < total ? (elapsed / done) * (total - done) : NaN
+  const observed = done > 0 && done < total ? (elapsed / done) * (total - done) : NaN
+  const eta = r.progress?.eta_s
+  const left = eta != null ? eta : observed
+  const waiting = waitingLine(r)
   const spend = rows.reduce((a, t) => a + (t.target_cost_usd ?? 0) + (t.judge_cost_usd ?? 0), 0)
-  const active = r.status === 'queued' || r.status === 'running'
+  const active = isLive(r.status)
   return (
     <div className="flex flex-wrap items-end gap-x-8 gap-y-3" data-testid="live-figures">
       <div><div className="t-label">Answered</div><div className="t-fig mt-1"><Odometer text={String(done)} /><span className="text-ink-3"> / {total}</span></div></div>
@@ -43,7 +56,8 @@ export function LiveFigures({ r, rows, now }: { r: RunHeader; rows: TrialRow[]; 
         <div className="t-label">Pass rate so far</div>
         <div className="t-fig mt-1">{n ? <><Odometer text={pct(pass / n)} /><span className="ml-1.5 font-mono text-xs text-ink-3">± {Math.round(((hi - lo) / 2) * 100)}pp</span></> : '–'}</div>
       </div>
-      <div><div className="t-label">{active ? 'Time left' : 'Took'}</div><div className="t-fig mt-1 num">{active ? (r.status === 'queued' ? 'queued' : clock(left)) : clock(elapsed)}</div></div>
+      <div><div className="t-label">{active ? 'Time left' : 'Took'}</div><div className="t-fig mt-1 num">{active ? (r.status === 'queued' && eta == null ? 'queued' : r.status === 'cancelling' ? 'stopping' : clock(left)) : clock(elapsed)}</div>
+        {active && waiting && r.status !== 'cancelling' && <div className="mt-0.5 max-w-xs text-xs text-ink-3" data-testid="live-waiting">{waiting}</div>}</div>
       <div><div className="t-label">Spent</div><div className="t-fig mt-1 text-ink-2"><Odometer text={usd(spend)} /></div></div>
     </div>
   )
@@ -133,7 +147,7 @@ function Swarm({ fin }: { fin: TrialRow[] }) {
 
 export function LiveRun({ r, rows, gate }: { r: RunHeader; rows: TrialRow[]; gate: number | null }) {
   const fin = useMemo(() => finishedTries(rows), [rows])
-  const active = r.status === 'queued' || r.status === 'running'
+  const active = isLive(r.status)
   const lanes = Math.max(1, r.concurrency ?? 1)
   const inFlight = active && r.status === 'running' ? Math.min(lanes, Math.max(0, r.progress_total - fin.length)) : 0
   const latest = fin.slice(-lanes).reverse()

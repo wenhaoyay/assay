@@ -120,7 +120,7 @@ export function TargetPage() {
   const [view, setView] = useState<'seen' | 'raw'>('seen')
   const [cfgView, setCfgView] = useState<'summary' | 'json'>('summary')
   const test = useMutation({ mutationFn: () => api.post<TestResponse>('/api/connect/test', { adapter: t.data!.adapter, config: t.data!.latest_version.config, message }) })
-  const check = useMutation({ mutationFn: () => api.post<TargetCheck>(`/api/targets/${id}/check`), onSuccess: () => qc.invalidateQueries({ queryKey: ['target', id] }) })
+  const check = useMutation({ meta: { silent: true }, mutationFn: () => api.post<TargetCheck>(`/api/targets/${id}/check`), onSuccess: () => qc.invalidateQueries({ queryKey: ['target', id] }) })
   const flags = useMutation({ mutationFn: (body: Record<string, unknown>) => api.patch(`/api/targets/${id}/flags`, body), onSuccess: () => { qc.invalidateQueries({ queryKey: ['target', id] }); qc.invalidateQueries({ queryKey: ['targets'] }); qc.invalidateQueries({ queryKey: ['estimate'] }) } })
   const [costText, setCostText] = useState<string | null>(null)
   const template = useMutation({ mutationFn: () => api.post('/api/connector-templates', { name: t.data!.name, adapter: t.data!.adapter, config: t.data!.latest_version.config, description: t.data!.latest_version.variant_label }) })
@@ -144,10 +144,11 @@ export function TargetPage() {
             <Badge tone="accent"><span className="font-mono">v{v.version}</span></Badge>
             {target.adapter !== 'replay' && <Button loading={check.isPending} onClick={() => check.mutate()}><Activity className="size-3.5" />Check now</Button>}
             {target.adapter !== 'replay' && <Link to={`/targets/new?from=${target.id}`} viewTransition className={linkButton()}><Pencil className="size-3.5" />Edit (new version)</Link>}
-            {target.adapter !== 'replay' && <Button variant="ghost" loading={template.isPending} onClick={() => template.mutate()} title="Save as a template">{template.isSuccess ? <Check className="size-3.5" /> : <BookmarkPlus className="size-3.5" />}</Button>}
+            {target.adapter !== 'replay' && <Button variant="ghost" loading={template.isPending} onClick={() => template.mutate()} title="Save as a template" aria-label="Save as a template">{template.isSuccess ? <Check className="size-3.5" /> : <BookmarkPlus className="size-3.5" />}</Button>}
           </>
         }
       />
+      {check.isError && <div className="mb-4"><ErrorState error={check.error} /></div>}
       {lc && !lc.ok && <div className="mb-4"><Notice tone="bad" title={lc.explanation ?? 'The last check failed'}><span className="font-mono text-xs">{lc.error}</span> · {when(lc.at)}</Notice></div>}
       <div className="grid gap-10 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
         <div className="space-y-10">
@@ -192,11 +193,11 @@ export function TargetPage() {
         <div className="space-y-10">
           <ReadingCard targetId={target.id} />
           <Card title="Grading privacy">
-            <Toggle checked={!!target.local_judges_only} onChange={(val) => flags.mutate({ local_judges_only: val })}
+            <Toggle disabled={flags.isPending} checked={!!target.local_judges_only} onChange={(val) => flags.mutate({ local_judges_only: val })}
               label={<span className="inline-flex items-center gap-1.5">Local grading models only<Help title="Local grading models only"><p>This bot's answers may only be graded by a model running on this machine (Ollama, LM Studio). Runs that pick a cloud model are refused.</p></Help></span>} />
           </Card>
           <Card title="Load and cost">
-            <Toggle checked={!!target.shared} onChange={(val) => flags.mutate({ shared: val })}
+            <Toggle disabled={flags.isPending} checked={!!target.shared} onChange={(val) => flags.mutate({ shared: val })}
               label={<span className="inline-flex items-center gap-1.5">Other people use this bot<Help title="A shared bot"><p>New runs then ask 2 questions at a time by default, and warn above that: test questions all at once would slow down real users' answers.</p></Help></span>} />
             <div className="mt-4">
               <Field label={<span className="inline-flex items-center gap-1.5">Cost per answer (USD, your estimate)<Help title="Cost per answer"><p>For bots that report no token counts (Assay cannot price them). With it, the spend cap and estimates can count this bot's answers.</p></Help></span>}

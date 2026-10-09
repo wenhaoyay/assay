@@ -20,6 +20,8 @@ test('start a run from the UI and see its gate verdict', async ({ page }) => {
   const value = await target.locator('option', { hasText: 'candidate - v1' }).first().getAttribute('value')
   await target.selectOption(value!)
   await page.getByLabel('Dataset version').selectOption({ index: 1 })
+  // The default (Quick check) asks 30 questions and checks no gate; this test means the release run.
+  await page.getByRole('radio', { name: /Release gate/ }).click()
   await page.getByLabel('Judge').selectOption('heuristic')
   await expect(page.getByTestId('receipt')).toContainText('Answers from the bot')
   await page.getByRole('button', { name: 'Create and run' }).click()

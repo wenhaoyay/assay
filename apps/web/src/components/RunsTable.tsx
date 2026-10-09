@@ -3,6 +3,7 @@ import { motion } from 'motion/react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ms, pct, when } from '../lib/format'
 import { useListNav } from '../lib/hotkeys'
+import { questionsOf } from '../lib/runstate'
 import type { RunHeader } from '../lib/types'
 import { Badge, RunStatus, StatusBadge, Table } from './ui'
 
@@ -76,7 +77,7 @@ export function RunsTable({ runs, compact = false, selectable = false, selected 
               {!compact && <td className="max-w-56 truncate text-ink-2" title={r.target}>{r.target} <span className="font-mono text-xs text-ink-3">v{r.target_version}</span></td>}
               {!compact && (
                 <td className="whitespace-nowrap text-xs text-ink-2">
-                  <span className="num font-mono">{r.n_cases ?? '?'}</span> × <span className="num font-mono">{r.trials_per_case}</span>
+                  <span className="num font-mono">{questionsOf(r) ?? 'n/a'}</span> × <span className="num font-mono">{r.trials_per_case}</span>
                   <span className={clsx('ml-1.5 rounded px-1', heur ? 'hatched text-ink-2' : 'text-ink-3')}>{r.judge ? (heur ? 'heuristic' : r.judge.model) : 'no judge'}</span>
                 </td>
               )}

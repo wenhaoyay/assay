@@ -68,3 +68,19 @@ export const FAILURE_LABELS: Record<string, string> = {
   execution_error: 'Execution error',
   unknown: 'Unknown',
 }
+
+/** "1 run", "2 runs": real plurals, never "(s)". */
+export function plural(n: number, word: string, pluralWord?: string): string {
+  return `${n.toLocaleString()} ${n === 1 ? word : pluralWord ?? `${word}s`}`
+}
+
+/** A span of seconds in plain words: "45 seconds", "12 minutes", "29 hours". */
+export function spanOf(seconds: number): string {
+  if (seconds < 90) return plural(Math.max(1, Math.round(seconds)), 'second')
+  if (seconds < 5400) return plural(Math.round(seconds / 60), 'minute')
+  if (seconds < 172800) return plural(Math.round(seconds / 3600), 'hour')
+  return plural(Math.round(seconds / 86400), 'day')
+}
+
+/** Estimates above this ask before starting. */
+export const LONG_SECONDS = 3600

@@ -7,11 +7,12 @@ import asyncio
 import csv
 import io
 import json
+import logging
 import time
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -19,6 +20,7 @@ from sqlalchemy.orm import Session
 from assay import local_models
 from assay.adapters import AdapterContext, build_adapter
 from assay.adapters import connect as cx
+from assay.errors import plain_error
 from assay.providers.catalog import CATALOG, list_models
 from assay.secrets import SecretError, keyring_available, list_stored
 from assay.secrets import delete as delete_secret
@@ -31,13 +33,22 @@ from assay.traces import redact
 from ..deps import get_session
 
 router = APIRouter(prefix="/api")
+ACTIVE_STATES = ["queued", "running", "cancelling"]
 _TASKS: set[asyncio.Task] = set()
+log = logging.getLogger("assay")
 
 
 def _spawn(coro) -> None:
     task = asyncio.create_task(coro)
     _TASKS.add(task)
     task.add_done_callback(_TASKS.discard)
+    task.add_done_callback(_log_failure)
+
+
+def _log_failure(task: asyncio.Task) -> None:
+    """A background job that dies still leaves a trace in the log (the job itself ends as failed)."""
+    if not task.cancelled() and (exc := task.exception()) is not None:
+        log.error("A background job stopped with an error", exc_info=exc)
 
 
 # --------------------------------------------------------------------------------------
@@ -55,7 +66,7 @@ class ProjectPatch(BaseModel):
 @router.get("/home")
 def home(s: Session = Depends(get_session)) -> dict[str, Any]:
     projects = [insights.project_card(s, p) for p in s.scalars(select(m.Project).order_by(m.Project.id))]
-    active = s.scalars(select(m.Run).where(m.Run.status.in_(["queued", "running"]))).all()
+    active = s.scalars(select(m.Run).where(m.Run.status.in_(ACTIVE_STATES))).all()
     return {"projects": projects, "active_runs": [svc.run_header(s, r) for r in active],
             "settings": workspace.get_settings(s),
             "has_providers": s.scalar(select(m.ProviderConfig.id)) is not None}
@@ -87,7 +98,7 @@ async def group_project_notes(project_id: int, body: GroupNotesIn, s: Session = 
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(502, f"The model did not answer: {type(exc).__name__}") from exc
+        raise HTTPException(502, plain_error(exc)) from exc
 
 
 @router.patch("/projects/{project_id}")
@@ -101,8 +112,8 @@ def patch_project(project_id: int, body: ProjectPatch, s: Session = Depends(get_
 
 @router.get("/activity")
 def activity(s: Session = Depends(get_session)) -> dict[str, Any]:
-    active = s.scalars(select(m.Run).where(m.Run.status.in_(["queued", "running"]))).all()
-    return {"active_runs": [{"id": r.id, "done": r.progress_done, "total": r.progress_total,
+    active = s.scalars(select(m.Run).where(m.Run.status.in_(ACTIVE_STATES))).all()
+    return {"active_runs": [{"id": r.id, "done": r.progress_done, "total": r.progress_total, "status": r.status,
                              "name": (r.snapshot or {}).get("experiment", {}).get("name")} for r in active]}
 
 
@@ -139,7 +150,7 @@ class EstimateIn(BaseModel):
     judge: dict[str, Any] | None = None
     trials: int = Field(default=1, ge=1, le=10)
     concurrency: int = Field(default=4, ge=1, le=16)
-    case_filter: dict[str, list[str]] | None = None
+    case_filter: dict[str, Any] | None = None
 
 
 @router.post("/estimate")
@@ -413,7 +424,9 @@ async def dry_run(body: DryRunIn, s: Session = Depends(get_session)) -> dict[str
             together = list(await asyncio.gather(*(ask(q) for q in questions)))
     finally:
         await adapter.aclose()
-    out = workspace.dry_run_summary(calls, n_cases, body.trials, body.concurrency, pricing)
+    default_judge = workspace.get_settings(s).get("default_judge")
+    out = workspace.dry_run_summary(calls, n_cases, body.trials, body.concurrency, pricing,
+                                    insights.judge_profile(s, default_judge) if default_judge else None)
     if body.load_check:
         out["load"] = workspace.load_summary(calls, together)
     return out
@@ -659,11 +672,15 @@ async def import_preview(file: UploadFile = File(...), limit: int = Form(20)) ->
 class BakeoffIn(BaseModel):
     dimension: str
     judges: list[dict[str, Any]] = Field(min_length=1, max_length=4)
+    estimate_only: bool = False  # say how long and how much, start nothing
 
 
 @router.post("/bakeoffs", status_code=202)
-async def start_bakeoff(body: BakeoffIn, s: Session = Depends(get_session)) -> dict[str, Any]:
+async def start_bakeoff(body: BakeoffIn, response: Response, s: Session = Depends(get_session)) -> dict[str, Any]:
     try:
+        if body.estimate_only:
+            response.status_code = 200
+            return workspace.estimate_bakeoff(s, body.dimension, body.judges)
         b = workspace.start_bakeoff(s, body.dimension, body.judges)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
@@ -678,6 +695,11 @@ def list_bakeoffs(dimension: str | None = None, s: Session = Depends(get_session
     if dimension:
         q = q.where(m.JudgeBakeoff.dimension == dimension)
     return [workspace.bakeoff_public(b) for b in s.scalars(q)]
+
+
+@router.post("/bakeoffs/{bakeoff_id}/cancel")
+def cancel_bakeoff(bakeoff_id: int, s: Session = Depends(get_session)) -> dict[str, Any]:
+    return workspace.bakeoff_public(workspace.cancel_bakeoff(s, bakeoff_id))
 
 
 @router.get("/bakeoffs/{bakeoff_id}")
@@ -722,4 +744,4 @@ async def local_pull(body: PullIn, s: Session = Depends(get_session)) -> dict[st
 
 @router.get("/local-models/pull")
 def local_pull_progress(model: str) -> dict[str, Any]:
-    return local_models.PULLS.get(model) or {"model": model, "status": "not started", "done": False, "error": None}
+    return local_models.pull_progress(model)

@@ -16,6 +16,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, ClassVar
 
+from assay.errors import plain_error
 from assay.schemas import EvalStatus, EvaluationResult, NormalizedTargetResult, TestCase, Trace
 
 
@@ -68,7 +69,7 @@ class Evaluator(ABC):
         try:
             out = await self.evaluate(case, result, trace, ctx)
         except Exception as exc:  # an evaluator bug must not crash a run
-            out = self.result(EvalStatus.ERROR, explanation=f"{type(exc).__name__}: {exc}")
+            out = self.result(EvalStatus.ERROR, explanation=f"This check could not finish. {plain_error(exc)}")
         out.duration_ms = (time.perf_counter() - t0) * 1000
         out.metadata.setdefault("gating", self.gating)
         return out

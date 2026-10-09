@@ -1,7 +1,7 @@
 // Shapes returned by the API (apps/api/app/serializers.py and routers).
 
 export type EvalStatus = 'pass' | 'fail' | 'unknown' | 'not_applicable' | 'not_evaluated' | 'error'
-export type RunStatus = 'queued' | 'running' | 'completed' | 'completed_with_errors' | 'failed' | 'cancelled'
+export type RunStatus = 'queued' | 'running' | 'cancelling' | 'completed' | 'completed_with_errors' | 'failed' | 'cancelled'
 export type GateStatus = 'PASS' | 'FAIL' | 'INCOMPLETE' | 'NOT_EVALUATED'
 
 export interface Project {
@@ -161,6 +161,20 @@ export interface RunHeader {
   overall_ci?: [number | null, number | null]
   /** The chatbot whose questions this run asked, when they were written for another one. */
   off_topic?: string | null
+  /** Known from the start (docs/jobs.md); older servers leave it out. */
+  n_questions?: number | null
+  progress?: RunProgress | null
+}
+
+export interface RunProgress {
+  total?: number
+  asked?: number
+  graded?: number
+  judge_calls_done?: number | null
+  judge_calls_total?: number | null
+  waiting_on?: 'bot' | 'grading_model' | null
+  grading_model?: string | null
+  eta_s?: number | null
 }
 
 export interface EvaluatorSummary {
@@ -652,7 +666,7 @@ export interface ModelCheck {
 export interface Bakeoff {
   id: number
   dimension: string
-  status: 'running' | 'completed' | 'failed'
+  status: 'running' | 'cancelling' | 'cancelled' | 'completed' | 'failed'
   judges: { provider_config_id?: number; provider?: string }[]
   progress_done: number
   progress_total: number

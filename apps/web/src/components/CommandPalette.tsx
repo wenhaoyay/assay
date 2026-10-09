@@ -188,7 +188,7 @@ export const SHORTCUTS: { group: string; keys: string[]; label: string }[] = [
   { group: 'Lists', keys: ['J'], label: 'Next row' },
   { group: 'Lists', keys: ['K'], label: 'Previous row' },
   { group: 'Lists', keys: ['Enter'], label: 'Open the picked row' },
-  { group: 'Run page', keys: ['1'], label: 'Summary ... 6 Config (tabs by number)' },
+  { group: 'Run page', keys: ['1'], label: 'Summary ... 7 Config (tabs by number)' },
   { group: 'Run page', keys: ['C'], label: 'Compare with the previous comparable run' },
   { group: 'Trial page', keys: ['['], label: 'Previous trial of this case' },
   { group: 'Trial page', keys: [']'], label: 'Next trial of this case' },

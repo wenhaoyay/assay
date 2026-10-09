@@ -47,8 +47,8 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
   const [ticked, setTicked] = useState(false)
   const [guide, setGuide] = useState(false)
   const [pulling, setPulling] = useState<string | null>(null)
-  const ack = useMutation({ mutationFn: () => api.put('/api/settings', { ollama_notice_ack: new Date().toISOString() }), onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }) })
-  const startPull = useMutation({ mutationFn: (model: string) => api.post<Pull>('/api/local-models/pull', { model }), onSuccess: (p) => setPulling(p.model) })
+  const ack = useMutation({ mutationFn: () => api.put('/api/settings', { ollama_notice_ack: new Date().toISOString() }), onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }), meta: { silent: true } })
+  const startPull = useMutation({ mutationFn: (model: string) => api.post<Pull>('/api/local-models/pull', { model }), onSuccess: (p) => setPulling(p.model), meta: { silent: true } })
   const progress = useQuery({
     queryKey: ['local-pull', pulling], enabled: !!pulling,
     queryFn: async () => {
@@ -56,16 +56,20 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
       if (p.done) qc.invalidateQueries({ queryKey: ['local-status'] }) // the new model is now installed
       return p
     },
-    refetchInterval: (q) => (q.state.data?.done ? false : 1000),
+    // Stop when the download is done or lost (a restart), or the request itself fails.
+    refetchInterval: (q) => (q.state.data?.done || q.state.data?.status === 'lost' || q.state.status === 'error' ? false : 1000),
+    retry: false,
   })
-  const downloading = !!pulling && !progress.data?.done
+  const downloading = !!pulling && !progress.data?.done && progress.data?.status !== 'lost' && !progress.isError
   const connect = useMutation({
     mutationFn: async (model: string) => {
       const pc = await api.post<ProviderConfig>('/api/models', { name: `Ollama ${model}`, provider: 'ollama', model, base_url: status.data?.base_url })
-      await api.post(`/api/models/${pc.id}/check`).catch(() => null)
-      return pc
+      let checkError: string | null = null
+      try { await api.post(`/api/models/${pc.id}/check`) } catch (e) { checkError = e instanceof Error ? e.message : 'The check failed.' }
+      return { pc, checkError }
     },
     onSuccess: onChange,
+    meta: { silent: true },
   })
 
   const st = status.data
@@ -159,7 +163,10 @@ export function LocalModelsCard({ models, onChange }: { models: ProviderConfig[]
           <ProgressBar value={progress.data.total ? progress.data.completed / progress.data.total : 0} />
         </div>
       )}
-      {progress.data?.error && <div className="mt-3"><Notice tone="bad" title="The download failed">{progress.data.error}</Notice></div>}
+      {progress.data?.error && <div className="mt-3"><Notice tone="bad" title={progress.data.status === 'lost' ? 'The download stopped' : 'The download failed'}>{progress.data.error}</Notice></div>}
+      {progress.isError && <div className="mt-3"><ErrorState error={progress.error} /></div>}
+      {connect.data?.checkError && <div className="mt-3"><Notice tone="warn" title="Connected, but the check failed">{connect.data.checkError}</Notice></div>}
+      {ack.isError && <div className="mt-3"><ErrorState error={ack.error} /></div>}
       {startPull.isError && <div className="mt-3"><ErrorState error={startPull.error} /></div>}
       {connect.isError && <div className="mt-3"><ErrorState error={connect.error} /></div>}
 
