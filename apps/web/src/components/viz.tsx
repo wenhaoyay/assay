@@ -351,7 +351,7 @@ export function LiveGrid({ total, done, statuses }: { total: number; done: numbe
   const motionOn = useMotionOn()
   const tiles = Array.from({ length: Math.max(total, statuses.length) }, (_, i) => statuses[i] ?? null)
   return (
-    <div className="flex flex-wrap gap-[3px]" aria-label={`${done} of ${total} tries finished`}>
+    <div className="flex flex-wrap gap-[3px]" role="img" aria-label={`${done} of ${total} tries finished`}>
       {tiles.map((t, i) => (
         <motion.span key={t?.key ?? `pending-${i}`} title={t ? `${t.caseId}: ${t.status}` : 'waiting'}
           data-case={t?.caseId}

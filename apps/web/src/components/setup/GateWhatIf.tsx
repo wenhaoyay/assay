@@ -74,7 +74,7 @@ export function GateWhatIf({ runs, passMin, p95Max }: { runs: WhatIfRun[]; passM
       </p>
       <div ref={box} className="w-full">
         {W > 0 && (
-          <svg ref={svg} width={width} height={H} role="img" aria-label={`${n} of ${runs.length} past runs would pass at a pass-rate limit of ${Math.round(thr * 100)}%`} data-testid="whatif-chart">
+          <svg ref={svg} width={width} height={H} role="group" aria-label={`${n} of ${runs.length} past runs would pass at a pass-rate limit of ${Math.round(thr * 100)}%`} data-testid="whatif-chart">
             {[0, 0.2, 0.4, 0.6, 0.8, 1].map((t) => (
               <g key={t}>
                 <g className={t === 0 ? 'axis' : 'gridline'}><line x1={m.l} x2={width - m.r} y1={y(t)} y2={y(t)} /></g>

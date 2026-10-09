@@ -76,8 +76,10 @@ export function TwoByTwo({ a, testPrefix = 'cell' }: { a: Agreement; testPrefix?
   return (
     <div className="grid gap-1.5" style={{ gridTemplateColumns: `max-content repeat(${cols.length}, minmax(0, 1fr))` }}
       role="table" aria-label="Confusion matrix (rows: you, columns: grading model)" data-testid="two-by-two">
-      <span />
-      {cols.map((j) => <span key={j} className="t-label pb-1 text-center" role="columnheader">Grading model: {name(j)}</span>)}
+      <div className="contents" role="row">
+        <span role="columnheader" aria-label="Rows: you, columns: grading model" />
+        {cols.map((j) => <span key={j} className="t-label pb-1 text-center" role="columnheader">Grading model: {name(j)}</span>)}
+      </div>
       {rows.map((h) => (
         <div key={h} className="contents" role="row">
           <span className="t-label self-center pr-2" role="rowheader">You: {name(h)}</span>

@@ -4,7 +4,7 @@ import { Check, Clipboard, Cloud, Cpu, ExternalLink, Lock, Plus, RefreshCw, Shie
 import { AnimatePresence, motion } from 'motion/react'
 import { Fragment, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Badge, Button, Card, Empty, ErrorState, Field, Input, Json, Loading, Notice, PageHeader, Panel, Segmented, Select, Term, Toggle } from '../components/ui'
+import { Badge, Button, Card, Empty, ErrorState, Field, Input, Json, Loading, Notice, PageHeader, Panel, ScrollBox, Segmented, Select, Term, Toggle } from '../components/ui'
 import { Checkbox, TextLink } from '../components/form'
 import { LabelHelp } from '../components/LabelHelp'
 import { ScrollTable, ScrollTabs } from '../components/Layout'
@@ -416,7 +416,7 @@ function ShapeTab() {
       </>}
         actions={<Button size="sm" onClick={async () => { await navigator.clipboard.writeText(SNIPPETS[lang]); setCopied(true); setTimeout(() => setCopied(false), 1500) }}>{copied ? <Check className="size-3.5" /> : <Clipboard className="size-3.5" />}{copied ? 'Copied' : 'Copy'}</Button>}>
         <Segmented size="sm" value={lang} onChange={setLang} options={Object.keys(SNIPPETS).map((k) => ({ id: k as keyof typeof SNIPPETS, label: k }))} />
-        <pre className="code scroll-thin mt-3 max-h-[440px] overflow-auto rounded-lg border border-line bg-surface-2 p-3">{SNIPPETS[lang]}</pre>
+        <ScrollBox label="Code snippet" className="scroll-thin mt-3 max-h-[440px] overflow-auto rounded-lg border border-line bg-surface-2"><pre className="code p-3">{SNIPPETS[lang]}</pre></ScrollBox>
       </Card>
     </div>
   )

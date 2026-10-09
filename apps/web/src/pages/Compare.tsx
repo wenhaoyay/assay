@@ -13,7 +13,7 @@ import { Replay } from '../components/compare/Replay'
 import { RunPicker } from '../components/compare/RunPicker'
 import { SampleSize } from '../components/instrument'
 import { ShareMenu } from '../components/Share'
-import { Badge, Card, Empty, ErrorState, Loading, Notice, PageSkeleton, Segmented, Skeleton, Table, Term } from '../components/ui'
+import { Badge, Card, Empty, ErrorState, Loading, Notice, PageSkeleton, ScrollBox, Segmented, Skeleton, Table, Term } from '../components/ui'
 import { Confetti, DeltaList, ForestPlot } from '../components/viz'
 import { api } from '../lib/api'
 import { fmtValue, pairCases, reading } from '../lib/compare'
@@ -208,7 +208,7 @@ function CompareView({ c }: { c: Comparison }) {
         </Card>
         {c.score_changes.length > 0 && (
           <Card title="Large score changes" meta={c.score_changes.length} help={<><p>Single checks whose score moved by 0.25 or more on a question, in either direction.</p><p>Hatched rows were scored by the word-overlap heuristic.</p></>}>
-            <div className="scroll-thin max-h-[420px] overflow-y-auto">
+            <ScrollBox label="Large score changes" className="scroll-thin max-h-[420px] overflow-y-auto">
               <Table>
                 <thead><tr><th className="t-label">Question</th><th className="t-label">Check</th><th className="t-label text-right">Baseline</th><th className="t-label text-right">Candidate</th></tr></thead>
                 <tbody>{c.score_changes.slice(0, 50).map((s) => (
@@ -219,7 +219,7 @@ function CompareView({ c }: { c: Comparison }) {
                   </tr>
                 ))}</tbody>
               </Table>
-            </div>
+            </ScrollBox>
           </Card>
         )}
       </div>

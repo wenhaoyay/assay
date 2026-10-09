@@ -21,7 +21,7 @@ export function HealthDot({ check, size = 10 }: { check: TargetCheck | null | un
   const tone = !check ? 'bg-untested' : check.ok ? 'bg-good' : 'bg-bad'
   const title = !check ? 'Not tested yet' : check.ok ? `Answered${check.elapsed_ms ? ` in ${ms(check.elapsed_ms)}` : ''} · ${when(check.at)}` : `${check.explanation ?? check.error ?? 'Failed'} · ${when(check.at)}`
   return (
-    <span className="relative inline-flex shrink-0" title={title} aria-label={title} style={{ width: size, height: size }}>
+    <span className="relative inline-flex shrink-0" title={title} role="img" aria-label={title} style={{ width: size, height: size }}>
       {check?.ok && <span className="absolute inline-flex size-full animate-ping rounded-full bg-good opacity-30 [animation-iteration-count:2]" />}
       <span className={clsx('relative inline-flex size-full rounded-full', tone)} />
     </span>

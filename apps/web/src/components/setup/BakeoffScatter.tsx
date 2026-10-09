@@ -99,7 +99,7 @@ export function BakeoffScatter({ bakeoff, dimension }: { bakeoff: Bakeoff; dimen
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div ref={box} className="min-w-0">
           {W > 0 && (
-            <svg width={width} height={H} role="img" aria-label={`${ax.name} against ${ay.name}: ${splits} answers split on pass or fail`} data-testid="bakeoff-scatter">
+            <svg width={width} height={H} role="group" aria-label={`${ax.name} against ${ay.name}: ${splits} answers split on pass or fail`} data-testid="bakeoff-scatter">
               {continuous ? [0, 0.2, 0.4, 0.6, 0.8, 1].map((t) => (
                 <g key={t}>
                   <g className="gridline">

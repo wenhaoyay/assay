@@ -163,7 +163,7 @@ export function TracePlayback({ spans, answer, onRetrieval }: { spans: Span[]; a
               </li>
             ))}
           </ul>
-          <svg ref={svgRef} width={chartW} height={H} className="cursor-grab touch-none select-none active:cursor-grabbing" role="img" aria-label="Trace timeline"
+          <svg ref={svgRef} width={chartW} height={H} className="cursor-grab touch-none select-none active:cursor-grabbing" role="group" aria-label="Trace timeline"
             onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setPlaying(false); seek(x.invert(e.clientX - r.left)) }}>
             <defs><clipPath id={clip}><rect x={0} y={0} width={chartW} height={H} /></clipPath></defs>
             {ticks.map((t) => <line key={t} x1={x(t)} x2={x(t)} y1={0} y2={H - AXIS_H} stroke="var(--line)" strokeDasharray="2 3" />)}

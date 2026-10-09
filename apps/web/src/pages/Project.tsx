@@ -251,7 +251,7 @@ function TopFailures({ h, runId }: { h: ProjectHome; runId: number }) {
 export function HealthDot({ check }: { check: ProjectHome['targets'][number]['last_check'] }) {
   const tone = !check ? 'bg-untested' : check.ok ? 'bg-good' : 'bg-bad'
   const title = !check ? 'Not tested yet' : check.ok ? `Answered ${check.elapsed_ms ? ms(check.elapsed_ms) : ''} · ${when(check.at)}` : `${check.explanation ?? check.error ?? 'Failed'} · ${when(check.at)}`
-  return <span className={clsx('size-2.5 shrink-0 rounded-full', tone)} title={title} aria-label={title} />
+  return <span className={clsx('size-2.5 shrink-0 rounded-full', tone)} title={title} role="img" aria-label={title} />
 }
 
 function ColorPicker({ projectId, current }: { projectId: number; current: string }) {

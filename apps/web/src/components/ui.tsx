@@ -330,13 +330,14 @@ export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
 }
 
 export function Toggle({ checked, onChange, label, hint, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: ReactNode; hint?: ReactNode; disabled?: boolean }) {
+  const labelId = useId()
   return (
     <div className="flex items-start gap-3">
       <button
         type="button"
         role="switch"
         aria-checked={checked}
-        aria-label={typeof label === 'string' ? label : undefined}
+        aria-labelledby={labelId}
         disabled={disabled}
         onClick={() => onChange(!checked)}
         className={clsx('relative mt-0.5 inline-flex h-5 w-9 shrink-0 rounded-full transition-colors duration-(--dur-ui) disabled:cursor-wait disabled:opacity-60', checked ? 'bg-accent' : 'bg-line-strong')}
@@ -345,7 +346,7 @@ export function Toggle({ checked, onChange, label, hint, disabled }: { checked: 
           className={clsx('absolute top-0.5 size-4 rounded-full bg-on-solid shadow', checked ? 'right-0.5' : 'left-0.5')} />
       </button>
       <span>
-        <span className="text-sm font-medium">{label}</span>
+        <span id={labelId} className="text-sm font-medium">{label}</span>
         {hint && <span className="block text-xs text-ink-3">{hint}</span>}
       </span>
     </div>
@@ -510,8 +511,9 @@ export function Kbd({ children }: { children: ReactNode }) {
 }
 
 export function Json({ value, maxHeight = 360 }: { value: unknown; maxHeight?: number }) {
+  const scroll = useScrollFocus<HTMLPreElement>('Data')
   return (
-    <pre className="code scroll-thin overflow-auto rounded-md border border-line bg-surface-2 p-3" style={{ maxHeight }}>
+    <pre {...scroll} className="code scroll-thin overflow-auto rounded-md border border-line bg-surface-2 p-3" style={{ maxHeight }}>
       {typeof value === 'string' ? value : JSON.stringify(value, null, 2)}
     </pre>
   )
@@ -575,10 +577,37 @@ export function Stat({ label, value, sub, title, tone, hatched, numeric, format,
   )
 }
 
+/**
+ * Props for an element that scrolls: while it really overflows it becomes a named region the
+ * keyboard can reach, so its content can be scrolled without a mouse.
+ */
+export function useScrollFocus<T extends HTMLElement>(label: string) {
+  const [el, setEl] = useState<T | null>(null)
+  const [scrolls, setScrolls] = useState(false)
+  useEffect(() => {
+    if (!el) return
+    const measure = () => setScrolls(el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1)
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    if (el.firstElementChild) ro.observe(el.firstElementChild)
+    return () => ro.disconnect()
+  }, [el])
+  return { ref: setEl, ...(scrolls ? { tabIndex: 0, role: 'region', 'aria-label': label } : {}) }
+}
+
+/** A box that scrolls, reachable by keyboard while it does. */
+export function ScrollBox({ label, className, children, ...rest }: { label: string; className?: string; children: ReactNode } & Omit<HTMLAttributes<HTMLDivElement>, 'role' | 'tabIndex'>) {
+  const scroll = useScrollFocus<HTMLDivElement>(label)
+  return <div {...rest} {...scroll} className={className}>{children}</div>
+}
+
 /** Headers are left-aligned; give a numeric column's `<th>` (and its cells) `text-right`. */
 export function Table({ children, className }: { children: ReactNode; className?: string }) {
+  const scroll = useScrollFocus<HTMLDivElement>('Table, scrolls sideways')
   return (
-    <div className={clsx('scroll-thin overflow-x-auto', className)}>
+    <div {...scroll} className={clsx('scroll-thin overflow-x-auto', className)}>
       <table className="gl-table w-full border-collapse text-sm [&_td]:border-t [&_td]:border-line [&_th]:text-xs [&_th]:font-medium [&_th]:text-ink-3">
         {children}
       </table>
@@ -640,7 +669,7 @@ export function Term({ k, children }: { k: GlossaryKey; children?: ReactNode }) 
 export function DotStrip({ statuses, size = 8, title }: { statuses: string[]; size?: number; title?: string }) {
   const passed = statuses.filter((s) => s === 'passed').length
   return (
-    <span className="inline-flex items-center gap-[3px]" title={title ?? `${passed} of ${statuses.length} passed`} aria-label={`${passed} of ${statuses.length} passed`}>
+    <span className="inline-flex items-center gap-[3px]" role="img" title={title ?? `${passed} of ${statuses.length} passed`} aria-label={`${passed} of ${statuses.length} passed`}>
       {statuses.map((s, i) => (
         <StateDot key={i} state={s === 'passed' ? 'pass' : s === 'failed' ? 'fail' : s === 'error' ? 'error' : 'cancelled'} size={size} />
       ))}

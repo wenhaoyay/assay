@@ -92,7 +92,7 @@ export function Fingerprint({ cells, size = 'md', hrefFor, vt, className, flippe
   const pass = cells.filter((c) => cellState(c) === 'pass').length
   return (
     <div className={clsx('flex flex-wrap items-center', size === 'sm' ? 'gap-[2.5px]' : 'gap-[3px]', className)}
-      style={vt ? { viewTransitionName: vt } : undefined} role="img"
+      style={vt ? { viewTransitionName: vt } : undefined} role={hrefFor ? 'group' : 'img'}
       aria-label={label ?? `${pass} of ${cells.length} questions passed every try`} data-testid="fingerprint">
       {cells.map((c) => {
         const st = cellState(c)
