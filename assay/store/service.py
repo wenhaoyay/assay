@@ -15,7 +15,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from assay import analysis
 from assay.adapters import build_adapter
@@ -733,8 +733,19 @@ RESTART_ERROR = "The server stopped while this was running."
 # --------------------------------------------------------------------------------------
 
 
-def trial_views(s: Session, run_id: int) -> list[analysis.TrialView]:
-    trials = s.scalars(select(m.Trial).where(m.Trial.run_id == run_id).order_by(m.Trial.id)).all()
+def load_trials(s: Session, run_id: int, loaded: dict[int, list[m.Trial]] | None = None) -> list[m.Trial]:
+    """A run's trials with their scores, in two queries; ``loaded`` lets one request read each run once."""
+    if loaded is not None and run_id in loaded:
+        return loaded[run_id]
+    trials = list(s.scalars(select(m.Trial).where(m.Trial.run_id == run_id).order_by(m.Trial.id)
+                            .options(selectinload(m.Trial.scores))))
+    if loaded is not None:
+        loaded[run_id] = trials
+    return trials
+
+
+def trial_views(s: Session, run_id: int, loaded: dict[int, list[m.Trial]] | None = None) -> list[analysis.TrialView]:
+    trials = load_trials(s, run_id, loaded)
     out = []
     for t in trials:
         out.append(analysis.TrialView(
@@ -762,10 +773,11 @@ def refresh_summary(s: Session, run: m.Run) -> dict[str, Any]:
     return summary
 
 
-def compare_runs(s: Session, baseline_id: int, candidate_id: int) -> dict[str, Any]:
+def compare_runs(s: Session, baseline_id: int, candidate_id: int,
+                 loaded: dict[int, list[m.Trial]] | None = None) -> dict[str, Any]:
     a, b = get(s, m.Run, baseline_id), get(s, m.Run, candidate_id)
     cases = {**case_infos(s, a), **case_infos(s, b)}
-    out = analysis.compare(trial_views(s, a.id), trial_views(s, b.id), cases)
+    out = analysis.compare(trial_views(s, a.id, loaded), trial_views(s, b.id, loaded), cases)
     out["baseline_run"] = run_header(s, a)
     out["candidate_run"] = run_header(s, b)
     same_ds = a.snapshot.get("dataset", {}).get("content_hash") == b.snapshot.get("dataset", {}).get("content_hash")

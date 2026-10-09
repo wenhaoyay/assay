@@ -13,8 +13,12 @@ from __future__ import annotations
 import math
 import random
 import statistics as st
+import sys
+from array import array
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
+from functools import lru_cache
+from operator import itemgetter
 from typing import Any
 
 # --------------------------------------------------------------------------------------
@@ -73,6 +77,33 @@ class Interval:
         return asdict(self)
 
 
+@lru_cache(maxsize=8)
+def _resample_rows(n: int, resamples: int, seed: int) -> tuple[Callable[[Sequence[float]], Sequence[float]], ...]:
+    """The index rows ``random.Random(seed).randrange(n)`` draws, resample after resample, one getter each.
+
+    Identical to calling ``randrange`` n * resamples times, only faster: ``randrange(n)`` takes the top
+    ``n.bit_length()`` bits of one 32-bit Mersenne Twister word and redraws when the result is ``>= n``, so the
+    accepted draws are the words of one long ``getrandbits`` read, shifted, with the too-big ones dropped.
+    They depend on (n, resamples, seed) and never on the values, so every metric of a size shares them.
+    """
+    rng = random.Random(seed)
+    shift = 32 - n.bit_length()
+    need = resamples * n
+    idx: list[int] = []
+    while len(idx) < need:
+        m = max(1024, (need - len(idx)) * 2 + 64)
+        words = array("I")
+        words.frombytes(rng.getrandbits(32 * m).to_bytes(4 * m, "little"))
+        if sys.byteorder == "big":
+            words.byteswap()
+        idx.extend(x for x in (w >> shift for w in words) if x < n)
+    del idx[need:]
+    return tuple(itemgetter(*idx[i * n:(i + 1) * n]) for i in range(resamples))
+
+
+_BOOT_CACHE: dict[tuple[tuple[float, ...], int, float, int], Interval] = {}
+
+
 def bootstrap_ci(values: Sequence[float], stat: Callable[[Sequence[float]], float] = st.fmean,
                  resamples: int = 2000, level: float = 0.95, seed: int = 20240601) -> Interval:
     vals = [float(v) for v in values if v is not None]
@@ -82,10 +113,21 @@ def bootstrap_ci(values: Sequence[float], stat: Callable[[Sequence[float]], floa
     est = stat(vals)
     if n == 1:
         return Interval(est, None, None, 1, level, 0)
-    rng = random.Random(seed)
-    boots = sorted(stat([vals[rng.randrange(n)] for _ in range(n)]) for _ in range(resamples))
+    key = (tuple(vals), resamples, level, seed)
+    if stat is st.fmean:
+        if (hit := _BOOT_CACHE.get(key)) is not None:
+            return Interval(**hit.as_dict())
+        boots = sorted(st.fmean(row(vals)) for row in _resample_rows(n, resamples, seed))
+    else:
+        rng = random.Random(seed)
+        boots = sorted(stat([vals[rng.randrange(n)] for _ in range(n)]) for _ in range(resamples))
     a = (1 - level) / 2
-    return Interval(est, percentile(boots, 100 * a), percentile(boots, 100 * (1 - a)), n, level, resamples)
+    out = Interval(est, percentile(boots, 100 * a), percentile(boots, 100 * (1 - a)), n, level, resamples)
+    if stat is st.fmean:
+        if len(_BOOT_CACHE) > 512:
+            _BOOT_CACHE.clear()
+        _BOOT_CACHE[key] = out
+    return out
 
 
 def paired_bootstrap_delta(pairs: Sequence[tuple[float, float]], resamples: int = 2000, level: float = 0.95,

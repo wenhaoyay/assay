@@ -157,9 +157,10 @@ def list_runs(experiment_id: int | None = None, limit: int = 100, s: Session = D
 
 @router.get("/runs/compare")
 def compare(baseline: int, candidate: int, s: Session = Depends(get_session)) -> dict[str, Any]:
-    out = svc.compare_runs(s, baseline, candidate)
+    loaded: dict[int, list[m.Trial]] = {}  # each run's trials are read once for the figures and the causes
+    out = svc.compare_runs(s, baseline, candidate, loaded)
     out["causes"] = cz.compare_causes(s, baseline, candidate, [x["case_id"] for x in out["improvements"]],
-                                      [x["case_id"] for x in out["regressions"]])
+                                      [x["case_id"] for x in out["regressions"]], loaded)
     # The full per-run summaries are large; the comparison page reads what it needs from the top level.
     for side in ("baseline", "candidate"):
         summary = out.pop(side)

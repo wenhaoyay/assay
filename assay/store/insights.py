@@ -264,13 +264,15 @@ def case_matrix(s: Session, dataset_id: int, project_id: int | None = None, limi
     runs = list(reversed(runs[:limit]))
     cells: dict[str, dict[str, dict[str, int]]] = {}
     for r in runs:
-        for t in s.scalars(select(m.Trial).where(m.Trial.run_id == r.id)):
-            if t.status not in ("passed", "failed", "error"):
+        # Two columns, not whole trial rows: their stored replies are what makes this slow.
+        for case_key, status in s.execute(select(m.Trial.case_key, m.Trial.status).where(m.Trial.run_id == r.id)
+                                          .order_by(m.Trial.id)):
+            if status not in ("passed", "failed", "error"):
                 continue
-            c = cells.setdefault(t.case_key, {}).setdefault(str(r.id), {"passed": 0, "total": 0, "errors": 0})
+            c = cells.setdefault(case_key, {}).setdefault(str(r.id), {"passed": 0, "total": 0, "errors": 0})
             c["total"] += 1
-            c["passed"] += t.status == "passed"
-            c["errors"] += t.status == "error"
+            c["passed"] += status == "passed"
+            c["errors"] += status == "error"
     latest = svc.latest_version(s, dataset_id)
     cases: list[dict[str, Any]] = [{"id": c.id, "title": c.title, "category": c.category}
                                    for _, c in svc.version_cases(s, latest.id)]

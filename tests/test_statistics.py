@@ -83,3 +83,26 @@ def test_summaries():
     assert summarize([]).mean is None
     assert percentile([1, 2, 3, 4, 5], 95) == pytest.approx(4.8)
     assert spearman([1, 2, 3], [10, 20, 30]) == pytest.approx(1.0)
+
+
+def _reference_bootstrap(values, resamples=2000, level=0.95, seed=20240601):
+    """The original draw-by-draw bootstrap, kept so the fast one is held to its exact numbers."""
+    import random
+    import statistics as st
+
+    vals = [float(v) for v in values]
+    n = len(vals)
+    rng = random.Random(seed)
+    boots = sorted(st.fmean([vals[rng.randrange(n)] for _ in range(n)]) for _ in range(resamples))
+    a = (1 - level) / 2
+    return percentile(boots, 100 * a), percentile(boots, 100 * (1 - a))
+
+
+@pytest.mark.parametrize("n", [2, 3, 7, 8, 16, 33, 58, 64, 100])
+@pytest.mark.parametrize("seed", [20240601, 7])
+def test_fast_bootstrap_is_identical_to_the_original(n, seed):
+    vals = [((i * 7919) % 101) / 100 for i in range(n)]
+    ci = bootstrap_ci(vals, resamples=300, seed=seed)
+    assert (ci.low, ci.high) == _reference_bootstrap(vals, resamples=300, seed=seed)
+    again = bootstrap_ci(vals, resamples=300, seed=seed)  # the cached answer is the same answer
+    assert (again.estimate, again.low, again.high, again.n) == (ci.estimate, ci.low, ci.high, ci.n)

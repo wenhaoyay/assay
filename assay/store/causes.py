@@ -20,7 +20,7 @@ from assay.store import service as svc
 class Context:
     """What every verdict of one run needs, loaded once."""
 
-    def __init__(self, s: Session, run: m.Run):
+    def __init__(self, s: Session, run: m.Run, matrices: dict[tuple[int, int | None], set[str]] | None = None):
         from assay.store.insights import case_matrix
 
         self.run = run
@@ -38,7 +38,13 @@ class Context:
             select(m.DocumentSource).where(m.DocumentSource.project_id == self.project_id))] if self.project_id else []
         self.always_fail: set[str] = set()
         if ds is not None:
-            self.always_fail = set(case_matrix(s, ds.id, project_id=self.project_id)["always_fail"])
+            key = (ds.id, self.project_id)
+            if matrices is not None and key in matrices:
+                self.always_fail = matrices[key]
+            else:
+                self.always_fail = set(case_matrix(s, ds.id, project_id=self.project_id)["always_fail"])
+                if matrices is not None:
+                    matrices[key] = self.always_fail
 
     def verdict(self, t: m.Trial) -> dict[str, Any] | None:
         scores = [{"evaluator_id": sc.evaluator_id, "status": sc.status, "gating": sc.gating,
@@ -53,10 +59,12 @@ def _info(t: m.Trial, case: dict[str, Any] | None) -> dict[str, Any]:
             "question": ((case or {}).get("input") or {}).get("message")}
 
 
-def run_causes(s: Session, run_id: int) -> dict[str, Any]:
+def run_causes(s: Session, run_id: int,
+               matrices: dict[tuple[int, int | None], set[str]] | None = None,
+               loaded: dict[int, list[m.Trial]] | None = None) -> dict[str, Any]:
     run = svc.get(s, m.Run, run_id)
-    ctx = Context(s, run)
-    trials = s.scalars(select(m.Trial).where(m.Trial.run_id == run_id).order_by(m.Trial.id)).all()
+    ctx = Context(s, run, matrices)
+    trials = svc.load_trials(s, run_id, loaded)
     by_trial: dict[int, dict[str, Any]] = {}
     pairs = []
     reported = False
@@ -79,13 +87,17 @@ def trial_cause(s: Session, t: m.Trial) -> dict[str, Any] | None:
 
 
 def compare_causes(s: Session, baseline_id: int, candidate_id: int, improvements: list[str],
-                   regressions: list[str]) -> dict[str, Any]:
+                   regressions: list[str], loaded: dict[int, list[m.Trial]] | None = None) -> dict[str, Any]:
     """What a change fixed (the old causes of the cases that now pass) and broke (the new causes)."""
+    matrices: dict[tuple[int, int | None], set[str]] = {}  # both runs usually share one dataset: read it once
+
     def side(run_id: int, keys: list[str]) -> list[dict[str, Any]]:
-        out = run_causes(s, run_id)
+        out = run_causes(s, run_id, matrices, loaded)
+        wanted = set(keys)
         rows = {}
-        for t in s.scalars(select(m.Trial).where(m.Trial.run_id == run_id, m.Trial.case_key.in_(keys))):
-            if t.id in out["by_trial"] and t.case_key not in rows:
+        # By question, then trial: the order the index gave when this asked the database for these trials.
+        for t in sorted(svc.load_trials(s, run_id, loaded), key=lambda x: (x.case_key, x.id)):
+            if t.case_key in wanted and t.id in out["by_trial"] and t.case_key not in rows:
                 rows[t.case_key] = ({"trial_id": t.id, "case_id": t.case_key, "title": ""}, out["by_trial"][t.id])
         return dx.summarize(list(rows.values()))
 
